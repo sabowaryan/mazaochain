@@ -1,12 +1,34 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from 'next/server';
+import { 
+  validateAuthToken, 
+  extractAuthToken, 
+  isProtectedRoute, 
+  getRequiredRole, 
+  hasPermission,
+  createRedirectUrl,
+  SECURITY_HEADERS,
+  type UserRole 
+} from './lib/auth/middleware-auth';
 
-let locales = ['en', 'fr', 'ln'];
-let defaultLocale = 'en';
+// Supported locales
+const LOCALES = ['en', 'fr', 'ln'] as const;
+const DEFAULT_LOCALE = 'fr'; // French as default for RDC
 
-// Get the preferred locale, similar to the above or using a library
-function getLocale(request: NextRequest) {
-  // Get locale from Accept-Language header
+// Development mode check
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+/**
+ * Get the preferred locale from request
+ */
+function getLocale(request: NextRequest): string {
+  // First check URL parameter
+  const localeFromUrl = request.nextUrl.searchParams.get('lang');
+  if (localeFromUrl && LOCALES.includes(localeFromUrl as any)) {
+    return localeFromUrl;
+  }
+
+  // Then check Accept-Language header
   const acceptLanguage = request.headers.get('accept-language');
   if (acceptLanguage) {
     const preferredLocale = acceptLanguage
@@ -14,46 +36,151 @@ function getLocale(request: NextRequest) {
       .split('-')[0]
       .toLowerCase();
     
-    if (locales.includes(preferredLocale)) {
+    if (LOCALES.includes(preferredLocale as any)) {
       return preferredLocale;
     }
   }
-  return defaultLocale;
+  
+  return DEFAULT_LOCALE;
 }
 
-export function middleware(request: NextRequest) {
+/**
+ * Check if pathname has locale prefix
+ */
+function hasLocalePrefix(pathname: string): boolean {
+  return LOCALES.some(locale => 
+    pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
+  );
+}
+
+/**
+ * Extract locale from pathname
+ */
+function extractLocale(pathname: string): string {
+  const segments = pathname.split('/');
+  const potentialLocale = segments[1];
+  return LOCALES.includes(potentialLocale as any) ? potentialLocale : DEFAULT_LOCALE;
+}
+
+/**
+ * Remove locale prefix from pathname
+ */
+function removeLocalePrefix(pathname: string): string {
+  return pathname.replace(/^\/[a-z]{2}/, '') || '/';
+}
+
+/**
+ * Add security headers to response
+ */
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  Object.entries(SECURITY_HEADERS).forEach(([key, value]) => {
+    response.headers.set(key, value);
+  });
+  return response;
+}
+
+/**
+ * Handle authentication for protected routes
+ */
+async function handleAuthentication(request: NextRequest, pathname: string) {
+  const token = extractAuthToken(request);
+  
+  if (!token) {
+    return { authenticated: false, error: 'No token found' };
+  }
+
+  try {
+    const authResult = await validateAuthToken(token);
+    return authResult;
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return { authenticated: false, error: 'Authentication failed' };
+  }
+}
+
+/**
+ * Main middleware function
+ * Handles authentication, authorization, and internationalization
+ */
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Skip middleware for static files and API routes
+  // Skip middleware for static files, API routes, and Next.js internals
   if (pathname.startsWith('/_next') || 
       pathname.startsWith('/api') || 
       pathname.includes('.') ||
       pathname === '/favicon.ico' ||
-      pathname === '/sw.js') {
-    return NextResponse.next();
-  }
-  
-  // Routes that should not have locale prefix
-  const excludedRoutes = ['/admin', '/test-wallet', '/unauthorized', '/test-contracts'];
-  const isExcludedRoute = excludedRoutes.some(route => pathname.startsWith(route));
-  
-  if (isExcludedRoute) {
+      pathname === '/sw.js' ||
+      pathname === '/manifest.json' ||
+      pathname === '/site.webmanifest') {
     return NextResponse.next();
   }
 
-  // Check if there is any supported locale in the pathname
-  const pathnameHasLocale = locales.some(
-    (locale) => pathname.startsWith(`/${locale}/`) || pathname === `/${locale}`
-  );
+  // Skip authentication for development test routes in dev mode
+  if (isDevelopment && (pathname.startsWith('/test-') || pathname.startsWith('/debug-'))) {
+    return NextResponse.next();
+  }
 
-  if (pathnameHasLocale) return;
+  // Handle locale routing
+  const hasLocale = hasLocalePrefix(pathname);
+  let locale = hasLocale ? extractLocale(pathname) : getLocale(request);
+  let localizedPathname = hasLocale ? pathname : `/${locale}${pathname}`;
+  let cleanPathname = removeLocalePrefix(localizedPathname);
 
-  // Redirect if there is no locale
-  const locale = getLocale(request);
-  request.nextUrl.pathname = `/${locale}${pathname}`;
-  // e.g. incoming request is /products
-  // The new URL is now /en/products
-  return NextResponse.redirect(request.nextUrl);
+  // Check if route requires protection
+  if (isProtectedRoute(cleanPathname)) {
+    console.log(`🔒 Protecting route: ${cleanPathname}`);
+    
+    const authResult = await handleAuthentication(request, cleanPathname);
+    
+    if (!authResult.authenticated) {
+      console.log(`❌ Authentication failed for ${cleanPathname}: ${authResult.error}`);
+      
+      // Redirect to login with return URL
+      const loginUrl = createRedirectUrl(
+        `${request.nextUrl.origin}/${locale}/auth/login`,
+        localizedPathname,
+        'authentication_required'
+      );
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // Check role-based access
+    const requiredRole = getRequiredRole(cleanPathname);
+    if (requiredRole && !hasPermission(authResult.role, requiredRole)) {
+      console.log(`❌ Insufficient permissions for ${cleanPathname}. Required: ${requiredRole}, User: ${authResult.role}`);
+      
+      const unauthorizedUrl = createRedirectUrl(
+        `${request.nextUrl.origin}/${locale}/unauthorized`,
+        localizedPathname,
+        'insufficient_permissions'
+      );
+      return NextResponse.redirect(unauthorizedUrl);
+    }
+
+    console.log(`✅ Access granted to ${cleanPathname} for user ${authResult.user?.email} (${authResult.role})`);
+
+    // Create response with user info in headers
+    const response = hasLocale ? NextResponse.next() : NextResponse.redirect(new URL(localizedPathname, request.url));
+    
+    // Add user info to headers for downstream use
+    response.headers.set('x-user-id', authResult.user?.id || '');
+    response.headers.set('x-user-role', authResult.role || '');
+    response.headers.set('x-user-email', authResult.user?.email || '');
+    response.headers.set('x-user-authenticated', 'true');
+    
+    // Add security headers
+    return addSecurityHeaders(response);
+  }
+
+  // Handle locale redirect if needed
+  if (!hasLocale) {
+    const redirectUrl = new URL(localizedPathname, request.url);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Add basic security headers to all responses
+  return addSecurityHeaders(NextResponse.next());
 }
 
 export const config = {

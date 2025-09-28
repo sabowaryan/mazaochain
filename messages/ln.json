@@ -1,0 +1,148 @@
+{
+  "common": {
+    "loading": "Kozela...",
+    "error": "Libunga",
+    "success": "Elongi",
+    "cancel": "Kotika",
+    "confirm": "Kondima",
+    "save": "Kobomba",
+    "edit": "Kobongola",
+    "delete": "Kolongola",
+    "back": "Kozonga",
+    "next": "Oyo elandi",
+    "previous": "Oyo eleki",
+    "submit": "Kotinda",
+    "close": "Kokanga",
+    "yes": "Iyo",
+    "no": "Te"
+  },
+  "navigation": {
+    "dashboard": "Esika ya mosala",
+    "profile": "Profil",
+    "evaluations": "Botaleli",
+    "loans": "Baniama",
+    "portfolio": "Biloko na ngai",
+    "opportunities": "Mabaku",
+    "logout": "Kobima",
+    "language": "Lokota"
+  },
+  "auth": {
+    "login": "Kokota",
+    "register": "Komikoma",
+    "email": "Email",
+    "password": "Mot de passe",
+    "confirmPassword": "Kondima mot de passe",
+    "role": "Mosala",
+    "farmer": "Moloni",
+    "cooperative": "Lisanga",
+    "lender": "Mopesi mbongo",
+    "loginButton": "Kokota",
+    "registerButton": "Komikoma",
+    "forgotPassword": "Obosani mot de passe?",
+    "alreadyHaveAccount": "Ozali na compte?",
+    "dontHaveAccount": "Ozali na compte te?",
+    "signInSuccess": "Kokota malamu!",
+    "signOutSuccess": "Kobima malamu",
+    "accountValidated": "Compte kondimami!",
+    "profileUpdated": "Profil esalemi sika"
+  },
+  "farmer": {
+    "dashboard": {
+      "title": "Esika ya mosala - Moloni",
+      "welcome": "Boyei malamu, {name}",
+      "cropValue": "Motuya ya bilanga",
+      "activeLoans": "Baniama oyo ezali kosala",
+      "pendingEvaluations": "Botaleli oyo ezali kozela"
+    },
+    "profile": {
+      "title": "Profil ya Moloni",
+      "name": "Kombo",
+      "superficie": "Bonene ya elanga (hectares)",
+      "location": "Esika",
+      "cropHistory": "Lisolo ya bilanga",
+      "validationStatus": "Ndenge ya kondima",
+      "validated": "Kondimami",
+      "pending": "Kozela",
+      "rejected": "Bobwaki"
+    },
+    "evaluation": {
+      "title": "Kotalela bilanga",
+      "cropType": "Lolenge ya elanga",
+      "manioc": "Manioc",
+      "coffee": "Kafe",
+      "superficie": "Bonene ya elanga (hectares)",
+      "historicalYield": "Mbuma ya kala (kg/ha)",
+      "referencePrice": "Ntalo ya reference (USDC/kg)",
+      "estimatedValue": "Motuya oyo bakanisi",
+      "calculate": "Kotanga",
+      "generateReport": "Kosala rapport PDF"
+    }
+  },
+  "cooperative": {
+    "dashboard": {
+      "title": "Esika ya mosala - Lisanga",
+      "pendingValidations": "Kondima oyo ezali kozela",
+      "pendingEvaluations": "Botaleli oyo ezali kozela",
+      "pendingLoans": "Baniama oyo ezali kozela"
+    },
+    "validation": {
+      "title": "Kondima baloni",
+      "approve": "Kondima",
+      "reject": "Bobwa",
+      "farmerDetails": "Makambo ya moloni"
+    }
+  },
+  "lender": {
+    "dashboard": {
+      "title": "Esika ya mosala - Mopesi mbongo",
+      "availableOpportunities": "Mabaku oyo ezali",
+      "activeInvestments": "Kotia mbongo oyo ezali kosala",
+      "totalReturns": "Mbongo nyonso oyo ezongeli"
+    },
+    "opportunities": {
+      "title": "Mabaku ya kotia mbongo",
+      "riskLevel": "Ndenge ya likama",
+      "expectedReturn": "Mbongo oyo bakanisi kozonga",
+      "loanAmount": "Mbongo ya niama",
+      "collateralRatio": "Ndenge ya garantie",
+      "invest": "Kotia mbongo"
+    }
+  },
+  "loan": {
+    "request": "Kosenga niama",
+    "amount": "Mbongo",
+    "collateral": "Garantie",
+    "interestRate": "Taux d'intérêt",
+    "duration": "Ntango",
+    "status": "Ndenge ezali",
+    "pending": "Kozela",
+    "approved": "Kondimami",
+    "active": "Ezali kosala",
+    "repaid": "Bafutaki",
+    "defaulted": "Ezali na mikakatano",
+    "repayment": "Kofuta",
+    "dueDate": "Mokolo ya kofuta",
+    "remainingBalance": "Mbongo oyo etikali"
+  },
+  "wallet": {
+    "connect": "Kokangisa portefeuille",
+    "disconnect": "Kokabola",
+    "balance": "Mbongo oyo ozali na yango",
+    "address": "Adresse",
+    "notConnected": "Portefeuille ekangisami te"
+  },
+  "pwa": {
+    "installPrompt": "Kotia MazaoChain na appareil na yo?",
+    "install": "Kotia",
+    "dismiss": "Kotika",
+    "offlineMessage": "Ozali offline. Mwa makambo ekoki kosala te."
+  },
+  "errors": {
+    "generic": "Libunga moko esalemi",
+    "networkError": "Libunga ya réseau",
+    "validationError": "Libunga ya validation",
+    "insufficientFunds": "Mbongo ekoki te",
+    "walletNotConnected": "Portefeuille ekangisami te",
+    "transactionFailed": "Transaction elongaki te"
+  }
+}

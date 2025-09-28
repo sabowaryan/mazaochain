@@ -1,0 +1,155 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "evaluations": "Evaluations",
+    "loans": "Loans",
+    "portfolio": "Portfolio",
+    "opportunities": "Opportunities",
+    "logout": "Logout",
+    "language": "Language",
+    "loading": "Loading...",
+    "login": "Login",
+    "register": "Register"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "role": "Role",
+    "farmer": "Farmer",
+    "cooperative": "Cooperative",
+    "lender": "Lender",
+    "loginButton": "Sign In",
+    "registerButton": "Sign Up",
+    "forgotPassword": "Forgot Password?",
+    "alreadyHaveAccount": "Already have an account?",
+    "dontHaveAccount": "Don't have an account?",
+    "loading": "Loading...",
+    "notAuthenticated": "Not authenticated",
+    "pendingValidation": "Pending validation",
+    "authenticated": "Authenticated",
+    "signInSuccess": "Successfully signed in!",
+    "signOutSuccess": "Successfully signed out",
+    "accountValidated": "Account validated!",
+    "profileUpdated": "Profile updated"
+  },
+  "farmer": {
+    "dashboard": {
+      "title": "Farmer Dashboard",
+      "welcome": "Welcome, {name}",
+      "cropValue": "Crop Value",
+      "activeLoans": "Active Loans",
+      "pendingEvaluations": "Pending Evaluations"
+    },
+    "profile": {
+      "title": "Farmer Profile",
+      "name": "Name",
+      "superficie": "Area (hectares)",
+      "location": "Location",
+      "cropHistory": "Crop History",
+      "validationStatus": "Validation Status",
+      "validated": "Validated",
+      "pending": "Pending",
+      "rejected": "Rejected"
+    },
+    "evaluation": {
+      "title": "Crop Evaluation",
+      "cropType": "Crop Type",
+      "manioc": "Cassava",
+      "coffee": "Coffee",
+      "superficie": "Area (hectares)",
+      "historicalYield": "Historical Yield (kg/ha)",
+      "referencePrice": "Reference Price (USDC/kg)",
+      "estimatedValue": "Estimated Value",
+      "calculate": "Calculate",
+      "generateReport": "Generate PDF Report"
+    }
+  },
+  "cooperative": {
+    "dashboard": {
+      "title": "Cooperative Dashboard",
+      "pendingValidations": "Pending Validations",
+      "pendingEvaluations": "Pending Evaluations",
+      "pendingLoans": "Pending Loans"
+    },
+    "validation": {
+      "title": "Farmer Validation",
+      "approve": "Approve",
+      "reject": "Reject",
+      "farmerDetails": "Farmer Details"
+    }
+  },
+  "lender": {
+    "dashboard": {
+      "title": "Lender Dashboard",
+      "availableOpportunities": "Available Opportunities",
+      "activeInvestments": "Active Investments",
+      "totalReturns": "Total Returns"
+    },
+    "opportunities": {
+      "title": "Investment Opportunities",
+      "riskLevel": "Risk Level",
+      "expectedReturn": "Expected Return",
+      "loanAmount": "Loan Amount",
+      "collateralRatio": "Collateral Ratio",
+      "invest": "Invest"
+    }
+  },
+  "loan": {
+    "request": "Loan Request",
+    "amount": "Amount",
+    "collateral": "Collateral",
+    "interestRate": "Interest Rate",
+    "duration": "Duration",
+    "status": "Status",
+    "pending": "Pending",
+    "approved": "Approved",
+    "active": "Active",
+    "repaid": "Repaid",
+    "defaulted": "Defaulted",
+    "repayment": "Repayment",
+    "dueDate": "Due Date",
+    "remainingBalance": "Remaining Balance"
+  },
+  "wallet": {
+    "connect": "Connect Wallet",
+    "disconnect": "Disconnect",
+    "balance": "Balance",
+    "address": "Address",
+    "notConnected": "Wallet not connected"
+  },
+  "pwa": {
+    "installPrompt": "Install MazaoChain on your device?",
+    "install": "Install",
+    "dismiss": "Dismiss",
+    "offlineMessage": "You are offline. Some features may be limited."
+  },
+  "errors": {
+    "generic": "An error occurred",
+    "networkError": "Network error",
+    "validationError": "Validation error",
+    "insufficientFunds": "Insufficient funds",
+    "walletNotConnected": "Wallet not connected",
+    "transactionFailed": "Transaction failed"
+  }
+}

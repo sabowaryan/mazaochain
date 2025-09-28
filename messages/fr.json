@@ -1,0 +1,155 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "error": "Erreur",
+    "success": "Succès",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "save": "Enregistrer",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "back": "Retour",
+    "next": "Suivant",
+    "previous": "Précédent",
+    "submit": "Soumettre",
+    "close": "Fermer",
+    "yes": "Oui",
+    "no": "Non"
+  },
+  "navigation": {
+    "dashboard": "Tableau de bord",
+    "profile": "Profil",
+    "evaluations": "Évaluations",
+    "loans": "Prêts",
+    "portfolio": "Portefeuille",
+    "opportunities": "Opportunités",
+    "logout": "Déconnexion",
+    "language": "Langue",
+    "loading": "Chargement...",
+    "login": "Connexion",
+    "register": "Inscription"
+  },
+  "auth": {
+    "login": "Connexion",
+    "register": "Inscription",
+    "email": "Email",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "role": "Rôle",
+    "farmer": "Agriculteur",
+    "cooperative": "Coopérative",
+    "lender": "Prêteur",
+    "loginButton": "Se connecter",
+    "registerButton": "S'inscrire",
+    "forgotPassword": "Mot de passe oublié ?",
+    "alreadyHaveAccount": "Vous avez déjà un compte ?",
+    "dontHaveAccount": "Vous n'avez pas de compte ?",
+    "loading": "Chargement...",
+    "notAuthenticated": "Non authentifié",
+    "pendingValidation": "En attente de validation",
+    "authenticated": "Authentifié",
+    "signInSuccess": "Connexion réussie !",
+    "signOutSuccess": "Déconnexion réussie",
+    "accountValidated": "Compte validé !",
+    "profileUpdated": "Profil mis à jour"
+  },
+  "farmer": {
+    "dashboard": {
+      "title": "Tableau de bord - Agriculteur",
+      "welcome": "Bienvenue, {name}",
+      "cropValue": "Valeur des cultures",
+      "activeLoans": "Prêts actifs",
+      "pendingEvaluations": "Évaluations en attente"
+    },
+    "profile": {
+      "title": "Profil Agriculteur",
+      "name": "Nom",
+      "superficie": "Superficie (hectares)",
+      "location": "Localisation",
+      "cropHistory": "Historique des cultures",
+      "validationStatus": "Statut de validation",
+      "validated": "Validé",
+      "pending": "En attente",
+      "rejected": "Rejeté"
+    },
+    "evaluation": {
+      "title": "Évaluation des cultures",
+      "cropType": "Type de culture",
+      "manioc": "Manioc",
+      "coffee": "Café",
+      "superficie": "Superficie (hectares)",
+      "historicalYield": "Rendement historique (kg/ha)",
+      "referencePrice": "Prix de référence (USDC/kg)",
+      "estimatedValue": "Valeur estimée",
+      "calculate": "Calculer",
+      "generateReport": "Générer le rapport PDF"
+    }
+  },
+  "cooperative": {
+    "dashboard": {
+      "title": "Tableau de bord - Coopérative",
+      "pendingValidations": "Validations en attente",
+      "pendingEvaluations": "Évaluations en attente",
+      "pendingLoans": "Prêts en attente"
+    },
+    "validation": {
+      "title": "Validation des agriculteurs",
+      "approve": "Approuver",
+      "reject": "Rejeter",
+      "farmerDetails": "Détails de l'agriculteur"
+    }
+  },
+  "lender": {
+    "dashboard": {
+      "title": "Tableau de bord - Prêteur",
+      "availableOpportunities": "Opportunités disponibles",
+      "activeInvestments": "Investissements actifs",
+      "totalReturns": "Rendements totaux"
+    },
+    "opportunities": {
+      "title": "Opportunités d'investissement",
+      "riskLevel": "Niveau de risque",
+      "expectedReturn": "Rendement attendu",
+      "loanAmount": "Montant du prêt",
+      "collateralRatio": "Ratio de garantie",
+      "invest": "Investir"
+    }
+  },
+  "loan": {
+    "request": "Demande de prêt",
+    "amount": "Montant",
+    "collateral": "Garantie",
+    "interestRate": "Taux d'intérêt",
+    "duration": "Durée",
+    "status": "Statut",
+    "pending": "En attente",
+    "approved": "Approuvé",
+    "active": "Actif",
+    "repaid": "Remboursé",
+    "defaulted": "En défaut",
+    "repayment": "Remboursement",
+    "dueDate": "Date d'échéance",
+    "remainingBalance": "Solde restant"
+  },
+  "wallet": {
+    "connect": "Connecter le portefeuille",
+    "disconnect": "Déconnecter",
+    "balance": "Solde",
+    "address": "Adresse",
+    "notConnected": "Portefeuille non connecté"
+  },
+  "pwa": {
+    "installPrompt": "Installer MazaoChain sur votre appareil ?",
+    "install": "Installer",
+    "dismiss": "Ignorer",
+    "offlineMessage": "Vous êtes hors ligne. Certaines fonctionnalités peuvent être limitées."
+  },
+  "errors": {
+    "generic": "Une erreur s'est produite",
+    "networkError": "Erreur de réseau",
+    "validationError": "Erreur de validation",
+    "insufficientFunds": "Fonds insuffisants",
+    "walletNotConnected": "Portefeuille non connecté",
+    "transactionFailed": "Transaction échouée"
+  }
+}

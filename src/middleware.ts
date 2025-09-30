@@ -106,7 +106,7 @@ function hasLocalePrefix(pathname: string): boolean {
 function extractLocale(pathname: string): string {
   const segments = pathname.split('/');
   const potentialLocale = segments[1];
-  return LOCALES.includes(potentialLocale as unknown) ? potentialLocale : DEFAULT_LOCALE;
+  return LOCALES.includes(potentialLocale as any) ? potentialLocale : DEFAULT_LOCALE;
 }
 
 /**

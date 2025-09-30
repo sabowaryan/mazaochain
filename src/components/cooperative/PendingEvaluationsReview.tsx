@@ -13,6 +13,7 @@ import { CropEvaluationService } from "@/lib/services/crop-evaluation";
 import { EvaluationDetails } from "@/components/crop-evaluation/EvaluationDetails";
 import { CROP_TYPES } from "@/types/crop-evaluation";
 import type { Tables } from "@/lib/supabase/database.types";
+import { useMazaoContracts } from "@/hooks/useMazaoContracts";
 
 interface PendingEvaluationsReviewProps {
   cooperativeId: string;
@@ -30,6 +31,7 @@ export function PendingEvaluationsReview({
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const cropEvaluationService = new CropEvaluationService();
+  const { tokenizeEvaluation, loading: contractsLoading } = useMazaoContracts();
 
   useEffect(() => {
     loadPendingEvaluations();
@@ -52,6 +54,28 @@ export function PendingEvaluationsReview({
   const handleApproveEvaluation = async (evaluationId: string) => {
     try {
       setProcessingId(evaluationId);
+      
+      // Trouver l'évaluation à approuver
+      const evaluation = evaluations.find(e => e.id === evaluationId);
+      if (!evaluation) {
+        throw new Error("Évaluation non trouvée");
+      }
+
+      // Tokeniser l'évaluation approuvée
+      const tokenizationResult = await tokenizeEvaluation(
+        evaluationId,
+        evaluation.crop_type,
+        evaluation.farmer_id,
+        evaluation.farmer?.wallet_address || '',
+        evaluation.valeur_estimee,
+        new Date(evaluation.harvest_date).getTime()
+      );
+
+      if (!tokenizationResult.success) {
+        throw new Error(tokenizationResult.error || "Erreur lors de la tokenisation");
+      }
+
+      // Mettre à jour le statut dans la base de données
       await cropEvaluationService.updateEvaluationStatus(
         evaluationId,
         "approved"
@@ -63,9 +87,9 @@ export function PendingEvaluationsReview({
       );
       setSelectedEvaluation(null);
 
-      // TODO: Send notification to farmer
-      alert("Évaluation approuvée avec succès!");
+      alert(`Évaluation approuvée et ${evaluation.valeur_estimee} tokens MAZAO créés avec succès!`);
     } catch (err) {
+      console.error('Erreur lors de l\'approbation:', err);
       alert(
         err instanceof Error ? err.message : "Erreur lors de l'approbation"
       );
@@ -138,8 +162,8 @@ export function PendingEvaluationsReview({
             </Button>
             <Button
               onClick={() => handleApproveEvaluation((selectedEvaluation as any).id)}
-              loading={processingId === (selectedEvaluation as unknown).id}
-              disabled={processingId !== null}
+              loading={processingId === (selectedEvaluation as any).id || contractsLoading}
+              disabled={processingId !== null || contractsLoading}
             >
               Approuver
             </Button>

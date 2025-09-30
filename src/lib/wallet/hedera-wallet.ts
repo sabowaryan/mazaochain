@@ -13,6 +13,7 @@ import {
   Transaction,
 } from "@hashgraph/sdk";
 import { env } from "@/lib/config/env";
+import { handleWalletError, suppressWalletConnectErrors } from "./wallet-error-handler";
 
 export interface WalletConnection {
   accountId: string;
@@ -45,17 +46,26 @@ class HederaWalletService {
       env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
         ? Client.forMainnet()
         : Client.forTestnet();
+    
+    // Supprimer les erreurs de console en développement
+    suppressWalletConnectErrors();
   }
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
+      // Vérifier les variables d'environnement requises
+      if (!env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) {
+        console.warn("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not set. Wallet functionality will be limited.");
+        return;
+      }
+
       const metadata = {
-        name: env.NEXT_PUBLIC_HASHPACK_APP_NAME,
-        description: env.NEXT_PUBLIC_HASHPACK_APP_DESCRIPTION,
-        url: env.NEXT_PUBLIC_APP_URL,
-        icons: [`${env.NEXT_PUBLIC_APP_URL}/favicon.ico`],
+        name: env.NEXT_PUBLIC_HASHPACK_APP_NAME || "MazaoChain MVP",
+        description: env.NEXT_PUBLIC_HASHPACK_APP_DESCRIPTION || "Decentralized lending platform for farmers",
+        url: env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        icons: [`${env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/favicon.ico`],
       };
 
       const ledgerId =
@@ -86,8 +96,9 @@ class HederaWalletService {
       this.isInitialized = true;
       console.log("Hedera Wallet service initialized successfully");
     } catch (error) {
-      console.error("Failed to initialize Hedera Wallet service:", error);
-      throw new Error("Failed to initialize wallet service");
+      const walletError = handleWalletError(error);
+      console.error("Failed to initialize Hedera Wallet service:", walletError);
+      throw walletError;
     }
   }
 

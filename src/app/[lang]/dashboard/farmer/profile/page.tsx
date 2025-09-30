@@ -1,25 +1,74 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { useTranslations } from "@/components/TranslationProvider";
+import { useFarmerProfile, useUserStats } from "@/hooks/useProfile";
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { FarmerProfileForm } from "@/components/profiles/FarmerProfileForm";
 
 export default function FarmerProfilePage() {
-  const { user, profile } = useAuth();
-  const t = useTranslations("farmer");
+  const { user, profile, loading: authLoading } = useAuth();
+  const { profileData: farmerProfile, loading: profileLoading, error, refreshProfile } = useFarmerProfile();
+  const { stats, loading: statsLoading } = useUserStats();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Show loading while authentication or profile data is loading
+  if (authLoading || profileLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <LoadingSpinner size="lg" />
+          <p className="mt-4 text-gray-600">Chargement du profil...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if user is not authenticated
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner size="lg" />
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Accès non autorisé
+          </h2>
+          <p className="text-gray-600">Veuillez vous connecter pour accéder à cette page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if user is not a farmer
+  if (profile?.role !== 'agriculteur') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Accès restreint
+          </h2>
+          <p className="text-gray-600">Cette page est réservée aux agriculteurs.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error message if there's an error loading profile
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">
+            Erreur de chargement
+          </h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={refreshProfile}>
+            Réessayer
+          </Button>
+        </div>
       </div>
     );
   }
@@ -62,14 +111,14 @@ export default function FarmerProfilePage() {
             </div>
 
             {isEditing ? (
-              <FarmerProfileForm
-                onSuccess={() => {
-                  setIsEditing(false);
-                  // Recharger le profil
-                  window.location.reload();
-                }}
-                onCancel={() => setIsEditing(false)}
-              />
+              <div>
+                <FarmerProfileForm />
+                <div className="mt-4 flex gap-2">
+                  <Button onClick={() => setIsEditing(false)} variant="outline">
+                    Annuler
+                  </Button>
+                </div>
+              </div>
             ) : (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -78,7 +127,7 @@ export default function FarmerProfilePage() {
                       Nom complet
                     </Label>
                     <p className="mt-1 text-gray-900">
-                      {profile?.farmer_profiles?.nom || "Non renseigné"}
+                      {farmerProfile?.nom || "Non renseigné"}
                     </p>
                   </div>
                   <div>
@@ -92,7 +141,7 @@ export default function FarmerProfilePage() {
                       Superficie (hectares)
                     </Label>
                     <p className="mt-1 text-gray-900">
-                      {profile?.farmer_profiles?.superficie || "Non renseigné"}
+                      {farmerProfile?.superficie || "Non renseigné"}
                     </p>
                   </div>
                   <div>
@@ -100,8 +149,7 @@ export default function FarmerProfilePage() {
                       Localisation
                     </Label>
                     <p className="mt-1 text-gray-900">
-                      {profile?.farmer_profiles?.localisation ||
-                        "Non renseigné"}
+                      {farmerProfile?.localisation || "Non renseigné"}
                     </p>
                   </div>
                   <div>
@@ -109,7 +157,7 @@ export default function FarmerProfilePage() {
                       Type de culture principal
                     </Label>
                     <p className="mt-1 text-gray-900">
-                      {profile?.farmer_profiles?.crop_type || "Non renseigné"}
+                      {farmerProfile?.crop_type || "Non renseigné"}
                     </p>
                   </div>
                   <div>
@@ -117,8 +165,7 @@ export default function FarmerProfilePage() {
                       Années d'expérience
                     </Label>
                     <p className="mt-1 text-gray-900">
-                      {profile?.farmer_profiles?.experience_annees ||
-                        "Non renseigné"}
+                      {farmerProfile?.experience_annees || "Non renseigné"}
                     </p>
                   </div>
                 </div>
@@ -181,15 +228,21 @@ export default function FarmerProfilePage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Évaluations</span>
-                <span className="font-medium">3</span>
+                <span className="font-medium">
+                  {statsLoading ? "..." : stats.evaluations || 0}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Prêts actifs</span>
-                <span className="font-medium">1</span>
+                <span className="font-medium">
+                  {statsLoading ? "..." : stats.activeLoans || 0}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Tokens MAZAO</span>
-                <span className="font-medium">12,000</span>
+                <span className="font-medium">
+                  {statsLoading ? "..." : stats.mazaoTokens?.toLocaleString() || 0}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Membre depuis</span>

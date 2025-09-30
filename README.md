@@ -63,11 +63,13 @@ MazaoChain transforme la récolte future en garantie numérique :
 ## 👥 Clients Cibles
 
 ### Segment Principal : Petits Agriculteurs
+
 - **Profil** : Agriculteurs sans accès bancaire, avec téléphone mobile
 - **Besoins** : Financement saisonnier, investissement productif
 - **Avantage** : Taux juste, processus simple, autonomie financière
 
 ### Segments Secondaires :
+
 - **Coopératives** : Revenus supplémentaires via commissions
 - **Prêteurs Institutionnels** : Rendement stable avec impact social
 - **Investisseurs Impact** : Retour financier + développement durable
@@ -77,12 +79,14 @@ MazaoChain transforme la récolte future en garantie numérique :
 ## ⭐ Valeur Ajoutée Unique
 
 ### Pour les Agriculteurs :
+
 - ✅ Accès au crédit sans garantie traditionnelle
 - ✅ Taux d'intérêt 5x inférieurs au marché informel
 - ✅ Autonomisation par la technologie
 - ✅ Historique de crédit pour futurs financements
 
 ### Pour l'Écosystème :
+
 - 🌱 Productivité agricole augmentée de 30-50%
 - 💰 Injection de capitaux dans l'économie rurale
 - 📈 Transformation digitale du secteur agricole
@@ -92,18 +96,19 @@ MazaoChain transforme la récolte future en garantie numérique :
 
 ## 🚀 Différenciation Clé
 
-| Critère | Solution Traditionnelle | MazaoChain |
-|---------|------------------------|------------|
-| **Garantie** | ❌ Exige des titres de propriété | ✅ Accepte les récoltes futures |
-| **Délai** | ❌ Processus de 2-3 mois | ✅ Prêt en 5 minutes |
-| **Taux** | ❌ Taux à 60-240%/an | ✅ Taux à 12-24%/an |
-| **Transparence** | ❌ Opacité totale | ✅ Transparence blockchain |
+| Critère          | Solution Traditionnelle          | MazaoChain                      |
+| ---------------- | -------------------------------- | ------------------------------- |
+| **Garantie**     | ❌ Exige des titres de propriété | ✅ Accepte les récoltes futures |
+| **Délai**        | ❌ Processus de 2-3 mois         | ✅ Prêt en 5 minutes            |
+| **Taux**         | ❌ Taux à 60-240%/an             | ✅ Taux à 12-24%/an             |
+| **Transparence** | ❌ Opacité totale                | ✅ Transparence blockchain      |
 
 ---
 
 ## 📈 Impact Potentiel
 
 ### À 5 ans :
+
 - 👥 **100,000** agriculteurs actifs
 - 💰 **50 millions $** de prêts débloqués
 - 🌱 **+30%** de productivité moyenne
@@ -116,12 +121,14 @@ MazaoChain transforme la récolte future en garantie numérique :
 ## 🎯 Caractéristiques Principales
 
 ### Innovation Technologique
+
 - **Tokenisation RWA** : Transformation des récoltes futures en actifs numériques sur Hedera
 - **Smart Contracts Automatisés** : Prêts, collateralisation et remboursements sans intermédiaire
 - **Hedera Consensus Service** : Audit trail immuable pour toutes les transactions
 - **Interface Multilingue** : Lingala et Français pour une adoption locale
 
 ### Accessibilité
+
 - **Design Mobile-First** : Optimisé pour smartphones bas de gamme
 - **Intégration USDC** : Stablecoin pour stabilité des prix
 - **Frais Négligeables** : Transactions à 0.0001$ sur Hedera
@@ -132,18 +139,22 @@ MazaoChain transforme la récolte future en garantie numérique :
 ## 🔄 Processus Simplifié en 5 Étapes
 
 ### Étape 1 : L'Inscription et Validation
+
 ```
 Agriculteur → Coopérative → Plateforme
 ```
+
 - L'agriculteur s'inscrit via une coopérative partenaire locale
 - Validation manuelle de son identité et de ses terres
 - Création d'un profil numérique avec historique cultural
 - Configuration du portefeuille HashPack intégré
 
 ### Étape 2 : L'Évaluation de la Récolte
+
 ```
 Champ → Données → Valeur
 ```
+
 - Saisie des données : culture, superficie, rendement attendu
 - Calcul automatique basé sur :
   - Prix marché actuels (via oracle futur)
@@ -152,27 +163,33 @@ Champ → Données → Valeur
 - Génération d'un rapport d'évaluation approuvé par la coopérative
 
 ### Étape 3 : La Tokenisation sur Hedera
+
 ```
 Valeur → MazaoTokens → Portefeuille
 ```
+
 - La valeur estimée est convertie en jetons numériques
 - Création des MazaoTokens via Hedera Token Service (HTS)
 - Exemple : 1000$ de café → 1000 MazaoTokens (valeur unitaire 1$)
 - Les jetons sont automatiquement transférés dans le portefeuille de l'agriculteur
 
 ### Étape 4 : La Demande de Prêt
+
 ```
 MazaoTokens → Garantie → USDC
 ```
+
 - L'agriculteur choisit le montant à emprunter
 - Calcul automatique du collateral requis (minimum 200%)
 - Exemple : Emprunt de 500$ → Verrouillage de 1000 MazaoTokens
 - Signature numérique via HashPack → Réception instantanée des USDC
 
 ### Étape 5 : Le Remboursement
+
 ```
 USDC → Paiement → Libération
 ```
+
 - À l'échéance (ou anticipation), l'agriculteur envoie les USDC dus
 - Le smart contract vérifie et accepte le paiement
 - Libération automatique des MazaoTokens collateralisés
@@ -183,6 +200,7 @@ USDC → Paiement → Libération
 ## 💰 Exemple Concret : L'Histoire de Papa Marcel
 
 ### Situation Initiale
+
 - **Agriculteur** : Marcel, cultivateur de café à Kikwit
 - **Récolte estimée** : 500kg de café
 - **Prix marché** : 4$/kg
@@ -191,12 +209,14 @@ USDC → Paiement → Libération
 ### Processus MazaoChain
 
 1. **Tokenisation**
+
    ```
    2000$ de café → 2000 MazaoTokens créés
    Chaque jeton = 1$ de valeur café
    ```
 
 2. **Demande de Prêt**
+
    ```
    Besoin : 800$ pour engrais et outils
    Collateral requis : 1600 MazaoTokens (200% de 800$)
@@ -205,6 +225,7 @@ USDC → Paiement → Libération
    ```
 
 3. **Utilisation des Fonds**
+
    ```
    Reçoit 800 USDC instantanément
    Achète des engrais de qualité
@@ -212,6 +233,7 @@ USDC → Paiement → Libération
    ```
 
 4. **Remboursement**
+
    ```
    À la récolte, vend son café 2200$ (meilleure qualité)
    Rembourse 800$ + 80$ d'intérêts (10%)
@@ -234,24 +256,28 @@ USDC → Paiement → Libération
 Pour tester l'application, utilisez les comptes de démonstration suivants :
 
 #### 👨‍🌾 Agriculteur
+
 - **Email**: `mazao.farmer.demo@gmail.com`
 - **Mot de passe**: `FarmerDemo123!`
 - **Profil**: Pierre Kasongo, 3.2 hectares à Kinshasa
 - **Statut**: Compte validé avec évaluations de cultures
 
 #### 🏢 Coopérative
+
 - **Email**: `mazao.cooperative.demo@gmail.com`
 - **Mot de passe**: `CoopDemo123!`
 - **Profil**: COPAKI Kinshasa, 1 membre
 - **Statut**: Compte validé avec permissions d'approbation
 
 #### 💰 Prêteur
+
 - **Email**: `mazao.lender.demo@gmail.com`
 - **Mot de passe**: `LenderDemo123!`
 - **Profil**: FinanceRDC, 75,000 USDC disponibles
 - **Statut**: Compte validé avec fonds disponibles
 
 ### Données de test incluses
+
 - ✅ Évaluations de cultures (manioc et café)
 - ✅ Prêt actif de 5,000 USDC
 - ✅ Transactions blockchain simulées
@@ -283,28 +309,33 @@ Pour tester l'application, utilisez les comptes de démonstration suivants :
 ## 🛠️ Installation
 
 1. **Cloner le repository**
+
 ```bash
 git clone https://github.com/sabowaryan/mazaochain.git
 cd mazaochain
 ```
 
 2. **Installer les dépendances**
+
 ```bash
 npm install
 ```
 
 3. **Configurer les variables d'environnement**
+
 ```bash
 cp .env.local.example .env.local
 ```
 
 Éditer `.env.local` avec :
+
 - Configuration Supabase
 - Configuration Hedera
 - Configuration HashPack
 - Autres variables
 
 4. **Lancer le serveur de développement**
+
 ```bash
 npm run dev
 ```
@@ -344,6 +375,7 @@ src/
 ## 🌍 Variables d'environnement
 
 ### Variables essentielles :
+
 - `NEXT_PUBLIC_SUPABASE_URL` - URL de votre projet Supabase
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Clé publique Supabase
 - `NEXT_PUBLIC_HEDERA_ACCOUNT_ID` - ID du compte Hedera
@@ -356,24 +388,28 @@ Voir `.env.local.example` pour la liste complète des variables.
 ## 🎨 Fonctionnalités
 
 ### Authentification en temps réel
+
 - ✅ Connexion/déconnexion automatique
 - ✅ Notifications en temps réel
 - ✅ Protection des routes par rôles
 - ✅ Gestion des sessions sécurisée
 
 ### Interface multilingue
+
 - ✅ Français (par défaut)
 - ✅ Anglais
 - ✅ Lingala
 - ✅ Routage automatique selon la langue
 
 ### Smart Contracts
+
 - ✅ Déployés sur Hedera Testnet
 - ✅ MazaoTokenFactory: `0.0.6913902`
 - ✅ LoanManager: `0.0.6913910`
 - ✅ Tests complets validés
 
 ### Design System
+
 - ✅ Logo adaptatif MazaoChain
 - ✅ Palette de couleurs cohérente
 - ✅ Composants réutilisables
@@ -384,12 +420,14 @@ Voir `.env.local.example` pour la liste complète des variables.
 ## 🛡️ Sécurité et Garanties
 
 ### Pour l'Agriculteur
+
 - **Pas de saisie de biens** : Seule la récolte tokenisée sert de garantie
 - **Transparence totale** : Tous les termes visibles sur blockchain
 - **Contrôle total** : L'agriculteur garde ses jetons non collatéralisés
 - **Pas de pénalités cachées** : Tous les frais connus à l'avance
 
 ### Pour le Prêteur
+
 - **Collateral surévalué** : Minimum 200% de couverture
 - **Liquidité garantie** : Les MazaoTokens peuvent être revendus
 - **Transparence** : Voir l'historique complet de l'agriculteur
@@ -400,6 +438,7 @@ Voir `.env.local.example` pour la liste complète des variables.
 ## 📱 Expérience Utilisateur
 
 ### Interface Agriculteur
+
 ```
 Écran 1 : Tableau de bord
 → Solde MazaoTokens et USDC
@@ -415,6 +454,7 @@ Voir `.env.local.example` pour la liste complète des variables.
 ```
 
 ### Notifications et Support
+
 - **SMS pour échéances** : Même sans smartphone
 - **Alertes prix** : Quand le cours du café varie
 - **Support local** : Via la coopérative partenaire
@@ -425,7 +465,7 @@ Voir `.env.local.example` pour la liste complète des variables.
 ## 🔄 Cycle Vertueux Créé
 
 ```
-PRÊT → INVESTISSEMENT → MEILLEURE RÉCOLTE → 
+PRÊT → INVESTISSEMENT → MEILLEURE RÉCOLTE →
 VALEUR AJOUTÉE → CRÉDIT AMÉLIORÉ → NOUVEAU PRÊT
 ```
 
@@ -446,12 +486,14 @@ VALEUR AJOUTÉE → CRÉDIT AMÉLIORÉ → NOUVEAU PRÊT
 ## 🚀 Déploiement
 
 ### Base de données
+
 1. Créer un projet Supabase
 2. Configurer les variables d'environnement
 3. Appliquer les migrations : `npx supabase db push`
 4. Les comptes de démonstration seront créés automatiquement
 
 ### Application
+
 1. Déployer sur Vercel/Netlify
 2. Configurer les variables d'environnement de production
 3. Tester avec les comptes de démonstration
@@ -500,4 +542,4 @@ Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 **MazaoChain ne donne pas de poisson, il donne une canne à pêche numérique.**
 
-*Révolutionner l'agriculture par la blockchain - Une récolte à la fois* 🌾⛓️
+_Révolutionner l'agriculture par la blockchain - Une récolte à la fois_ 🌾⛓️

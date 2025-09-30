@@ -246,7 +246,7 @@ class AlertsService {
       if (error) throw error;
 
       return (
-        data?.map((alert: unknown) => ({
+        data?.map((alert: any) => ({
           id: alert.id,
           type: alert.type as
             | "performance"

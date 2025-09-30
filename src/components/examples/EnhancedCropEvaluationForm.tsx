@@ -241,7 +241,7 @@ async function submitCropEvaluation(data: CropEvaluationData): Promise<{
     return {
       success: false,
       error: new MazaoChainError(
-        'VALIDATION_ERROR' as unknown,
+        'VALIDATION_ERROR' as any,
         'Superficie too large',
         {
           retryable: false,

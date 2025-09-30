@@ -195,7 +195,7 @@ export class NotificationService {
       emailEnabled: data.email_enabled || false,
       smsEnabled: data.sms_enabled || false,
       inAppEnabled: data.in_app_enabled || false,
-      channels: (data.channels as unknown) || {}
+      channels: (data.channels as any) || {}
     };
   }
 

@@ -145,33 +145,4 @@ export function useRouteAuth(routePath: string) {
   return accessResult;
 }
 
-/**
- * Higher-order component for role-based protection
- */
-export function withRoleProtection<P extends object>(
-  Component: React.ComponentType<P>,
-  requiredRole: UserRole,
-  fallbackComponent?: React.ComponentType
-) {
-  return function ProtectedComponent(props: P) {
-    const { hasAccess, isLoading } = useRoleProtection(requiredRole);
-
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500"></div>
-        </div>
-      );
-    }
-
-    if (!hasAccess) {
-      if (fallbackComponent) {
-        const FallbackComponent = fallbackComponent;
-        return <FallbackComponent />;
-      }
-      return null;
-    }
-
-    return <Component {...props} />;
-  };
-}
+// HOC removed - use AuthGuard components instead

@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { RequireAuth } from '@/components/auth/AuthGuard';
 
 interface TokenHolding {
   tokenId: string;

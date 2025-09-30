@@ -297,7 +297,7 @@ class USDCTransferService {
       
       if (balance.tokens) {
         const tokenId = TokenId.fromString(this.USDC_TOKEN_ID);
-        const usdcBalance = (balance.tokens as unknown).get(tokenId);
+        const usdcBalance = balance.tokens.get(tokenId);
         return usdcBalance ? Number(usdcBalance) / Math.pow(10, this.USDC_DECIMALS) : 0;
       }
 

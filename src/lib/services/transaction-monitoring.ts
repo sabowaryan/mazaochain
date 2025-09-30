@@ -97,7 +97,7 @@ class TransactionMonitoringService {
         .gte('created_at', twentyFourHoursAgo.toISOString());
 
       // Calculate total volume in USD (assuming USDC = 1 USD, MAZAO needs price conversion)
-      const totalVolume = volumeData?.reduce((sum: number, tx: any) => {
+      const totalVolume = volumeData?.reduce((sum: number, tx: unknown) => {
         if (tx.token_type === 'USDC') {
           return sum + tx.amount;
         } else if (tx.token_type === 'MAZAO') {
@@ -148,7 +148,7 @@ class TransactionMonitoringService {
     errorMessage?: string
   ) {
     try {
-      const updateData: unknown = { status };
+      const updateData: { status: string; error_message?: string } = { status };
       if (errorMessage) {
         updateData.error_message = errorMessage;
       }

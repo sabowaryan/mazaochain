@@ -221,7 +221,7 @@ export class ErrorHandler {
    * Handle form validation errors
    */
   static handleValidationErrors(errors: unknown[]): MazaoChainError {
-    const messages = errors.map((error: unknown) => error.message).join(', ');
+    const messages = errors.map((error: any) => error.message).join(', ');
     
     return new MazaoChainError(
       ErrorCode.VALIDATION_ERROR,

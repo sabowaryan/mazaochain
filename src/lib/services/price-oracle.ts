@@ -267,7 +267,7 @@ export class PriceOracleService {
       await this.supabase
         .from("notifications")
         .update({ is_read: true })
-        .eq("id", (notification as unknown).id);
+        .eq("id", (notification as any).id);
     } catch (error) {
       console.error("Error processing price notifications:", error);
     }

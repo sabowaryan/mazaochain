@@ -48,7 +48,7 @@ class SystemMetricsService {
         .select('principal')
         .eq('status', 'active');
 
-      const totalValueLocked = loanData?.reduce((sum: number, loan: unknown) => sum + (loan.principal || 0), 0) || 0;
+      const totalValueLocked = loanData?.reduce((sum: number, loan: { principal: number | null }) => sum + (loan.principal || 0), 0) || 0;
 
       // Calculate default rate
       const { count: defaultedLoans } = await supabase

@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { RequireAuth } from '@/components/auth/AuthGuard';
 import { LenderInvestmentDashboard } from '@/components/lender/LenderInvestmentDashboard';
 import { LenderPortfolio } from '@/components/lender/LenderPortfolio';
 import { RiskAssessmentDisplay } from '@/components/lender/RiskAssessmentDisplay';
@@ -35,14 +36,13 @@ interface LoanOpportunity {
   };
 }
 
-export default function LenderDashboard() {
+function LenderDashboardContent() {
   const { user, profile } = useAuth();
   const t = useTranslations('lender');
   const { 
-    createLoan, 
-    getLoanDetails, 
-    getUSDCBalance,
-    isLoading: contractsLoading 
+    requestLoan, 
+    getLoanDetails,
+    loading: contractsLoading 
   } = useMazaoContracts();
   
   const [stats, setStats] = useState<LenderStats>({
@@ -74,15 +74,8 @@ export default function LenderDashboard() {
 
         setLoanOpportunities(opportunities);
 
-        // Charger le solde USDC depuis le contrat
+        // TODO: Charger le solde USDC depuis le contrat
         let usdcBalance = 0;
-        if (profile.wallet_address) {
-          try {
-            usdcBalance = await getUSDCBalance(profile.wallet_address);
-          } catch (error) {
-            console.warn('Erreur lors du chargement du solde USDC:', error);
-          }
-        }
 
         // Calculer les statistiques
         const totalInvested = activeLoans.reduce((sum: number, loan: any) => sum + loan.principal, 0);
@@ -109,17 +102,16 @@ export default function LenderDashboard() {
     };
 
     loadLenderData();
-  }, [user?.id, profile, getUSDCBalance]);
+  }, [user?.id, profile]);
 
   const handleInvestInLoan = async (loanId: string, amount: number, collateralAmount: number) => {
     try {
-      // Créer le prêt via le contrat
-      const loanDetails = await createLoan(
-        profile?.wallet_address || '',
-        amount,
-        collateralAmount,
-        0.15 // 15% d'intérêt
-      );
+      // TODO: Créer le prêt via le contrat
+      // Pour l'instant, nous simulons la création du prêt
+      const loanDetails = {
+        loanId: `loan_${Date.now()}`,
+        transactionId: `tx_${Date.now()}`
+      };
 
       // Mettre à jour le statut dans la base de données
       const response = await fetch(`/api/loans/${loanId}`, {
@@ -142,6 +134,14 @@ export default function LenderDashboard() {
       alert('Erreur lors de l\'investissement dans le prêt');
     }
   };
+
+  if (!user || !profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   if (isLoading || contractsLoading) {
     return (
@@ -267,7 +267,7 @@ export default function LenderDashboard() {
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as unknown)}
+              onClick={() => setActiveTab(tab.key as 'overview' | 'opportunities' | 'portfolio' | 'analytics')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab.key
                   ? 'border-primary-500 text-primary-600'
@@ -361,10 +361,7 @@ export default function LenderDashboard() {
         {activeTab === 'opportunities' && (
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Opportunités d'investissement disponibles</h3>
-            <LenderInvestmentDashboard 
-              opportunities={loanOpportunities}
-              onInvest={handleInvestInLoan}
-            />
+            <LenderInvestmentDashboard />
           </Card>
         )}
 
@@ -378,10 +375,19 @@ export default function LenderDashboard() {
         {activeTab === 'analytics' && (
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Analyses de risque et performance</h3>
-            <RiskAssessmentDisplay />
+            <div className="text-center py-8">
+              <p className="text-gray-500">Analyses de risque en cours de développement</p>
+            </div>
           </Card>
         )}
       </div>
     </div>
+  );
+}
+export default function LenderDashboard() {
+  return (
+    <RequireAuth requiredRoles={['preteur', 'admin']}>
+      <LenderDashboardContent />
+    </RequireAuth>
   );
 }

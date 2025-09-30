@@ -2,6 +2,7 @@
 'use client';
 
 import { WalletTest } from '@/components/wallet/WalletTest';
+import { WalletConnectionTest } from '@/components/wallet/WalletConnectionTest';
 
 export default function TestWalletPage() {
   return (
@@ -16,7 +17,10 @@ export default function TestWalletPage() {
           </p>
         </div>
         
-        <WalletTest />
+        <div className="space-y-8">
+          <WalletConnectionTest />
+          <WalletTest />
+        </div>
       </div>
     </div>
   );

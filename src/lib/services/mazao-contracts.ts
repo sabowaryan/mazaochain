@@ -125,7 +125,7 @@ class MazaoContractsService {
 
         const result = await nextTokenIdQuery.execute(this.client);
         const nextTokenId = result.getUint256(0);
-        const createdTokenId = (nextTokenId - 1).toString();
+        const createdTokenId = (Number(nextTokenId) - 1).toString();
 
         console.log(`Crop token created successfully: ${createdTokenId}`);
 
@@ -164,7 +164,7 @@ class MazaoContractsService {
         .setGas(800000)
         .setFunction("mintTokens",
           new ContractFunctionParameters()
-            .addUint256(tokenId)
+            .addUint256(Number(tokenId))
             .addUint256(amount)
             .addAddress(recipientAddress)
         );
@@ -208,7 +208,7 @@ class MazaoContractsService {
         .setFunction("getFarmerBalanceForToken",
           new ContractFunctionParameters()
             .addAddress(farmerAddress)
-            .addUint256(tokenId)
+            .addUint256(Number(tokenId))
         );
 
       const result = await balanceQuery.execute(this.client);
@@ -258,7 +258,7 @@ class MazaoContractsService {
         .setGas(150000)
         .setFunction("getTokenDetails",
           new ContractFunctionParameters()
-            .addUint256(tokenId)
+            .addUint256(Number(tokenId))
         );
 
       const result = await tokenQuery.execute(this.client);
@@ -304,7 +304,7 @@ class MazaoContractsService {
         .setGas(1200000)
         .setFunction("requestLoan",
           new ContractFunctionParameters()
-            .addUint256(collateralTokenId)
+            .addUint256(Number(collateralTokenId))
             .addUint256(principal)
             .addUint256(duration)
             .addUint256(interestRate)
@@ -322,7 +322,7 @@ class MazaoContractsService {
 
         const result = await nextLoanIdQuery.execute(this.client);
         const nextLoanId = result.getUint256(0);
-        const createdLoanId = (nextLoanId - 1).toString();
+        const createdLoanId = (Number(nextLoanId) - 1).toString();
 
         console.log(`Loan requested successfully: ${createdLoanId}`);
 
@@ -355,7 +355,7 @@ class MazaoContractsService {
         .setGas(150000)
         .setFunction("getLoan",
           new ContractFunctionParameters()
-            .addUint256(loanId)
+            .addUint256(Number(loanId))
         );
 
       const result = await loanQuery.execute(this.client);
@@ -449,7 +449,7 @@ class MazaoContractsService {
         throw new Error(createResult.error);
       }
 
-      const tokenId = createResult.data?.tokenId;
+      const tokenId = (createResult.data as any)?.tokenId;
       if (!tokenId) {
         throw new Error("No token ID returned from creation");
       }

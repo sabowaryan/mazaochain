@@ -19,9 +19,9 @@ export default function FarmerDashboard() {
   const { user, profile } = useAuth();
   const t = useTranslations("farmer");
   const {
-    getTokenBalance,
+    getFarmerTotalBalance,
     getLoanDetails,
-    isLoading: contractsLoading,
+    loading: contractsLoading,
   } = useMazaoContracts();
 
   const [stats, setStats] = useState<FarmerStats>({
@@ -53,7 +53,7 @@ export default function FarmerDashboard() {
         let mazaoBalance = 0;
         if (profile.wallet_address) {
           try {
-            mazaoBalance = await getTokenBalance(profile.wallet_address);
+            mazaoBalance = await getFarmerTotalBalance(profile.wallet_address);
           } catch (error) {
             console.warn("Erreur lors du chargement du solde MAZAO:", error);
           }
@@ -68,7 +68,7 @@ export default function FarmerDashboard() {
           (l: any) => l.status === "active"
         ).length;
         const pendingEvaluationsCount = evaluations.filter(
-          (e: unknown) => e.status === "pending"
+          (e: any) => e.status === "pending"
         ).length;
 
         setStats({
@@ -88,7 +88,7 @@ export default function FarmerDashboard() {
     };
 
     loadFarmerData();
-  }, [user?.id, profile, getTokenBalance]);
+  }, [user?.id, profile, getFarmerTotalBalance]);
 
   if (isLoading || contractsLoading) {
     return (
@@ -106,9 +106,7 @@ export default function FarmerDashboard() {
           {t("dashboard.title")}
         </h1>
         <p className="text-gray-600">
-          {t("dashboard.welcome", {
-            name: profile?.farmer_profiles?.nom || user?.email,
-          })}
+          Bienvenue, {profile?.farmer_profiles?.nom || user?.email}
         </p>
       </div>
 

@@ -199,7 +199,7 @@ class PerformanceMetricsService {
         .eq('status', 'confirmed');
 
       if (recentTxs && recentTxs.length > 0) {
-        const avgTime = recentTxs.reduce((sum: number, tx: unknown) => sum + (tx.processing_time || 3), 0) / recentTxs.length;
+        const avgTime = recentTxs.reduce((sum: number, tx: any) => sum + (tx.processing_time || 3), 0) / recentTxs.length;
         
         if (avgTime > 5) { // 5 second threshold per requirement 8.3
           await this.createAlert({

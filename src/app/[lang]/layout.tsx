@@ -43,13 +43,14 @@ export default async function RootLayout({
   params,
 }: Readonly<{
   children: React.ReactNode;
-  params: Promise<{ lang: 'en' | 'fr' | 'ln' }>;
+  params: Promise<{ lang: string }>;
 }>) {
   const { lang } = await params;
-  const dict = await getDictionary(lang);
+  const validLang = ['en', 'fr', 'ln'].includes(lang) ? lang as 'en' | 'fr' | 'ln' : 'fr';
+  const dict = await getDictionary(validLang);
 
   return (
-    <html lang={lang}>
+    <html lang={validLang}>
       <head>
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -61,7 +62,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
       >
-        <TranslationProvider messages={dict} locale={lang}>
+        <TranslationProvider messages={dict} locale={validLang}>
           <AuthProvider>
             <ServiceWorkerRegistration />
             <ClientNavigation />

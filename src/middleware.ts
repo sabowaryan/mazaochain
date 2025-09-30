@@ -2,9 +2,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from 'next/server';
 import { 
   validateAuthToken, 
-  extractAuthToken, 
-  isProtectedRoute, 
-  getRequiredRole, 
   hasPermission,
   createRedirectUrl,
   SECURITY_HEADERS,
@@ -17,6 +14,56 @@ const DEFAULT_LOCALE = 'fr'; // French as default for RDC
 
 // Development mode check
 const isDevelopment = process.env.NODE_ENV === 'development';
+
+/**
+ * Check if a route is protected (requires authentication)
+ */
+function isProtectedRoute(pathname: string): boolean {
+  // Remove locale prefix for checking
+  const cleanPath = pathname.replace(/^\/[a-z]{2}/, '') || '/';
+  
+  // Always allow auth routes - they should never be protected
+  if (cleanPath.startsWith('/auth/')) {
+    return false;
+  }
+  
+  // Always allow public routes
+  const publicRoutes = [
+    '/',
+    '/unauthorized',
+    '/test-wallet', // Allow test routes in development
+    '/test-contracts'
+  ];
+  
+  const isExplicitlyPublic = publicRoutes.some(route => {
+    if (route === '/') {
+      return cleanPath === '/';
+    }
+    return cleanPath === route || cleanPath.startsWith(route + '/');
+  });
+  
+  if (isExplicitlyPublic) {
+    return false;
+  }
+  
+  // Check protected routes
+  const protectedPrefixes = ['/dashboard', '/admin'];
+  return protectedPrefixes.some(prefix => cleanPath.startsWith(prefix));
+}
+
+/**
+ * Get required role for a route
+ */
+function getRequiredRole(pathname: string): UserRole | null {
+  const cleanPath = pathname.replace(/^\/[a-z]{2}/, '') || '/';
+  
+  if (cleanPath.startsWith('/admin')) return 'admin';
+  if (cleanPath.startsWith('/dashboard/farmer')) return 'agriculteur';
+  if (cleanPath.startsWith('/dashboard/cooperative')) return 'cooperative';
+  if (cleanPath.startsWith('/dashboard/lender')) return 'preteur';
+  
+  return null;
+}
 
 /**
  * Get the preferred locale from request
@@ -59,7 +106,7 @@ function hasLocalePrefix(pathname: string): boolean {
 function extractLocale(pathname: string): string {
   const segments = pathname.split('/');
   const potentialLocale = segments[1];
-  return LOCALES.includes(potentialLocale as any) ? potentialLocale : DEFAULT_LOCALE;
+  return LOCALES.includes(potentialLocale as unknown) ? potentialLocale : DEFAULT_LOCALE;
 }
 
 /**
@@ -80,20 +127,31 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 }
 
 /**
- * Handle authentication for protected routes
+ * Handle authentication for protected routes using Supabase
  */
 async function handleAuthentication(request: NextRequest, pathname: string) {
-  const token = extractAuthToken(request);
-  
-  if (!token) {
-    return { authenticated: false, error: 'No token found' };
-  }
-
   try {
-    const authResult = await validateAuthToken(token);
-    return authResult;
+    // Get Supabase auth cookies
+    const accessToken = request.cookies.get('sb-access-token')?.value ||
+                       request.cookies.get('supabase-auth-token')?.value ||
+                       request.cookies.get('supabase.auth.token')?.value;
+    
+    const refreshToken = request.cookies.get('sb-refresh-token')?.value ||
+                        request.cookies.get('supabase-refresh-token')?.value;
+
+    if (!accessToken && !refreshToken) {
+      return { authenticated: false, error: 'No auth tokens found' };
+    }
+
+    // Use the validateAuthToken function from middleware-auth
+    if (accessToken) {
+      const authResult = await validateAuthToken(accessToken);
+      return authResult;
+    }
+
+    return { authenticated: false, error: 'No valid access token' };
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('Authentication error in middleware:', error);
     return { authenticated: false, error: 'Authentication failed' };
   }
 }

@@ -246,7 +246,7 @@ export class LoanService {
       
       const loans = await response.json()
       
-      return loans?.map((loan: unknown) => ({
+      return loans?.map((loan: any) => ({
         ...loan,
         borrower: loan.borrower ? {
           id: loan.borrower.id,
@@ -856,7 +856,7 @@ export class LoanService {
     try {
       const transactions = await transactionReceiptService.getLoanTransactions(loanId)
       
-      const result: unknown = {}
+      const result: any = {}
       
       transactions.forEach(tx => {
         switch (tx.transaction_type) {

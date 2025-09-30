@@ -1,5 +1,6 @@
 import { RequireAuth } from '@/components/auth/AuthGuard';
 import { AuthStatus, UserDetails } from '@/components/auth/AuthStatus';
+import { AuthActionButtons } from '@/components/auth/AuthActionButtons';
 
 export default function AuthDemoPage() {
   return (
@@ -67,26 +68,11 @@ function AuthActionsDemo() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Les notifications d'authentification apparaîtront automatiquement lors des changements d'état.
+        Les notifications d'authentification apparaîtront automatiquement lors des changements d&apos;état.
       </p>
       
       <div className="flex flex-wrap gap-2">
-        <button 
-          onClick={() => window.location.reload()}
-          className="px-3 py-2 text-sm bg-primary-100 text-primary-700 rounded-md hover:bg-primary-200 transition-colors"
-        >
-          Recharger la page
-        </button>
-        
-        <button 
-          onClick={() => {
-            // Simuler une mise à jour de profil
-            console.log('Profile refresh triggered');
-          }}
-          className="px-3 py-2 text-sm bg-secondary-100 text-secondary-700 rounded-md hover:bg-secondary-200 transition-colors"
-        >
-          Actualiser le profil
-        </button>
+        <AuthActionButtons />
       </div>
     </div>
   );

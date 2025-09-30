@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@/lib/utils/source-map-suppressor";
 
 export const metadata: Metadata = {
   title: "MazaoChain MVP",

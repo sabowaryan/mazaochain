@@ -28,7 +28,7 @@ export function useNotifications() {
     try {
       setLoading(true);
       const data = await notificationService.getNotifications(user.id, 10);
-      const transformedData = (data || []).map((item: unknown) => ({
+      const transformedData = (data || []).map((item: any) => ({
         id: item.id,
         title: item.title,
         message: item.message,

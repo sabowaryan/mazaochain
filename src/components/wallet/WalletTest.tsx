@@ -75,7 +75,7 @@ export function WalletTest() {
           <Button
             onClick={runConnectionTest}
             disabled={isConnecting}
-            variant="primary"
+            variant="default"
           >
             {isConnecting ? 'Connecting...' : 'Test Connection'}
           </Button>

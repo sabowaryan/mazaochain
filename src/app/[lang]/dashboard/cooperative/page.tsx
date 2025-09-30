@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { RequireAuth } from '@/components/auth/AuthGuard';
 import { PendingEvaluationsReview } from '@/components/cooperative/PendingEvaluationsReview';
 import { LoanApprovalList } from '@/components/cooperative/LoanApprovalList';
 
@@ -44,10 +45,10 @@ interface LoanRequest {
   };
 }
 
-export default function CooperativeDashboard() {
+function CooperativeDashboardContent() {
   const { user, profile } = useAuth();
   const t = useTranslations('cooperative');
-  const { mintTokens, isLoading: contractsLoading } = useMazaoContracts();
+  const { loading: contractsLoading } = useMazaoContracts();
   
   const [stats, setStats] = useState<CooperativeStats>({
     totalMembers: 0,
@@ -103,27 +104,15 @@ export default function CooperativeDashboard() {
     loadCooperativeData();
   }, [user?.id, profile]);
 
-  const handleApproveEvaluation = async (evaluationId: string, farmerWallet: string, tokenAmount: number) => {
-    try {
-      // Approuver l'évaluation dans la base de données
-      const response = await fetch(`/api/crop-evaluations/${evaluationId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'approved' })
-      });
 
-      if (!response.ok) throw new Error('Erreur lors de l\'approbation');
 
-      // Minter les tokens MAZAO via le contrat
-      await mintTokens(farmerWallet, tokenAmount);
-
-      // Recharger les données
-      window.location.reload();
-    } catch (error) {
-      console.error('Erreur lors de l\'approbation:', error);
-      alert('Erreur lors de l\'approbation de l\'évaluation');
-    }
-  };
+  if (!user || !profile) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   if (isLoading || contractsLoading) {
     return (
@@ -231,7 +220,7 @@ export default function CooperativeDashboard() {
           ].map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key as unknown)}
+              onClick={() => setActiveTab(tab.key as 'overview' | 'evaluations' | 'loans' | 'members')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab.key
                   ? 'border-primary-500 text-primary-600'
@@ -307,8 +296,7 @@ export default function CooperativeDashboard() {
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Évaluations en attente de validation</h3>
             <PendingEvaluationsReview 
-              evaluations={pendingEvaluations}
-              onApprove={handleApproveEvaluation}
+              cooperativeId={user?.id || ''}
             />
           </Card>
         )}
@@ -316,7 +304,7 @@ export default function CooperativeDashboard() {
         {activeTab === 'loans' && (
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Demandes de prêt en attente</h3>
-            <LoanApprovalList loans={pendingLoans} />
+            <LoanApprovalList />
           </Card>
         )}
 
@@ -333,5 +321,13 @@ export default function CooperativeDashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function CooperativeDashboard() {
+  return (
+    <RequireAuth requiredRoles={['cooperative', 'admin']}>
+      <CooperativeDashboardContent />
+    </RequireAuth>
   );
 }

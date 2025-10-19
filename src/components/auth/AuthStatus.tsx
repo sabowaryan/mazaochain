@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslations } from '@/components/TranslationProvider';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -26,7 +27,17 @@ export function AuthStatus({
   } = useAuth();
   const t = useTranslations('auth');
 
-  if (!initialized || loading) {
+  // Si le chargement prend plus de 5 secondes, afficher quand même le statut
+  const [forceShow, setForceShow] = React.useState(false);
+  
+  React.useEffect(() => {
+    if (!initialized || loading) {
+      const timer = setTimeout(() => setForceShow(true), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [initialized, loading]);
+
+  if ((!initialized || loading) && !forceShow) {
     return (
       <div className={cn('flex items-center gap-2', className)}>
         <LoadingSpinner size="sm" />

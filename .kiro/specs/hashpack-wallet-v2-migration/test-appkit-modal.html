@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AppKit Modal Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-button {
+            background-color: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .test-button:hover {
+            background-color: #059669;
+        }
+        .test-button:disabled {
+            background-color: #d1d5db;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        .status.error {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .status.info {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .checklist {
+            list-style-type: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f9fafb;
+            border-left: 3px solid #10b981;
+        }
+        .checklist li::before {
+            content: "☐ ";
+            margin-right: 8px;
+        }
+        code {
+            background-color: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>AppKit Modal Opening Test</h1>
+    
+    <div class="test-section">
+        <h2>Prerequisites</h2>
+        <ul class="checklist">
+            <li>Set <code>NEXT_PUBLIC_USE_APPKIT=true</code> in .env.local</li>
+            <li>Set valid <code>NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID</code></li>
+            <li>Install HashPack wallet extension</li>
+            <li>Restart the development server</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Instructions</h2>
+        <p>This is a manual test guide. Follow these steps in your actual application:</p>
+        
+        <h3>Step 1: Navigate to a page with AppKitButton</h3>
+        <p>Go to any page that uses the <code>WalletConnectionWrapper</code> or <code>AppKitButton</code> component.</p>
+        
+        <h3>Step 2: Check Button Rendering</h3>
+        <ul class="checklist">
+            <li>Button should display "Initializing..." briefly</li>
+            <li>Button should then show the AppKit connect button</li>
+            <li>No error messages should appear</li>
+        </ul>
+        
+        <h3>Step 3: Click the Button</h3>
+        <button class="test-button" onclick="simulateClick()">Simulate Button Click</button>
+        <div id="click-status"></div>
+        
+        <h3>Step 4: Verify Modal Opens</h3>
+        <ul class="checklist">
+            <li>AppKit modal should appear on screen</li>
+            <li>Modal should show wallet connection options</li>
+            <li>HashPack should be listed as an option</li>
+            <li>Modal should be responsive and properly styled</li>
+        </ul>
+        
+        <h3>Step 5: Test Modal Interactions</h3>
+        <ul class="checklist">
+            <li>Click outside modal - should close</li>
+            <li>Click X button - should close</li>
+            <li>Select HashPack - should trigger connection flow</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Expected Behavior</h2>
+        <div class="status info">
+            <strong>✓ Success Criteria:</strong>
+            <ul>
+                <li>Button click opens the AppKit modal immediately</li>
+                <li>Modal displays wallet connection options</li>
+                <li>No console errors appear</li>
+                <li>Modal is properly styled and functional</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Troubleshooting</h2>
+        <h3>Modal doesn't open?</h3>
+        <ul>
+            <li>Check browser console for errors</li>
+            <li>Verify <code>NEXT_PUBLIC_USE_APPKIT=true</code></li>
+            <li>Verify WalletConnect Project ID is valid</li>
+            <li>Check that AppKit initialized successfully</li>
+        </ul>
+        
+        <h3>Button shows error?</h3>
+        <ul>
+            <li>Check the error message displayed</li>
+            <li>Verify all required dependencies are installed</li>
+            <li>Check network connectivity</li>
+        </ul>
+        
+        <h3>Modal opens but looks broken?</h3>
+        <ul>
+            <li>Check for CSS conflicts</li>
+            <li>Verify AppKit version compatibility</li>
+            <li>Check theme configuration in appkit-config.ts</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>Browser Console Commands</h2>
+        <p>Run these commands in the browser console to debug:</p>
+        <pre><code>// Check if AppKit is enabled
+console.log('AppKit Enabled:', process.env.NEXT_PUBLIC_USE_APPKIT);
+
+// Check AppKit instance
+console.log('AppKit Instance:', window.appKit);
+
+// Check for initialization errors
+console.log('Check console for AppKit errors');
+</code></pre>
+    </div>
+
+    <script>
+        function simulateClick() {
+            const statusDiv = document.getElementById('click-status');
+            statusDiv.innerHTML = '<div class="status info"><strong>Simulated Click</strong><br>In the actual app, clicking the AppKitButton should:<br>1. Call appKit.open()<br>2. Display the modal overlay<br>3. Show wallet connection options</div>';
+        }
+
+        // Display environment check
+        window.addEventListener('load', () => {
+            console.log('AppKit Modal Test Page Loaded');
+            console.log('This is a test guide - perform actual tests in your Next.js application');
+        });
+    </script>
+</body>
+</html>

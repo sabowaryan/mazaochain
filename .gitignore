@@ -128,3 +128,7 @@ scripts/diagnose-*.ps1
 scripts/create-*.ps1
 scripts/fix-*.sql
 scripts/validate-*.js
+
+# Test wallet credentials (NEVER commit private keys!)
+scripts/test-wallets.json
+test-wallets.json

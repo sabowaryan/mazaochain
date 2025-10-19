@@ -14,6 +14,7 @@ import { EvaluationDetails } from "@/components/crop-evaluation/EvaluationDetail
 import { CROP_TYPES } from "@/types/crop-evaluation";
 import type { Tables } from "@/lib/supabase/database.types";
 import { useMazaoContracts } from "@/hooks/useMazaoContracts";
+import { notificationService } from "@/lib/services/notification";
 
 interface PendingEvaluationsReviewProps {
   cooperativeId: string;
@@ -25,6 +26,7 @@ export function PendingEvaluationsReview({
   const [evaluations, setEvaluations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedEvaluation, setSelectedEvaluation] = useState<unknown | null>(
     null
   );
@@ -40,7 +42,9 @@ export function PendingEvaluationsReview({
   const loadPendingEvaluations = async () => {
     try {
       setLoading(true);
-      const data = await cropEvaluationService.getPendingEvaluations();
+      const data = await cropEvaluationService.getPendingEvaluations(
+        cooperativeId
+      );
       setEvaluations(data);
     } catch (err) {
       setError(
@@ -54,25 +58,32 @@ export function PendingEvaluationsReview({
   const handleApproveEvaluation = async (evaluationId: string) => {
     try {
       setProcessingId(evaluationId);
-      
+
       // Trouver l'évaluation à approuver
-      const evaluation = evaluations.find(e => e.id === evaluationId);
+      const evaluation = evaluations.find((e) => e.id === evaluationId);
       if (!evaluation) {
         throw new Error("Évaluation non trouvée");
       }
 
-      // Tokeniser l'évaluation approuvée
+      // Vérifier que le fermier a une adresse wallet
+      if (!evaluation.farmer?.wallet_address) {
+        throw new Error("Le fermier n'a pas d'adresse wallet configurée");
+      }
+
+      // Tokeniser l'évaluation approuvée via le hook
       const tokenizationResult = await tokenizeEvaluation(
         evaluationId,
         evaluation.crop_type,
         evaluation.farmer_id,
-        evaluation.farmer?.wallet_address || '',
+        evaluation.farmer.wallet_address,
         evaluation.valeur_estimee,
         new Date(evaluation.harvest_date).getTime()
       );
 
       if (!tokenizationResult.success) {
-        throw new Error(tokenizationResult.error || "Erreur lors de la tokenisation");
+        throw new Error(
+          tokenizationResult.error || "Erreur lors de la tokenisation"
+        );
       }
 
       // Mettre à jour le statut dans la base de données
@@ -81,18 +92,50 @@ export function PendingEvaluationsReview({
         "approved"
       );
 
+      // Envoyer une notification à l'agriculteur
+      try {
+        await notificationService.sendNotification({
+          userId: evaluation.farmer_id,
+          type: "evaluation_approved",
+          title: "Évaluation Approuvée",
+          message: `Votre évaluation de ${
+            CROP_TYPES[evaluation.crop_type as keyof typeof CROP_TYPES]
+          } a été approuvée. ${
+            evaluation.valeur_estimee
+          } tokens MAZAO ont été créés et ajoutés à votre portefeuille.`,
+          data: {
+            evaluationId,
+            tokenAmount: evaluation.valeur_estimee,
+            cropType: evaluation.crop_type,
+            actionUrl: `/dashboard/farmer/portfolio`,
+          },
+          channels: ["in_app", "email"],
+        });
+      } catch (notifError) {
+        console.error("Erreur lors de l'envoi de la notification:", notifError);
+        // Ne pas bloquer le processus si la notification échoue
+      }
+
       // Remove from pending list
       setEvaluations((prev) =>
         prev.filter((evaluation) => evaluation.id !== evaluationId)
       );
       setSelectedEvaluation(null);
 
-      alert(`Évaluation approuvée et ${evaluation.valeur_estimee} tokens MAZAO créés avec succès!`);
+      // Success notification
+      setSuccessMessage(
+        `Évaluation approuvée et ${evaluation.valeur_estimee} tokens MAZAO créés avec succès!`
+      );
+      setError(null);
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err) {
-      console.error('Erreur lors de l\'approbation:', err);
-      alert(
+      console.error("Erreur lors de l'approbation:", err);
+      setError(
         err instanceof Error ? err.message : "Erreur lors de l'approbation"
       );
+      setSuccessMessage(null);
     } finally {
       setProcessingId(null);
     }
@@ -103,10 +146,39 @@ export function PendingEvaluationsReview({
 
     try {
       setProcessingId(evaluationId);
+
+      // Trouver l'évaluation à rejeter
+      const evaluation = evaluations.find((e) => e.id === evaluationId);
+      if (!evaluation) {
+        throw new Error("Évaluation non trouvée");
+      }
+
       await cropEvaluationService.updateEvaluationStatus(
         evaluationId,
         "rejected"
       );
+
+      // Envoyer une notification à l'agriculteur
+      try {
+        await notificationService.sendNotification({
+          userId: evaluation.farmer_id,
+          type: "evaluation_rejected",
+          title: "Évaluation Rejetée",
+          message: `Votre évaluation de ${
+            CROP_TYPES[evaluation.crop_type as keyof typeof CROP_TYPES]
+          } a été rejetée.${reason ? ` Raison: ${reason}` : ""}`,
+          data: {
+            evaluationId,
+            cropType: evaluation.crop_type,
+            reason: reason || undefined,
+            actionUrl: `/dashboard/farmer/evaluations`,
+          },
+          channels: ["in_app", "email"],
+        });
+      } catch (notifError) {
+        console.error("Erreur lors de l'envoi de la notification:", notifError);
+        // Ne pas bloquer le processus si la notification échoue
+      }
 
       // Remove from pending list
       setEvaluations((prev) =>
@@ -114,10 +186,15 @@ export function PendingEvaluationsReview({
       );
       setSelectedEvaluation(null);
 
-      // TODO: Send notification to farmer with reason
-      alert("Évaluation rejetée");
+      // Success notification
+      setSuccessMessage("Évaluation rejetée avec succès");
+      setError(null);
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erreur lors du rejet");
+      setError(err instanceof Error ? err.message : "Erreur lors du rejet");
+      setSuccessMessage(null);
     } finally {
       setProcessingId(null);
     }
@@ -136,16 +213,65 @@ export function PendingEvaluationsReview({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Révision de l'évaluation</h3>
-          <Button variant="outline" onClick={() => setSelectedEvaluation(null)}>
+          <Button variant="outline" onClick={() => {
+            setSelectedEvaluation(null);
+            setError(null);
+          }}>
             Retour à la liste
           </Button>
         </div>
+
+        {successMessage && (
+          <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-800">{successMessage}</p>
+              </div>
+              <button
+                onClick={() => setSuccessMessage(null)}
+                className="ml-auto flex-shrink-0 text-green-400 hover:text-green-600"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="ml-auto flex-shrink-0 text-red-400 hover:text-red-600"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         {selectedEvaluation && (
           <EvaluationDetails
             evaluation={selectedEvaluation as any}
             farmerName={(selectedEvaluation as any).farmer?.nom}
-            farmerLocation={(selectedEvaluation as any).farmer?.localisation}
+            farmerLocation={(selectedEvaluation as unknown).farmer?.localisation}
             showActions={false}
           />
         )}
@@ -154,15 +280,22 @@ export function PendingEvaluationsReview({
           <div className="flex gap-3 justify-center">
             <Button
               variant="destructive"
-              onClick={() => handleRejectEvaluation((selectedEvaluation as any).id)}
-              loading={processingId === (selectedEvaluation as any).id}
+              onClick={() =>
+                handleRejectEvaluation((selectedEvaluation as unknown).id)
+              }
+              loading={processingId === (selectedEvaluation as unknown).id}
               disabled={processingId !== null}
             >
               Rejeter
             </Button>
             <Button
-              onClick={() => handleApproveEvaluation((selectedEvaluation as any).id)}
-              loading={processingId === (selectedEvaluation as any).id || contractsLoading}
+              onClick={() =>
+                handleApproveEvaluation((selectedEvaluation as unknown).id)
+              }
+              loading={
+                processingId === (selectedEvaluation as unknown).id ||
+                contractsLoading
+              }
               disabled={processingId !== null || contractsLoading}
             >
               Approuver

@@ -15,10 +15,11 @@ export const env = {
   NEXT_PUBLIC_MAZAO_TOKEN_FACTORY_CONTRACT_ID: process.env.NEXT_PUBLIC_MAZAO_TOKEN_FACTORY_CONTRACT_ID!,
   NEXT_PUBLIC_LOAN_MANAGER_CONTRACT_ID: process.env.NEXT_PUBLIC_LOAN_MANAGER_CONTRACT_ID!,
 
-  // HashPack
+  // HashPack Wallet (v2)
   NEXT_PUBLIC_HASHPACK_APP_NAME: process.env.NEXT_PUBLIC_HASHPACK_APP_NAME || 'MazaoChain MVP',
   NEXT_PUBLIC_HASHPACK_APP_DESCRIPTION: process.env.NEXT_PUBLIC_HASHPACK_APP_DESCRIPTION || 'Decentralized lending platform for farmers',
-  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo_project_id',
+  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
+  NEXT_PUBLIC_USE_APPKIT: process.env.NEXT_PUBLIC_USE_APPKIT === 'true',
 
   // Application
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
@@ -42,6 +43,7 @@ const requiredEnvVars = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
   'NEXT_PUBLIC_HEDERA_ACCOUNT_ID',
+  'NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID',
 ] as const
 
 export function validateEnv() {
@@ -52,6 +54,29 @@ export function validateEnv() {
       `Missing required environment variables: ${missing.join(', ')}\n` +
       'Please check your .env.local file and ensure all required variables are set.'
     )
+  }
+
+  // Validate WalletConnect Project ID format
+  if (env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) {
+    const projectId = env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+    
+    // Check if it's a placeholder value
+    if (projectId.includes('your_') || projectId.includes('demo_')) {
+      console.warn(
+        '⚠️  WARNING: NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID appears to be a placeholder.\n' +
+        'Please obtain a valid project ID from https://cloud.walletconnect.com/\n' +
+        'HashPack wallet connection will not work without a valid project ID.'
+      )
+    }
+    
+    // Check minimum length (WalletConnect project IDs are typically 32+ characters)
+    if (projectId.length < 32) {
+      console.warn(
+        '⚠️  WARNING: NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID seems too short.\n' +
+        'Valid WalletConnect project IDs are typically 32+ characters.\n' +
+        'Please verify your project ID at https://cloud.walletconnect.com/'
+      )
+    }
   }
 }
 

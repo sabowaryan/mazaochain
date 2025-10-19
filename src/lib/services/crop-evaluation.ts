@@ -79,8 +79,16 @@ export class CropEvaluationService {
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
       
-      const data = await response.json()
-      return data || []
+      const result = await response.json()
+      // L'API retourne { data: [...], message: '...', timestamp: '...' }
+      const evaluations = Array.isArray(result) ? result : (result?.data || [])
+      
+      if (!Array.isArray(evaluations)) {
+        console.error('Evaluations data is not an array:', evaluations)
+        return []
+      }
+      
+      return evaluations
     } catch (error) {
       console.error('Error fetching farmer evaluations:', error)
       throw new Error(`Erreur lors de la récupération des évaluations: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
@@ -180,17 +188,30 @@ export class CropEvaluationService {
   /**
    * Get pending evaluations for cooperative review
    */
-  async getPendingEvaluations(): Promise<Tables<'crop_evaluations'>[]> {
+  async getPendingEvaluations(cooperativeId?: string): Promise<Tables<'crop_evaluations'>[]> {
     try {
-      const response = await fetch('/api/crop-evaluations?status=pending')
+      let url = '/api/crop-evaluations?status=pending'
+      if (cooperativeId) {
+        url += `&cooperative_id=${cooperativeId}`
+      }
+      
+      const response = await fetch(url)
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
       
-      const data = await response.json()
-      return data || []
+      const result = await response.json()
+      // L'API retourne { data: [...], message: '...', timestamp: '...' }
+      const evaluations = Array.isArray(result) ? result : (result?.data || [])
+      
+      if (!Array.isArray(evaluations)) {
+        console.error('Pending evaluations data is not an array:', evaluations)
+        return []
+      }
+      
+      return evaluations
     } catch (error) {
       console.error('Error fetching pending evaluations:', error)
       throw new Error(`Erreur lors de la récupération des évaluations en attente: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)

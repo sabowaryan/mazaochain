@@ -19,12 +19,12 @@ export function ResponsiveContainer({
   centerContent = false
 }: ResponsiveContainerProps) {
   const maxWidthClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-4xl',
-    xl: 'max-w-6xl',
-    '2xl': 'max-w-7xl',
-    full: 'max-w-full'
+    sm: 'max-w-screen-sm',
+    md: 'max-w-screen-md',
+    lg: 'max-w-screen-4xl',
+    xl: 'max-w-screen-6xl',
+    '2xl': 'max-w-screen-7xl',
+    full: 'max-w-screen-full'
   };
 
   const paddingClasses = {

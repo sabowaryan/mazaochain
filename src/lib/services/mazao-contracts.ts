@@ -5,7 +5,7 @@ import {
   ContractCallQuery,
   ContractExecuteTransaction,
   ContractFunctionParameters,
-  Hbar
+  Hbar,
 } from "@hashgraph/sdk";
 import { env } from "@/lib/config/env";
 
@@ -54,29 +54,39 @@ class MazaoContractsService {
     if (!this.client) {
       try {
         // Initialize Hedera client
-        this.client = env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
-          ? Client.forMainnet()
-          : Client.forTestnet();
+        this.client =
+          env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
+            ? Client.forMainnet()
+            : Client.forTestnet();
 
         // Set operator account
-        this.operatorAccountId = AccountId.fromString(env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID);
-        this.operatorPrivateKey = PrivateKey.fromStringECDSA(env.HEDERA_PRIVATE_KEY);
-        
-        this.client.setOperator(this.operatorAccountId, this.operatorPrivateKey);
+        this.operatorAccountId = AccountId.fromString(
+          env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID
+        );
+        this.operatorPrivateKey = PrivateKey.fromStringECDSA(
+          env.HEDERA_PRIVATE_KEY
+        );
+
+        this.client.setOperator(
+          this.operatorAccountId,
+          this.operatorPrivateKey
+        );
 
         // Set contract IDs from deployed contracts
-        this.tokenFactoryId = env.NEXT_PUBLIC_MAZAO_TOKEN_FACTORY_CONTRACT_ID || '0.0.6913792';
-        this.loanManagerId = env.NEXT_PUBLIC_LOAN_MANAGER_CONTRACT_ID || '0.0.6913794';
+        this.tokenFactoryId =
+          env.NEXT_PUBLIC_MAZAO_TOKEN_FACTORY_CONTRACT_ID || "0.0.6913792";
+        this.loanManagerId =
+          env.NEXT_PUBLIC_LOAN_MANAGER_CONTRACT_ID || "0.0.6913794";
 
-        console.log('MazaoContracts initialized:', {
+        console.log("MazaoContracts initialized:", {
           network: env.NEXT_PUBLIC_HEDERA_NETWORK,
           account: this.operatorAccountId.toString(),
           tokenFactory: this.tokenFactoryId,
-          loanManager: this.loanManagerId
+          loanManager: this.loanManagerId,
         });
       } catch (error) {
-        console.error('Failed to initialize MazaoContracts client:', error);
-        throw new Error('MazaoContracts client initialization failed');
+        console.error("Failed to initialize MazaoContracts client:", error);
+        throw new Error("MazaoContracts client initialization failed");
       }
     }
   }
@@ -92,19 +102,20 @@ class MazaoContractsService {
     tokenSymbol: string
   ): Promise<ContractInteractionResult> {
     this.initializeClient();
-    
+
     try {
-      console.log('Creating crop token:', {
+      console.log("Creating crop token:", {
         farmer: farmerAddress,
         value: estimatedValue,
         crop: cropType,
-        symbol: tokenSymbol
+        symbol: tokenSymbol,
       });
 
       const createTokenTx = new ContractExecuteTransaction()
         .setContractId(this.tokenFactoryId)
         .setGas(1000000)
-        .setFunction("createCropToken",
+        .setFunction(
+          "createCropToken",
           new ContractFunctionParameters()
             .addAddress(farmerAddress)
             .addUint256(estimatedValue)
@@ -115,7 +126,7 @@ class MazaoContractsService {
 
       const response = await createTokenTx.execute(this.client);
       const receipt = await response.getReceipt(this.client);
-      
+
       if (receipt.status.toString() === "SUCCESS") {
         // Get the new token ID by querying nextTokenId
         const nextTokenIdQuery = new ContractCallQuery()
@@ -132,16 +143,18 @@ class MazaoContractsService {
         return {
           success: true,
           transactionId: response.transactionId.toString(),
-          data: { tokenId: createdTokenId }
+          data: { tokenId: createdTokenId },
         };
       } else {
-        throw new Error(`Transaction failed with status: ${receipt.status.toString()}`);
+        throw new Error(
+          `Transaction failed with status: ${receipt.status.toString()}`
+        );
       }
     } catch (error) {
       console.error("Error creating crop token:", error);
       return {
         success: false,
-        error: `Failed to create crop token: ${error}`
+        error: `Failed to create crop token: ${error}`,
       };
     }
   }
@@ -155,14 +168,19 @@ class MazaoContractsService {
     recipientAddress: string
   ): Promise<ContractInteractionResult> {
     this.initializeClient();
-    
+
     try {
-      console.log('Minting tokens:', { tokenId, amount, recipient: recipientAddress });
+      console.log("Minting tokens:", {
+        tokenId,
+        amount,
+        recipient: recipientAddress,
+      });
 
       const mintTokensTx = new ContractExecuteTransaction()
         .setContractId(this.tokenFactoryId)
         .setGas(800000)
-        .setFunction("mintTokens",
+        .setFunction(
+          "mintTokens",
           new ContractFunctionParameters()
             .addUint256(Number(tokenId))
             .addUint256(amount)
@@ -171,23 +189,27 @@ class MazaoContractsService {
 
       const response = await mintTokensTx.execute(this.client);
       const receipt = await response.getReceipt(this.client);
-      
+
       if (receipt.status.toString() === "SUCCESS") {
-        console.log(`Tokens minted successfully: ${amount} tokens for ${recipientAddress}`);
+        console.log(
+          `Tokens minted successfully: ${amount} tokens for ${recipientAddress}`
+        );
 
         return {
           success: true,
           transactionId: response.transactionId.toString(),
-          data: { tokenId, amount, recipient: recipientAddress }
+          data: { tokenId, amount, recipient: recipientAddress },
         };
       } else {
-        throw new Error(`Transaction failed with status: ${receipt.status.toString()}`);
+        throw new Error(
+          `Transaction failed with status: ${receipt.status.toString()}`
+        );
       }
     } catch (error) {
       console.error("Error minting tokens:", error);
       return {
         success: false,
-        error: `Failed to mint tokens: ${error}`
+        error: `Failed to mint tokens: ${error}`,
       };
     }
   }
@@ -200,12 +222,13 @@ class MazaoContractsService {
     tokenId: string
   ): Promise<number> {
     this.initializeClient();
-    
+
     try {
       const balanceQuery = new ContractCallQuery()
         .setContractId(this.tokenFactoryId)
         .setGas(100000)
-        .setFunction("getFarmerBalanceForToken",
+        .setFunction(
+          "getFarmerBalanceForToken",
           new ContractFunctionParameters()
             .addAddress(farmerAddress)
             .addUint256(Number(tokenId))
@@ -213,7 +236,7 @@ class MazaoContractsService {
 
       const result = await balanceQuery.execute(this.client);
       const balance = result.getUint256(0);
-      
+
       return parseInt(balance.toString());
     } catch (error) {
       console.error("Error getting farmer balance:", error);
@@ -226,19 +249,19 @@ class MazaoContractsService {
    */
   async getFarmerTotalBalance(farmerAddress: string): Promise<number> {
     this.initializeClient();
-    
+
     try {
       const balanceQuery = new ContractCallQuery()
         .setContractId(this.tokenFactoryId)
         .setGas(100000)
-        .setFunction("getFarmerBalance",
-          new ContractFunctionParameters()
-            .addAddress(farmerAddress)
+        .setFunction(
+          "getFarmerBalance",
+          new ContractFunctionParameters().addAddress(farmerAddress)
         );
 
       const result = await balanceQuery.execute(this.client);
       const balance = result.getUint256(0);
-      
+
       return parseInt(balance.toString());
     } catch (error) {
       console.error("Error getting farmer total balance:", error);
@@ -251,18 +274,18 @@ class MazaoContractsService {
    */
   async getTokenDetails(tokenId: string): Promise<MazaoTokenInfo | null> {
     this.initializeClient();
-    
+
     try {
       const tokenQuery = new ContractCallQuery()
         .setContractId(this.tokenFactoryId)
         .setGas(150000)
-        .setFunction("getTokenDetails",
-          new ContractFunctionParameters()
-            .addUint256(Number(tokenId))
+        .setFunction(
+          "getTokenDetails",
+          new ContractFunctionParameters().addUint256(Number(tokenId))
         );
 
       const result = await tokenQuery.execute(this.client);
-      
+
       return {
         tokenId,
         farmer: result.getAddress(0),
@@ -272,7 +295,7 @@ class MazaoContractsService {
         isActive: result.getBool(4),
         totalSupply: parseInt(result.getUint256(5).toString()),
         createdAt: parseInt(result.getUint256(6).toString()),
-        tokenSymbol: result.getString(7)
+        tokenSymbol: result.getString(7),
       };
     } catch (error) {
       console.error("Error getting token details:", error);
@@ -290,19 +313,20 @@ class MazaoContractsService {
     interestRate: number
   ): Promise<ContractInteractionResult> {
     this.initializeClient();
-    
+
     try {
-      console.log('Requesting loan:', {
+      console.log("Requesting loan:", {
         collateral: collateralTokenId,
         principal,
         duration,
-        rate: interestRate
+        rate: interestRate,
       });
 
       const loanRequestTx = new ContractExecuteTransaction()
         .setContractId(this.loanManagerId)
         .setGas(1200000)
-        .setFunction("requestLoan",
+        .setFunction(
+          "requestLoan",
           new ContractFunctionParameters()
             .addUint256(Number(collateralTokenId))
             .addUint256(principal)
@@ -312,7 +336,7 @@ class MazaoContractsService {
 
       const response = await loanRequestTx.execute(this.client);
       const receipt = await response.getReceipt(this.client);
-      
+
       if (receipt.status.toString() === "SUCCESS") {
         // Get the new loan ID
         const nextLoanIdQuery = new ContractCallQuery()
@@ -329,16 +353,18 @@ class MazaoContractsService {
         return {
           success: true,
           transactionId: response.transactionId.toString(),
-          data: { loanId: createdLoanId }
+          data: { loanId: createdLoanId },
         };
       } else {
-        throw new Error(`Transaction failed with status: ${receipt.status.toString()}`);
+        throw new Error(
+          `Transaction failed with status: ${receipt.status.toString()}`
+        );
       }
     } catch (error) {
       console.error("Error requesting loan:", error);
       return {
         success: false,
-        error: `Failed to request loan: ${error}`
+        error: `Failed to request loan: ${error}`,
       };
     }
   }
@@ -348,18 +374,18 @@ class MazaoContractsService {
    */
   async getLoanDetails(loanId: string): Promise<LoanInfo | null> {
     this.initializeClient();
-    
+
     try {
       const loanQuery = new ContractCallQuery()
         .setContractId(this.loanManagerId)
         .setGas(150000)
-        .setFunction("getLoan",
-          new ContractFunctionParameters()
-            .addUint256(Number(loanId))
+        .setFunction(
+          "getLoan",
+          new ContractFunctionParameters().addUint256(Number(loanId))
         );
 
       const result = await loanQuery.execute(this.client);
-      
+
       return {
         loanId,
         borrower: result.getAddress(0),
@@ -368,7 +394,7 @@ class MazaoContractsService {
         duration: parseInt(result.getUint256(3).toString()),
         interestRate: parseInt(result.getUint256(4).toString()),
         status: parseInt(result.getUint8(5).toString()),
-        createdAt: parseInt(result.getUint256(6).toString())
+        createdAt: parseInt(result.getUint256(6).toString()),
       };
     } catch (error) {
       console.error("Error getting loan details:", error);
@@ -381,7 +407,7 @@ class MazaoContractsService {
    */
   async getNextTokenId(): Promise<number> {
     this.initializeClient();
-    
+
     try {
       const query = new ContractCallQuery()
         .setContractId(this.tokenFactoryId)
@@ -401,7 +427,7 @@ class MazaoContractsService {
    */
   async getNextLoanId(): Promise<number> {
     this.initializeClient();
-    
+
     try {
       const query = new ContractCallQuery()
         .setContractId(this.loanManagerId)
@@ -433,55 +459,38 @@ class MazaoContractsService {
     error?: string;
   }> {
     try {
-      console.log(`Starting tokenization for evaluation ${evaluationId}`);
+      // Call the API instead of using Hedera client directly
+      // This ensures private keys stay on the server
+      const response = await fetch("/api/tokenization", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          evaluationId,
+          cropType,
+          farmerId,
+          farmerAddress,
+          estimatedValue,
+          harvestDate,
+        }),
+      });
 
-      // Step 1: Create the crop token
-      const tokenSymbol = `${cropType.toUpperCase()}-${farmerId.slice(-6)}`;
-      const createResult = await this.createCropToken(
-        farmerAddress,
-        estimatedValue,
-        cropType,
-        harvestDate,
-        tokenSymbol
-      );
-
-      if (!createResult.success) {
-        throw new Error(createResult.error);
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const tokenId = (createResult.data as any)?.tokenId;
-      if (!tokenId) {
-        throw new Error("No token ID returned from creation");
-      }
-
-      // Step 2: Mint tokens based on estimated value
-      const mintResult = await this.mintTokens(
-        tokenId,
-        estimatedValue,
-        farmerAddress
-      );
-
-      if (!mintResult.success) {
-        throw new Error(mintResult.error);
-      }
-
-      const transactionIds = [
-        createResult.transactionId,
-        mintResult.transactionId
-      ].filter(Boolean) as string[];
-
-      console.log(`Tokenization completed for evaluation ${evaluationId}`);
-
-      return {
-        success: true,
-        tokenId,
-        transactionIds
-      };
+      const result = await response.json();
+      // Extract data from API response format { data: {...}, message: '...', timestamp: '...' }
+      return result?.data || result;
     } catch (error) {
       console.error("Error in tokenization process:", error);
       return {
         success: false,
-        error: `Tokenization failed: ${error}`
+        error: `Tokenization failed: ${error}`,
       };
     }
   }

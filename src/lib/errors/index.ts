@@ -20,6 +20,32 @@ export * from '../validation/validators';
 // Blockchain-specific error handling
 export { BlockchainErrorHandler } from '../blockchain/error-handler';
 
+// Blockchain error translation
+export {
+  translateBlockchainError,
+  createBlockchainError,
+  isBlockchainError,
+  detectBlockchainErrorCode,
+  BlockchainErrorCode,
+  type SupportedLanguage
+} from './blockchain-errors';
+
+// API error responses
+export {
+  createErrorResponse,
+  createSuccessResponse,
+  createValidationErrorResponse,
+  createUnauthorizedResponse,
+  createForbiddenResponse,
+  createDatabaseErrorResponse,
+  withErrorHandling,
+  generateRequestId,
+  getErrorCodeFromStatus,
+  getStatusCodeFromError,
+  type APIErrorResponse,
+  type APISuccessResponse
+} from './api-errors';
+
 // Import for internal use
 import { errorUtils } from './handler';
 

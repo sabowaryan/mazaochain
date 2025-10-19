@@ -142,7 +142,11 @@
     "installPrompt": "Install MazaoChain on your device?",
     "install": "Install",
     "dismiss": "Dismiss",
-    "offlineMessage": "You are offline. Some features may be limited."
+    "offlineMessage": "You are offline. Some features may be limited.",
+    "verifyingConnection": "Verifying connection...",
+    "connectionRestored": "Connection restored",
+    "syncingData": "Syncing data...",
+    "syncComplete": "Sync complete"
   },
   "errors": {
     "generic": "An error occurred",
@@ -150,6 +154,12 @@
     "validationError": "Validation error",
     "insufficientFunds": "Insufficient funds",
     "walletNotConnected": "Wallet not connected",
-    "transactionFailed": "Transaction failed"
+    "transactionFailed": "Transaction failed",
+    "userRejected": "Transaction cancelled by user",
+    "contractError": "Contract error",
+    "loadingError": "Loading error",
+    "unauthorized": "Unauthorized",
+    "notFound": "Not found",
+    "serverError": "Server error"
   }
 }

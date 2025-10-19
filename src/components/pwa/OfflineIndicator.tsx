@@ -1,20 +1,68 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from '@/components/TranslationProvider';
 
 export function OfflineIndicator() {
   const t = useTranslations('pwa');
   const [isOnline, setIsOnline] = useState(true);
   const [showOfflineMessage, setShowOfflineMessage] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // Verify actual connectivity by making a network request
+  const verifyConnection = useCallback(async () => {
+    if (!navigator.onLine) {
+      return false;
+    }
+
+    setIsVerifying(true);
+    try {
+      // Try to fetch a small resource to verify actual connectivity
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch('/manifest.json', {
+        method: 'HEAD',
+        cache: 'no-cache',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      setIsVerifying(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Set initial online status
-    setIsOnline(navigator.onLine);
+    // Set initial online status and verify
+    const checkInitialStatus = async () => {
+      const online = await verifyConnection();
+      setIsOnline(online);
+      if (!online) {
+        setShowOfflineMessage(true);
+      }
+    };
+    
+    checkInitialStatus();
 
-    const handleOnline = () => {
-      setIsOnline(true);
-      setShowOfflineMessage(false);
+    const handleOnline = async () => {
+      // Verify actual connectivity before declaring online
+      const actuallyOnline = await verifyConnection();
+      setIsOnline(actuallyOnline);
+      
+      if (actuallyOnline) {
+        setShowOfflineMessage(true); // Show "back online" message
+        
+        // Trigger sync of offline data
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SYNC_OFFLINE_DATA'
+          });
+        }
+      }
     };
 
     const handleOffline = () => {
@@ -25,18 +73,28 @@ export function OfflineIndicator() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Periodic connectivity check (every 30 seconds)
+    const intervalId = setInterval(async () => {
+      const online = await verifyConnection();
+      if (online !== isOnline) {
+        setIsOnline(online);
+        setShowOfflineMessage(true);
+      }
+    }, 30000);
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [verifyConnection, isOnline]);
 
-  // Auto-hide the offline message after 5 seconds when back online
+  // Auto-hide the message after 5 seconds when back online
   useEffect(() => {
     if (isOnline && showOfflineMessage) {
       const timer = setTimeout(() => {
         setShowOfflineMessage(false);
-      }, 3000);
+      }, 5000);
       return () => clearTimeout(timer);
     }
   }, [isOnline, showOfflineMessage]);
@@ -53,7 +111,11 @@ export function OfflineIndicator() {
     }`}>
       <div className="flex items-center space-x-2">
         <div className="flex-shrink-0">
-          {isOnline ? (
+          {isVerifying ? (
+            <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          ) : isOnline ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -65,7 +127,11 @@ export function OfflineIndicator() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium">
-            {isOnline ? 'Connexion rétablie' : t('offlineMessage')}
+            {isVerifying 
+              ? t('verifyingConnection') || 'Vérification de la connexion...'
+              : isOnline 
+                ? t('connectionRestored') || 'Connexion rétablie' 
+                : t('offlineMessage')}
           </p>
         </div>
       </div>

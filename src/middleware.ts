@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from 'next/server';
 import { 
-  validateAuthToken, 
   hasPermission,
   createRedirectUrl,
   SECURITY_HEADERS,
   type UserRole 
 } from './lib/auth/middleware-auth';
+import { createMiddlewareClient } from './lib/supabase/middleware';
 
 // Supported locales
 const LOCALES = ['en', 'fr', 'ln'] as const;
@@ -19,8 +19,8 @@ const isDevelopment = process.env.NODE_ENV === 'development';
  * Check if a route is protected (requires authentication)
  */
 function isProtectedRoute(pathname: string): boolean {
-  // Remove locale prefix for checking
-  const cleanPath = pathname.replace(/^\/[a-z]{2}/, '') || '/';
+  // Remove locale prefix for checking (e.g., /fr/, /en/, /ln/)
+  const cleanPath = pathname.replace(/^\/[a-z]{2}\//, '/') || pathname;
   
   // Always allow auth routes - they should never be protected
   if (cleanPath.startsWith('/auth/')) {
@@ -55,7 +55,8 @@ function isProtectedRoute(pathname: string): boolean {
  * Get required role for a route
  */
 function getRequiredRole(pathname: string): UserRole | null {
-  const cleanPath = pathname.replace(/^\/[a-z]{2}/, '') || '/';
+  // Remove locale prefix (e.g., /fr/, /en/, /ln/)
+  const cleanPath = pathname.replace(/^\/[a-z]{2}\//, '/') || pathname;
   
   if (cleanPath.startsWith('/admin')) return 'admin';
   if (cleanPath.startsWith('/dashboard/farmer')) return 'agriculteur';
@@ -71,7 +72,7 @@ function getRequiredRole(pathname: string): UserRole | null {
 function getLocale(request: NextRequest): string {
   // First check URL parameter
   const localeFromUrl = request.nextUrl.searchParams.get('lang');
-  if (localeFromUrl && LOCALES.includes(localeFromUrl as any)) {
+  if (localeFromUrl && LOCALES.includes(localeFromUrl as typeof LOCALES[number])) {
     return localeFromUrl;
   }
 
@@ -83,7 +84,7 @@ function getLocale(request: NextRequest): string {
       .split('-')[0]
       .toLowerCase();
     
-    if (LOCALES.includes(preferredLocale as any)) {
+    if (LOCALES.includes(preferredLocale as typeof LOCALES[number])) {
       return preferredLocale;
     }
   }
@@ -106,14 +107,14 @@ function hasLocalePrefix(pathname: string): boolean {
 function extractLocale(pathname: string): string {
   const segments = pathname.split('/');
   const potentialLocale = segments[1];
-  return LOCALES.includes(potentialLocale as any) ? potentialLocale : DEFAULT_LOCALE;
+  return LOCALES.includes(potentialLocale as typeof LOCALES[number]) ? potentialLocale : DEFAULT_LOCALE;
 }
 
 /**
  * Remove locale prefix from pathname
  */
 function removeLocalePrefix(pathname: string): string {
-  return pathname.replace(/^\/[a-z]{2}/, '') || '/';
+  return pathname.replace(/^\/[a-z]{2}\//, '/') || pathname;
 }
 
 /**
@@ -129,28 +130,53 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
 /**
  * Handle authentication for protected routes using Supabase
  */
-async function handleAuthentication(request: NextRequest, pathname: string) {
+async function handleAuthentication(request: NextRequest, response: NextResponse) {
   try {
-    // Get Supabase auth cookies
-    const accessToken = request.cookies.get('sb-access-token')?.value ||
-                       request.cookies.get('supabase-auth-token')?.value ||
-                       request.cookies.get('supabase.auth.token')?.value;
+    console.log('🔍 Checking authentication...');
+    console.log('📝 Cookies:', request.cookies.getAll().map(c => c.name).join(', '));
     
-    const refreshToken = request.cookies.get('sb-refresh-token')?.value ||
-                        request.cookies.get('supabase-refresh-token')?.value;
+    // Create Supabase client for middleware
+    const supabase = createMiddlewareClient(request, response);
 
-    if (!accessToken && !refreshToken) {
-      return { authenticated: false, error: 'No auth tokens found' };
+    // Get the current user (more secure than getSession)
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    console.log('📊 User check:', {
+      hasUser: !!user,
+      hasError: !!userError,
+      errorMessage: userError?.message,
+      userId: user?.id
+    });
+
+    if (userError || !user) {
+      return { authenticated: false, error: userError?.message || 'No authenticated user' };
     }
 
-    // Use the validateAuthToken function from middleware-auth
-    if (accessToken) {
-      const authResult = await validateAuthToken(accessToken);
-      return authResult;
+    // Get user profile with role
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, is_validated')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return { authenticated: false, error: 'Profile not found' };
     }
 
-    return { authenticated: false, error: 'No valid access token' };
-  } catch (error) {
+    // Check if user account is validated (except for farmers who can be unvalidated)
+    if (!profile.is_validated && profile.role !== 'agriculteur') {
+      return {
+        authenticated: false,
+        error: 'Account not validated'
+      };
+    }
+
+    return {
+      authenticated: true,
+      user: user,
+      role: profile.role as UserRole
+    };
+  } catch (error: unknown) {
     console.error('Authentication error in middleware:', error);
     return { authenticated: false, error: 'Authentication failed' };
   }
@@ -181,15 +207,18 @@ export async function middleware(request: NextRequest) {
 
   // Handle locale routing
   const hasLocale = hasLocalePrefix(pathname);
-  let locale = hasLocale ? extractLocale(pathname) : getLocale(request);
-  let localizedPathname = hasLocale ? pathname : `/${locale}${pathname}`;
-  let cleanPathname = removeLocalePrefix(localizedPathname);
+  const locale = hasLocale ? extractLocale(pathname) : getLocale(request);
+  const localizedPathname = hasLocale ? pathname : `/${locale}${pathname}`;
+  const cleanPathname = removeLocalePrefix(localizedPathname);
+
+  // Create response object early for Supabase cookie management
+  let response = hasLocale ? NextResponse.next() : NextResponse.redirect(new URL(localizedPathname, request.url));
 
   // Check if route requires protection
   if (isProtectedRoute(cleanPathname)) {
     console.log(`🔒 Protecting route: ${cleanPathname}`);
     
-    const authResult = await handleAuthentication(request, cleanPathname);
+    const authResult = await handleAuthentication(request, response);
     
     if (!authResult.authenticated) {
       console.log(`❌ Authentication failed for ${cleanPathname}: ${authResult.error}`);
@@ -218,9 +247,6 @@ export async function middleware(request: NextRequest) {
 
     console.log(`✅ Access granted to ${cleanPathname} for user ${authResult.user?.email} (${authResult.role})`);
 
-    // Create response with user info in headers
-    const response = hasLocale ? NextResponse.next() : NextResponse.redirect(new URL(localizedPathname, request.url));
-    
     // Add user info to headers for downstream use
     response.headers.set('x-user-id', authResult.user?.id || '');
     response.headers.set('x-user-role', authResult.role || '');
@@ -234,11 +260,11 @@ export async function middleware(request: NextRequest) {
   // Handle locale redirect if needed
   if (!hasLocale) {
     const redirectUrl = new URL(localizedPathname, request.url);
-    return NextResponse.redirect(redirectUrl);
+    response = NextResponse.redirect(redirectUrl);
   }
 
   // Add basic security headers to all responses
-  return addSecurityHeaders(NextResponse.next());
+  return addSecurityHeaders(response);
 }
 
 export const config = {

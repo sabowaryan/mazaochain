@@ -3,6 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslations } from '@/components/TranslationProvider';
 import { useMazaoContracts } from '@/hooks/useMazaoContracts';
+import { useWallet } from '@/hooks/useWallet';
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +11,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RequireAuth } from '@/components/auth/AuthGuard';
 import { PendingEvaluationsReview } from '@/components/cooperative/PendingEvaluationsReview';
 import { LoanApprovalList } from '@/components/cooperative/LoanApprovalList';
+import { WalletConnection } from '@/components/wallet/WalletConnection';
 
 interface CooperativeStats {
   totalMembers: number;
@@ -46,9 +48,10 @@ interface LoanRequest {
 }
 
 function CooperativeDashboardContent() {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const t = useTranslations('cooperative');
   const { loading: contractsLoading } = useMazaoContracts();
+  const { isConnected } = useWallet();
   
   const [stats, setStats] = useState<CooperativeStats>({
     totalMembers: 0,
@@ -63,7 +66,9 @@ function CooperativeDashboardContent() {
 
   useEffect(() => {
     const loadCooperativeData = async () => {
-      if (!user?.id || !profile) return;
+      if (!user?.id || !profile) {
+        return;
+      }
 
       try {
         setIsLoading(true);
@@ -72,12 +77,25 @@ function CooperativeDashboardContent() {
         const [evaluationsRes, loansRes, membersRes] = await Promise.all([
           fetch(`/api/crop-evaluations?status=pending&cooperative_id=${user.id}`),
           fetch(`/api/loans?status=pending&cooperative_id=${user.id}`),
-          fetch(`/api/farmers?cooperative_id=${user.id}`)
+          fetch(`/api/cooperative/members?cooperative_id=${user.id}`)
         ]);
 
-        const evaluations = await evaluationsRes.json();
-        const loans = await loansRes.json();
-        const members = await membersRes.json();
+        const evaluationsResult = await evaluationsRes.json();
+        const loansResult = await loansRes.json();
+        const membersResult = await membersRes.json();
+
+        // Extraire les données des réponses API avec gestion d'erreur
+        const evaluations = evaluationsResult?.error 
+          ? [] 
+          : (Array.isArray(evaluationsResult) ? evaluationsResult : (evaluationsResult?.data || []));
+        
+        const loans = loansResult?.error 
+          ? [] 
+          : (Array.isArray(loansResult) ? loansResult : (loansResult?.data || []));
+        
+        const members = membersResult?.error 
+          ? [] 
+          : (Array.isArray(membersResult) ? membersResult : (membersResult?.data || []));
 
         setPendingEvaluations(evaluations);
         setPendingLoans(loans);
@@ -102,17 +120,12 @@ function CooperativeDashboardContent() {
     };
 
     loadCooperativeData();
-  }, [user?.id, profile]);
+  }, [user.id, profile, user]);
 
 
 
-  if (!user || !profile) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
+  // Le AuthGuard s'occupe déjà de vérifier l'authentification
+  // On affiche juste un loader si les données sont en cours de chargement
 
   if (isLoading || contractsLoading) {
     return (
@@ -133,6 +146,13 @@ function CooperativeDashboardContent() {
           Bienvenue, {profile?.cooperative_profiles?.nom || user?.email}
         </p>
       </div>
+
+      {/* Wallet Connection */}
+      {!isConnected && (
+        <div className="mb-8">
+          <WalletConnection showBalances={false} />
+        </div>
+      )}
 
       {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

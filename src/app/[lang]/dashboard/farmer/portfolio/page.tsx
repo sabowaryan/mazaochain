@@ -29,14 +29,31 @@ export default function FarmerPortfolioPage() {
 
   useEffect(() => {
     const loadPortfolio = async () => {
-      if (!user?.id || !profile?.wallet_address) return;
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
 
       try {
         setLoading(true);
 
-        // Charger le solde total
-        const balance = await getFarmerTotalBalance(profile.wallet_address);
-        setTotalBalance(balance);
+        // Charger le solde total si wallet_address est disponible avec timeout
+        if (profile?.wallet_address) {
+          try {
+            // Ajouter un timeout de 3 secondes pour éviter le blocage
+            const balancePromise = getFarmerTotalBalance(profile.wallet_address);
+            const timeoutPromise = new Promise<number>((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 3000)
+            );
+            
+            const balance = await Promise.race([balancePromise, timeoutPromise]);
+            setTotalBalance(balance as number);
+          } catch (error) {
+            console.warn('Could not fetch balance from blockchain:', error);
+            // Continue même si la blockchain n'est pas accessible
+            setTotalBalance(0);
+          }
+        }
 
         // Simuler des holdings de tokens (en attendant l'API réelle)
         const mockHoldings: TokenHolding[] = [

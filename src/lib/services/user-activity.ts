@@ -175,7 +175,7 @@ class UserActivityService {
 
       if (error) throw error;
 
-      return data?.map((activity: any) => ({
+      return data?.map((activity: unknown) => ({
         id: activity.id,
         userId: activity.user_id || '',
         userEmail: 'N/A', // Will be fetched separately if needed

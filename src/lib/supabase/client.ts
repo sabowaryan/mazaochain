@@ -1,25 +1,15 @@
-import { createBrowserClient } from '@supabase/ssr'
-import { Database } from './database.types'
+import { createBrowserClient } from "@supabase/ssr";
+import { Database } from "./database.types";
 
-export const createClient = () =>
-  createBrowserClient<Database>(
+export const createClient = () => {
+  return createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-        storageKey: 'mazaochain-auth-token',
-        flowType: 'pkce'
-      },
-      global: {
-        headers: {
-          'X-Client-Info': 'mazaochain-web'
-        }
-      }
-    }
-  )
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+};
 
-export const supabase = createClient()
+// Only create instance in browser environment
+export const supabase =
+  typeof window !== "undefined"
+    ? createClient()
+    : (null as unknown as ReturnType<typeof createClient>);

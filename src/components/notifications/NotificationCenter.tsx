@@ -85,7 +85,7 @@ export function NotificationCenter() {
       );
 
       // Transform data to match Notification interface
-      const transformedData = (data || []).map((item: any) => ({
+      const transformedData = (data || []).map((item: unknown) => ({
         id: item.id,
         type: item.type as NotificationType,
         title: item.title,
@@ -115,7 +115,8 @@ export function NotificationCenter() {
     if (user) {
       loadNotifications(true);
     }
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleMarkAsRead = markAsRead;
   const handleMarkAllAsRead = markAllAsRead;

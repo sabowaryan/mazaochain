@@ -10,14 +10,19 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { FarmerProfileForm } from "@/components/profiles/FarmerProfileForm";
 
 export default function FarmerProfilePage() {
-  const { user, profile, loading: authLoading } = useAuth();
-  const { profileData: farmerProfile, loading: profileLoading, error, refreshProfile } = useFarmerProfile();
+  const { user, profile, loading: authLoading, initialized } = useAuth();
+  const {
+    profileData: farmerProfile,
+    loading: profileLoading,
+    error,
+    refreshProfile,
+  } = useFarmerProfile();
   const { stats, loading: statsLoading } = useUserStats();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Show loading while authentication or profile data is loading
-  if (authLoading || profileLoading) {
+  // Show loading while authentication is initializing or profile data is loading
+  if (!initialized || authLoading || profileLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -36,27 +41,31 @@ export default function FarmerProfilePage() {
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
             Accès non autorisé
           </h2>
-          <p className="text-gray-600">Veuillez vous connecter pour accéder à cette page.</p>
+          <p className="text-gray-600">
+            Veuillez vous connecter pour accéder à cette page.
+          </p>
         </div>
       </div>
     );
   }
 
   // Show error if user is not a farmer
-  if (profile?.role !== 'agriculteur') {
+  if (profile?.role !== "agriculteur") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
             Accès restreint
           </h2>
-          <p className="text-gray-600">Cette page est réservée aux agriculteurs.</p>
+          <p className="text-gray-600">
+            Cette page est réservée aux agriculteurs.
+          </p>
         </div>
       </div>
     );
   }
 
-  // Show error message if there's an error loading profile
+  // Show error message if there&apos;s an error loading profile
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -65,22 +74,11 @@ export default function FarmerProfilePage() {
             Erreur de chargement
           </h2>
           <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={refreshProfile}>
-            Réessayer
-          </Button>
+          <Button onClick={refreshProfile}>Réessayer</Button>
         </div>
       </div>
     );
   }
-
-  const handleSave = async () => {
-    setLoading(true);
-    // Logique de sauvegarde
-    setTimeout(() => {
-      setLoading(false);
-      setIsEditing(false);
-    }, 1000);
-  };
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -162,7 +160,7 @@ export default function FarmerProfilePage() {
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-gray-700">
-                      Années d'expérience
+                      Années d&apos;expérience
                     </Label>
                     <p className="mt-1 text-gray-900">
                       {farmerProfile?.experience_annees || "Non renseigné"}
@@ -241,7 +239,9 @@ export default function FarmerProfilePage() {
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Tokens MAZAO</span>
                 <span className="font-medium">
-                  {statsLoading ? "..." : stats.mazaoTokens?.toLocaleString() || 0}
+                  {statsLoading
+                    ? "..."
+                    : stats.mazaoTokens?.toLocaleString() || 0}
                 </span>
               </div>
               <div className="flex items-center justify-between">

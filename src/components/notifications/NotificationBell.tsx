@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 
 export function NotificationBell() {
   const { user } = useAuth();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } =
+    useNotifications();
   const [showDropdown, setShowDropdown] = useState(false);
 
   if (!user) return null;
@@ -27,7 +29,7 @@ export function NotificationBell() {
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M15 17h5l-5 5v-5zM11 19H6a2 2 0 01-2-2V7a2 2 0 012-2h5m5 0v6m0 0l3-3m-3 3l-3-3"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
           />
         </svg>
         {unreadCount > 0 && (
@@ -98,13 +100,13 @@ export function NotificationBell() {
           </div>
 
           <div className="p-2 border-t border-gray-200">
-            <a
+            <Link
               href="/dashboard/notifications"
               className="block w-full text-center text-sm text-primary-600 hover:text-primary-800 py-2 font-medium"
               onClick={() => setShowDropdown(false)}
             >
               Voir toutes les notifications
-            </a>
+            </Link>
           </div>
         </div>
       )}

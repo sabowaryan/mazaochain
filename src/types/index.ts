@@ -79,3 +79,6 @@ export interface Transaction {
   hederaTransactionId: string;
   timestamp: Date;
 }
+
+// Export wallet types
+export * from './wallet';

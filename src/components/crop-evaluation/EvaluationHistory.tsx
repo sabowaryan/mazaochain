@@ -27,9 +27,15 @@ export function EvaluationHistory({ farmerId, onViewDetails }: EvaluationHistory
     try {
       setLoading(true)
       const data = await cropEvaluationService.getFarmerEvaluations(farmerId)
-      setEvaluations(data)
+      // S'assurer que data est un tableau
+      const evaluationsArray = Array.isArray(data) ? data : []
+      if (!Array.isArray(data)) {
+        console.warn('Evaluations data is not an array:', data)
+      }
+      setEvaluations(evaluationsArray)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement')
+      setEvaluations([]) // Set empty array on error
     } finally {
       setLoading(false)
     }
@@ -96,7 +102,7 @@ export function EvaluationHistory({ farmerId, onViewDetails }: EvaluationHistory
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {evaluations.length === 0 ? (
+        {!Array.isArray(evaluations) || evaluations.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-gray-400 mb-4">
               <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">

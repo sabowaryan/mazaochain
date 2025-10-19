@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
-import type { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
+import type { User, AuthChangeEvent } from '@supabase/supabase-js';
+import type { Session } from '@supabase/supabase-js';
 import type { Database } from '@/lib/supabase/database.types';
 
 type Profile = Database['public']['Tables']['profiles']['Row'] & {
@@ -15,14 +16,13 @@ type Profile = Database['public']['Tables']['profiles']['Row'] & {
 interface AuthState {
   user: User | null;
   profile: Profile | null;
-  session: Session | null;
   loading: boolean;
   initialized: boolean;
 }
 
 interface AuthContextType extends AuthState {
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, userData: Partial<Profile>) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: unknown }>;
+  signUp: (email: string, password: string, userData: Partial<Profile>) => Promise<{ error: unknown }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   isAuthenticated: boolean;
@@ -37,7 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     profile: null,
-    session: null,
     loading: true,
     initialized: false,
   });
@@ -47,6 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch user profile with farmer profile data
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    if (!supabase) {
+      console.warn('Supabase client not available');
+      return null;
+    }
+    
     try {
       // First, get the basic profile
       const { data: profileData, error: profileError } = await supabase
@@ -74,11 +78,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
         
-        if (profileError.message?.includes('permission denied')) {
-          console.warn('Permission denied for profiles table - user may need to complete setup');
+        if (profileError.message?.includes('permission denied') || profileError.message?.includes('JWT')) {
+          console.warn('Permission denied for profiles table - using fallback profile from user metadata');
+          // Créer un profil par défaut basé sur les métadonnées utilisateur
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user?.user_metadata?.role) {
+            return {
+              id: userId,
+              email: user.email || null,
+              phone_number: null,
+              role: user.user_metadata.role as 'admin' | 'cooperative' | 'agriculteur' | 'preteur',
+              is_validated: user.user_metadata.role !== 'agriculteur',
+              wallet_address: null,
+              created_at: new Date().toISOString()
+            };
+          }
         }
         
         console.error('Error fetching profile:', profileError.message || profileError);
+        // Retourner un profil minimal plutôt que null pour éviter le blocage
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          return {
+            id: userId,
+            email: user.email || null,
+            phone_number: null,
+            role: (user.user_metadata?.role as 'admin' | 'cooperative' | 'agriculteur' | 'preteur') || 'agriculteur',
+            is_validated: false,
+            wallet_address: null,
+            created_at: new Date().toISOString()
+          };
+        }
         return null;
       }
 
@@ -163,8 +193,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     event: AuthChangeEvent,
     session: Session | null
   ) => {
-    console.log('Auth state changed:', event, session?.user?.email);
-
     setAuthState(prev => ({ ...prev, loading: true }));
 
     if (session?.user) {
@@ -173,34 +201,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setAuthState({
         user: session.user,
         profile,
-        session,
         loading: false,
         initialized: true,
       });
-
-      // Handle different auth events
-      switch (event) {
-        case 'SIGNED_IN':
-          console.log('User signed in:', session.user.email);
-          break;
-        case 'TOKEN_REFRESHED':
-          console.log('Token refreshed for:', session.user.email);
-          break;
-        case 'USER_UPDATED':
-          console.log('User updated:', session.user.email);
-          break;
-      }
     } else {
       setAuthState({
         user: null,
         profile: null,
-        session: null,
         loading: false,
         initialized: true,
       });
 
       if (event === 'SIGNED_OUT') {
-        console.log('User signed out');
         router.push('/');
       }
     }
@@ -211,19 +223,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     const initializeAuth = async () => {
+      if (!supabase) {
+        console.warn('Supabase client not available during initialization');
+        if (mounted) {
+          setAuthState(prev => ({ ...prev, loading: false, initialized: true }));
+        }
+        return;
+      }
+
       try {
-        // Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Get session first (safer approach)
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error('Error getting session:', error);
+        // If no session, user is not authenticated - this is normal, not an error
+        if (!session) {
+          if (mounted) {
+            setAuthState({
+              user: null,
+              profile: null,
+              loading: false,
+              initialized: true,
+            });
+          }
+          return;
+        }
+
+        // If we have a session, verify the user
+        const { error: userError } = await supabase.auth.getUser();
+        
+        if (userError && !userError.message?.includes('Auth session missing')) {
+          console.error('Error getting user:', userError);
         }
 
         if (mounted) {
           await handleAuthChange('INITIAL_SESSION', session);
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        // Only log unexpected errors, not auth session missing
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('Auth session missing')) {
+          console.error('Error initializing auth:', error);
+        }
         if (mounted) {
           setAuthState(prev => ({ ...prev, loading: false, initialized: true }));
         }
@@ -232,17 +272,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+    // Listen for auth changes (only if supabase is available)
+    if (supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+
+      return () => {
+        mounted = false;
+        subscription.unsubscribe();
+      };
+    }
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
-  }, [supabase.auth, handleAuthChange]);
+  }, [supabase, handleAuthChange]);
 
   // Sign in function
   const signIn = useCallback(async (email: string, password: string) => {
+    if (!supabase) {
+      return { error: new Error('Supabase client not available') };
+    }
+
     setAuthState(prev => ({ ...prev, loading: true }));
     
     const { error } = await supabase.auth.signInWithPassword({
@@ -255,7 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return { error };
-  }, [supabase.auth]);
+  }, [supabase]);
 
   // Sign up function
   const signUp = useCallback(async (
@@ -263,9 +313,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string, 
     userData: Partial<Profile>
   ) => {
+    if (!supabase) {
+      return { error: new Error('Supabase client not available') };
+    }
+
     setAuthState(prev => ({ ...prev, loading: true }));
 
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -278,10 +332,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return { error };
-  }, [supabase.auth]);
+  }, [supabase]);
 
   // Sign out function
   const signOut = useCallback(async () => {
+    if (!supabase) {
+      console.error('Supabase client not available');
+      return;
+    }
+
     setAuthState(prev => ({ ...prev, loading: true }));
     
     const { error } = await supabase.auth.signOut();
@@ -290,7 +349,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error signing out:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
     }
-  }, [supabase.auth]);
+  }, [supabase]);
 
   // Helper functions
   const isAuthenticated = !!authState.user;

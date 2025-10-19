@@ -21,7 +21,6 @@ export function AuthGuard({
   fallback,
 }: AuthGuardProps) {
   const { 
-    user, 
     profile, 
     loading, 
     initialized, 
@@ -32,7 +31,9 @@ export function AuthGuard({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!initialized || loading) return;
+    if (!initialized || loading) {
+      return;
+    }
 
     // If auth is required but user is not authenticated
     if (requireAuth && !isAuthenticated) {
@@ -77,12 +78,18 @@ export function AuthGuard({
     redirectTo,
   ]);
 
-  // Show loading while initializing or during auth checks
-  if (!initialized || loading) {
+  // Show loading only during initial initialization (first load)
+  // But if user is already authenticated, show content immediately
+  if (!initialized) {
+    // Si l'utilisateur est déjà authentifié (session en cours), afficher le contenu
+    // Cela évite le spinner lors de la navigation entre pages
+    if (isAuthenticated && !requiredRoles.length) {
+      return <>{children}</>;
+    }
     return fallback || <AuthLoadingFallback />;
   }
 
-  // If auth is required but user is not authenticated, show loading
+  // If auth is required but user is not authenticated, show loading briefly
   // (redirect will happen in useEffect)
   if (requireAuth && !isAuthenticated) {
     return fallback || <AuthLoadingFallback />;
@@ -107,7 +114,7 @@ function AuthLoadingFallback() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
         <LoadingSpinner size="lg" />
-        <p className="text-muted-foreground">Vérification de l'authentification...</p>
+        <p className="text-muted-foreground">Vérification de l&apos;authentification...</p>
       </div>
     </div>
   );

@@ -33,18 +33,8 @@ export class LenderService {
               superficie,
               localisation,
               crop_type,
-              cooperative_profiles!farmer_profiles_cooperative_id_fkey(
-                nom,
-                region
-              )
+              cooperative_id
             )
-          ),
-          crop_evaluations!crop_evaluations_farmer_id_fkey(
-            crop_type,
-            superficie,
-            rendement_historique,
-            valeur_estimee,
-            created_at
           )
         `)
         .eq('status', 'approved')
@@ -61,8 +51,30 @@ export class LenderService {
       const opportunities: LoanOpportunity[] = await Promise.all(
         loans.map(async (loan) => {
           const farmerProfile = (loan.borrower as any)?.farmer_profiles
-          const cooperativeProfile = farmerProfile?.cooperative_profiles
-          const evaluation = (loan as any).crop_evaluations?.[0]
+          
+          // Get the most recent evaluation for this farmer
+          const { data: evaluations } = await this.supabase
+            .from('crop_evaluations')
+            .select('*')
+            .eq('farmer_id', loan.borrower_id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          const evaluation = evaluations?.[0];
+
+          // Get cooperative info if cooperative_id exists
+          let cooperativeName = 'Non affilié';
+          if (farmerProfile?.cooperative_id) {
+            const { data: coopProfile } = await this.supabase
+              .from('cooperative_profiles')
+              .select('nom')
+              .eq('user_id', farmerProfile.cooperative_id)
+              .single();
+            
+            if (coopProfile) {
+              cooperativeName = coopProfile.nom;
+            }
+          }
 
           // Calculate risk assessment
           const riskAssessment = await this.calculateRiskAssessment(loan.borrower_id || '', evaluation)
@@ -79,7 +91,7 @@ export class LenderService {
             farmerName: farmerProfile?.nom || 'Agriculteur Inconnu',
             farmerId: loan.borrower_id || '',
             cropType: evaluation?.crop_type || farmerProfile?.crop_type || 'Non spécifié',
-            region: cooperativeProfile?.region || farmerProfile?.localisation || 'Non spécifiée',
+            region: farmerProfile?.localisation || 'Non spécifiée',
             requestedAmount: loan.principal,
             collateralValue: loan.collateral_amount,
             collateralRatio: Math.round((loan.collateral_amount / loan.principal) * 100),
@@ -91,6 +103,7 @@ export class LenderService {
             farmingExperience: 5, // Default experience
             riskAssessment,
             cooperativeApproved: true, // Since status is approved
+            cooperativeName, // Add cooperative name
             createdAt: loan.created_at || new Date().toISOString()
           }
         })
@@ -506,7 +519,7 @@ export class LenderService {
         lenderWallet.wallet_address,
         liquidationValue,
         loanId,
-        (collateralTokens as any)[0]?.tokenId
+        (collateralTokens as unknown)[0]?.tokenId
       )
 
       if (!liquidationResult.success) {
@@ -631,7 +644,7 @@ export class LenderService {
   /**
    * Calculate risk assessment for a farmer and crop
    */
-  private async calculateRiskAssessment(farmerId: string, evaluation: any): Promise<RiskAssessment> {
+  private async calculateRiskAssessment(farmerId: string, evaluation: unknown): Promise<RiskAssessment> {
     try {
       // Get farmer's history
       const { data: farmerLoans } = await this.supabase

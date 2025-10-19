@@ -1,7 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { 
+  createErrorResponse, 
+  createSuccessResponse, 
+  createDatabaseErrorResponse,
+  generateRequestId 
+} from "@/lib/errors/api-errors";
+import { ErrorCode } from "@/lib/errors/types";
+import { MazaoChainError } from "@/lib/errors/MazaoChainError";
 
 export async function GET(request: NextRequest) {
+  const requestId = generateRequestId();
+  
   try {
     const supabase = createClient();
     const { searchParams } = new URL(request.url);
@@ -68,24 +78,33 @@ export async function GET(request: NextRequest) {
     });
 
     if (error) {
-      console.error("Erreur lors de la récupération des prêts:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return createDatabaseErrorResponse(error, requestId);
     }
 
-    return NextResponse.json(data || []);
+    return createSuccessResponse(data || [], 'Loans retrieved successfully');
   } catch (error) {
-    console.error("Erreur serveur:", error);
-    return NextResponse.json(
-      { error: "Erreur interne du serveur" },
-      { status: 500 }
-    );
+    return createErrorResponse(error, 500, requestId);
   }
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+  
   try {
     const supabase = createClient();
     const body = await request.json();
+
+    // Validate required fields
+    if (!body.borrower_id || !body.amount) {
+      const validationError = new MazaoChainError(
+        ErrorCode.VALIDATION_ERROR,
+        'Missing required fields: borrower_id and amount are required',
+        {
+          userMessage: 'Veuillez fournir tous les champs obligatoires'
+        }
+      );
+      return createErrorResponse(validationError, 400, requestId);
+    }
 
     const { data, error } = await (await supabase)
       .from("loans")
@@ -94,16 +113,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Erreur lors de la création du prêt:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return createDatabaseErrorResponse(error, requestId);
     }
 
-    return NextResponse.json(data);
+    return createSuccessResponse(data, 'Loan created successfully', 201);
   } catch (error) {
-    console.error("Erreur serveur:", error);
-    return NextResponse.json(
-      { error: "Erreur interne du serveur" },
-      { status: 500 }
-    );
+    return createErrorResponse(error, 500, requestId);
   }
 }

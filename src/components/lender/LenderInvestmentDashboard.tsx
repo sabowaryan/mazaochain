@@ -35,7 +35,8 @@ export function LenderInvestmentDashboard() {
     if (user && profile?.role === 'preteur') {
       loadDashboardData()
     }
-  }, [user, profile, loadDashboardData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, profile?.role])
 
   const handleCommitFunds = async (opportunityId: string, amount: number) => {
     try {

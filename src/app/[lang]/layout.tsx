@@ -5,9 +5,12 @@ import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/pwa/ServiceWorkerRegistration";
 import { MobileNavigation } from "@/components/navigation/MobileNavigation";
+import { WalletErrorSuppressor } from "@/components/WalletErrorSuppressor";
 import { getDictionary } from './dictionaries';
 import { TranslationProvider } from '@/components/TranslationProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ErrorBoundary } from '@/components/errors/ErrorBoundary';
+import { WalletModalGlobalProvider } from '@/components/wallet/WalletModalGlobalProvider';
 
 import "../globals.css";
 
@@ -62,17 +65,21 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
       >
-        <TranslationProvider messages={dict} locale={validLang}>
-          <AuthProvider>
-            <ServiceWorkerRegistration />
-            <ClientNavigation />
-            <main className="min-h-screen pb-16 md:pb-0">{children}</main>
-            <MobileNavigation />
-            <PWAInstallPrompt />
-            <OfflineIndicator />
-
-          </AuthProvider>
-        </TranslationProvider>
+        <ErrorBoundary>
+          <TranslationProvider messages={dict} locale={validLang}>
+            <AuthProvider>
+              <WalletModalGlobalProvider>
+                <WalletErrorSuppressor />
+                <ServiceWorkerRegistration />
+                <ClientNavigation />
+                <main className="min-h-screen pb-16 md:pb-0">{children}</main>
+                <MobileNavigation />
+                <PWAInstallPrompt />
+                <OfflineIndicator />
+              </WalletModalGlobalProvider>
+            </AuthProvider>
+          </TranslationProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

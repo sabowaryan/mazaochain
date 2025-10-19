@@ -19,9 +19,17 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   // Webpack configuration (utilisé uniquement pour les builds de production)
-  webpack: (config: { externals: string[]; resolve: { fallback: any; }; }, { isServer }: any) => {
+  webpack: (config: { externals: string[]; resolve: { fallback: any; }; plugins: any[]; }, { isServer }: unknown) => {
     // Externaliser les modules problématiques (recommandation Reown Appkit)
     config.externals.push("pino-pretty", "lokijs", "encoding");
+
+    // Ajouter le plugin ProvidePlugin pour buffer (nécessaire pour @hashgraph/sdk)
+    const webpack = require('webpack');
+    config.plugins.push(
+      new webpack.ProvidePlugin({
+        Buffer: ['buffer', 'Buffer'],
+      })
+    );
 
     // Fallback pour les modules Node.js non disponibles côté client
     if (!isServer) {

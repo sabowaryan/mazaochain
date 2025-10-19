@@ -48,7 +48,7 @@ export function useWallet(): UseWalletReturn {
 
   const { user } = useAuth();
 
-  // Get the appropriate wallet service (custom or AppKit)
+  // Get the wallet service (DAppConnector-based)
   const walletService = getWalletService();
 
   // Load balances function

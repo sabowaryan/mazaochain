@@ -47,13 +47,12 @@
     "db:verify": "npm run audit:database && npm run test:database"
   },
   "dependencies": {
-    "@hashgraph/hedera-wallet-connect": "^2.0.4-canary.3ca04e9.0",
+    "@hashgraph/hedera-wallet-connect": "^2.0.3",
     "@hashgraph/sdk": "2.72.0",
     "@heroicons/react": "^2.2.0",
-    "@reown/appkit": "^1.8.10",
-    "@reown/appkit-adapter-wagmi": "^1.8.10",
-    "@reown/appkit-common": "^1.8.10",
-    "@reown/appkit-scaffold-ui": "^1.8.10",
+    "@reown/appkit": "^1.7.16",
+    "@reown/appkit-common": "^1.7.16",
+    "@reown/walletkit": "^1.2.8",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "2.57.4",
     "@walletconnect/modal": "^2.7.0",

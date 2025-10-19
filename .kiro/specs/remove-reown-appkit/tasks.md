@@ -1,6 +1,8 @@
 # Implementation Plan
 
-- [-] 1. Préparer l'environnement et vérifier les dépendances
+- [x] 1. Préparer l'environnement et vérifier les dépendances
+
+
 
 
 
@@ -9,62 +11,104 @@
   - Créer une sauvegarde du code actuel
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 2. Mettre à jour le service HederaWalletService (hedera-wallet.ts)
-  - [ ] 2.1 Remplacer les imports AppKit par DAppConnector
+- [x] 2. Mettre à jour le service HederaWalletService (hedera-wallet.ts)
+
+
+
+
+
+
+  - [x] 2.1 Remplacer les imports AppKit par DAppConnector
+
     - Supprimer les imports HederaProvider, HederaAdapter, HederaChainDefinition, hederaNamespace
     - Ajouter les imports DAppConnector, HederaSessionEvent, HederaJsonRpcMethod, HederaChainId, DAppSigner
     - Ajouter l'import LedgerId depuis @hashgraph/sdk
     - Ajouter l'import WalletConnectModal depuis @walletconnect/modal
     - _Requirements: 1.1, 8.1_
 
-  - [ ] 2.2 Mettre à jour les propriétés de classe
+
+
+  - [x] 2.2 Mettre à jour les propriétés de classe
+
+
+
+
+
+
+
     - Remplacer `hederaProvider: HederaProvider | null` par `dAppConnector: DAppConnector | null`
     - Supprimer `nativeAdapter` et `evmAdapter`
     - Ajouter `signers: DAppSigner[]`
     - Remplacer `modal: any` par `walletConnectModal: WalletConnectModal | null`
+
+
     - _Requirements: 1.1, 8.2_
 
-  - [ ] 2.3 Réécrire la méthode initialize()
+  - [x] 2.3 Réécrire la méthode initialize()
+
+
+
+
+
     - Créer l'objet metadata avec les informations de l'application
     - Déterminer le LedgerId (MAINNET ou TESTNET) depuis la configuration
     - Instancier DAppConnector avec metadata, ledgerId, projectId, methods, events, chains
     - Appeler `dAppConnector.init({ logger: 'error' })`
+
+
     - Créer WalletConnectModal avec projectId et chains
     - Supprimer la logique createAdapters()
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 8.3_
 
-  - [ ] 2.4 Réécrire la méthode connectWallet()
+  - [x] 2.4 Réécrire la méthode connectWallet()
+
+
+
+
+
     - Supprimer la logique de sélection d'adapter
     - Appeler `dAppConnector.openModal()` pour ouvrir la modal WalletConnect
     - Attendre la résolution de la promesse de session
+
+
     - Extraire les signers de la session avec createSignersFromSession()
     - Mettre à jour connectionState avec les informations du premier signer
     - Sauvegarder la session dans localStorage
     - Gérer les erreurs (timeout, rejection, etc.)
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 8.3_
 
+
+
   - [ ] 2.5 Créer la méthode createSignersFromSession()
     - Extraire les comptes depuis session.namespaces
     - Parser chaque compte au format "hedera:network:accountId"
     - Créer un DAppSigner pour chaque compte via `dAppConnector.getSigner()`
     - Retourner le tableau de signers
+
+
     - _Requirements: 2.5, 5.1_
 
   - [ ] 2.6 Mettre à jour la méthode signTransaction()
     - Supprimer l'appel à `hederaProvider.hedera_signTransaction`
     - Obtenir le premier signer depuis `this.signers`
     - Appeler `signer.signTransaction(transaction)`
+
+
     - Retourner la transaction signée
     - Gérer les erreurs de signature
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 8.4_
 
   - [ ] 2.7 Mettre à jour la méthode signMessage()
     - Remplacer `hederaProvider.hedera_signMessage` par `dAppConnector.signMessage`
+
+
     - Formater signerAccountId au format HIP-30 (hedera:network:accountId)
     - Passer les paramètres { signerAccountId, message }
     - Retourner le résultat de signature
     - Gérer les erreurs de signature
+
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+
 
   - [ ] 2.8 Mettre à jour la méthode disconnectWallet()
     - Parcourir tous les signers dans `this.signers`
@@ -86,39 +130,69 @@
     - Nettoyer les imports inutilisés
     - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 3. Mettre à jour wallet-service-factory.ts
+- [x] 3. Mettre à jour wallet-service-factory.ts
+
+
+
+
+
   - Supprimer la fonction `isAppKitEnabled()` ou sa logique
   - Simplifier `getWalletService()` pour retourner directement `hederaWalletService`
   - Supprimer les imports liés à AppKit
   - _Requirements: 7.1, 7.2, 7.3, 8.1_
 
-- [ ] 4. Supprimer les fichiers AppKit
+- [x] 4. Supprimer les fichiers AppKit
+
+
+
+
+
   - Supprimer `src/lib/wallet/appkit-config.ts`
   - Supprimer `src/components/wallet/AppKitButton.tsx`
   - Vérifier qu'aucun autre fichier n'importe ces fichiers supprimés
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 5. Mettre à jour les composants utilisant AppKit
-  - [ ] 5.1 Vérifier WalletConnectionWrapper.tsx
+- [x] 5. Mettre à jour les composants utilisant AppKit
+
+
+
+
+
+
+  - [x] 5.1 Vérifier WalletConnectionWrapper.tsx
+
     - S'assurer qu'il n'importe pas AppKitButton
     - Vérifier qu'il utilise correctement le service wallet
     - Mettre à jour si nécessaire
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-  - [ ] 5.2 Vérifier Navigation.tsx et autres composants
+
+  - [x] 5.2 Vérifier Navigation.tsx et autres composants
+
     - Rechercher les imports de AppKitButton
     - Remplacer par des boutons personnalisés si nécessaire
     - Vérifier que les composants utilisent useWallet correctement
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 6. Mettre à jour le hook useWallet
+- [x] 6. Mettre à jour le hook useWallet
+
+
+
+
+
   - Vérifier que le hook fonctionne avec la nouvelle implémentation
   - S'assurer que le polling de l'état fonctionne correctement
   - Vérifier la gestion des événements
   - Tester la mise à jour de l'état de connexion
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [ ] 7. Supprimer les dépendances Reown du package.json
+- [x] 7. Supprimer les dépendances Reown du package.json
+
+
+
+
+
+
   - Exécuter `npm uninstall @reown/appkit`
   - Supprimer toutes les dépendances `@reown/*` si présentes
   - Exécuter `npm install` pour nettoyer package-lock.json

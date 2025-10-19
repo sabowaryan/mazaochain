@@ -1,12 +1,17 @@
+"use client";
+
 // Hedera Wallet integration service using official @hashgraph/hedera-wallet-connect v2
-// Using Reown AppKit approach with HederaProvider and HederaAdapter
+// Using DAppConnector for direct WalletConnect integration
 import {
-  HederaProvider,
-  HederaAdapter,
-  HederaChainDefinition,
-  hederaNamespace,
+  DAppConnector,
+  HederaSessionEvent,
+  HederaJsonRpcMethod,
+  HederaChainId,
+  DAppSigner,
 } from "@hashgraph/hedera-wallet-connect";
-import { Client, Transaction } from "@hashgraph/sdk";
+import { Client, Transaction, LedgerId, AccountId } from "@hashgraph/sdk";
+import { WalletConnectModal } from "@walletconnect/modal";
+import type { SessionTypes } from "@walletconnect/types";
 // UniversalProvider type is used for type casting in setUniversalProvider calls
 import { env } from "@/lib/config/env";
 import { suppressWalletConnectErrors } from "./wallet-error-handler";
@@ -19,19 +24,13 @@ import {
   WalletError,
 } from "@/types/wallet";
 
-// Import WalletConnect modal for QR code display
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let WalletConnectModal: any = null;
-
 class HederaWalletService {
-  private hederaProvider: HederaProvider | null = null;
-  private nativeAdapter: HederaAdapter | null = null;
-  private evmAdapter: HederaAdapter | null = null;
+  private dAppConnector: DAppConnector | null = null;
+  private signers: DAppSigner[] = [];
   private isInitialized = false;
   private connectionState: WalletConnection | null = null;
   private client: Client;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private modal: any = null;
+  private walletConnectModal: WalletConnectModal | null = null;
 
   constructor() {
     // Initialize Hedera client
@@ -58,16 +57,6 @@ class HederaWalletService {
         );
       }
 
-      // Dynamically import WalletConnect modal (only in browser)
-      if (typeof window !== "undefined" && !WalletConnectModal) {
-        try {
-          const modalModule = await import("@walletconnect/modal");
-          WalletConnectModal = modalModule.WalletConnectModal;
-        } catch (error) {
-          console.warn("Failed to load WalletConnect modal:", error);
-        }
-      }
-
       // Configure application metadata
       const metadata = {
         name: env.NEXT_PUBLIC_HASHPACK_APP_NAME || "MazaoChain MVP",
@@ -80,27 +69,32 @@ class HederaWalletService {
         ],
       };
 
-      // Initialize HederaProvider with metadata and projectId
-      this.hederaProvider = await HederaProvider.init({
-        projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-        metadata,
-      });
+      // Determine the LedgerId (MAINNET or TESTNET) from configuration
+      const ledgerId =
+        env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
+          ? LedgerId.MAINNET
+          : LedgerId.TESTNET;
 
-      // Initialize WalletConnect modal if available
-      if (WalletConnectModal && typeof window !== "undefined") {
-        this.modal = new WalletConnectModal({
+      // Create DAppConnector with metadata, ledgerId, projectId, methods, events, chains
+      this.dAppConnector = new DAppConnector(
+        metadata,
+        ledgerId,
+        env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+        Object.values(HederaJsonRpcMethod),
+        [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
+        [HederaChainId.Mainnet, HederaChainId.Testnet]
+      );
+
+      // Initialize DAppConnector
+      await this.dAppConnector.init({ logger: "error" });
+
+      // Create WalletConnect modal
+      if (typeof window !== "undefined") {
+        this.walletConnectModal = new WalletConnectModal({
           projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-          chains: ["hedera:testnet", "hedera:mainnet"],
-          themeMode: "light",
-          themeVariables: {
-            "--wcm-accent-color": "#10b981",
-            "--wcm-background-color": "#10b981",
-          },
+          chains: ["hedera:mainnet", "hedera:testnet"],
         });
       }
-
-      // Create and configure HederaAdapters for both namespaces
-      await this.createAdapters();
 
       // Set up session event listeners
       this.setupSessionListeners();
@@ -124,141 +118,17 @@ class HederaWalletService {
   }
 
   /**
-   * Create and configure HederaAdapters for Native and EVM namespaces
-   */
-  private async createAdapters(): Promise<void> {
-    if (!this.hederaProvider) {
-      throw new WalletError(
-        WalletErrorCode.INITIALIZATION_FAILED,
-        "HederaProvider not initialized"
-      );
-    }
-
-    const projectId = env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
-    const isMainnet = env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet";
-
-    // Create Native Hedera Adapter
-    this.nativeAdapter = new HederaAdapter({
-      projectId,
-      networks: isMainnet
-        ? [HederaChainDefinition.Native.Mainnet]
-        : [HederaChainDefinition.Native.Testnet],
-      namespace: hederaNamespace,
-    });
-
-    // Create EVM Adapter
-    this.evmAdapter = new HederaAdapter({
-      projectId,
-      networks: isMainnet
-        ? [HederaChainDefinition.EVM.Mainnet]
-        : [HederaChainDefinition.EVM.Testnet],
-      namespace: "eip155",
-    });
-
-    // Set the universal provider for both adapters
-    // @ts-expect-error - Type mismatch due to different UniversalProvider versions
-    await this.nativeAdapter.setUniversalProvider(this.hederaProvider);
-    // @ts-expect-error - Type mismatch due to different UniversalProvider versions
-    await this.evmAdapter.setUniversalProvider(this.hederaProvider);
-  }
-
-  /**
-   * Set up session event listeners for v2
+   * Set up session event listeners
+   * Note: DAppConnector handles session events automatically via its internal listeners
+   * configured during initialization (ChainChanged, AccountsChanged).
+   * No manual event handling is required.
    */
   private setupSessionListeners(): void {
-    if (!this.hederaProvider) return;
-
-    // Listen for session events using HederaProvider's emit system
-    this.hederaProvider.on("session_update", (data: unknown) => {
-      this.handleSessionUpdate(data);
-    });
-
-    this.hederaProvider.on("session_delete", (data: unknown) => {
-      this.handleSessionDelete(data);
-    });
-
-    this.hederaProvider.on("accountsChanged", (accounts: string[]) => {
-      this.handleAccountChange(accounts);
-    });
-
-    this.hederaProvider.on("chainChanged", (chainId: string) => {
-      this.handleChainChange(chainId);
-    });
-
-    this.hederaProvider.on("disconnect", () => {
-      this.connectionState = null;
-    });
-  }
-
-  /**
-   * Handle session updates
-   */
-  private handleSessionUpdate(data: unknown): void {
-    console.log("Session update received:", data);
-
-    // Extract account information from the update
-    const accounts = this.hederaProvider?.getAccountAddresses();
-    if (accounts && accounts.length > 0) {
-      this.updateConnectionStateFromAccount(accounts[0]);
-    }
-  }
-
-  /**
-   * Handle session deletion
-   */
-  private handleSessionDelete(data: unknown): void {
-    console.log("Session deleted:", data);
-    this.connectionState = null;
-  }
-
-  /**
-   * Handle account change events
-   */
-  private handleAccountChange(accounts: string[]): void {
-    console.log("Account changed:", accounts);
-    if (accounts && accounts.length > 0) {
-      this.updateConnectionStateFromAccount(accounts[0]);
-    }
-  }
-
-  /**
-   * Handle chain change events
-   */
-  private handleChainChange(chainId: string): void {
-    console.log("Chain changed:", chainId);
-    if (this.connectionState) {
-      this.connectionState.chainId = chainId;
-    }
-  }
-
-  /**
-   * Update connection state from account string
-   */
-  private updateConnectionStateFromAccount(accountString: string): void {
-    const parts = accountString.split(":");
-    if (parts.length >= 3) {
-      const namespace = parts[0] as "hedera" | "eip155";
-      const networkOrChainId = parts[1];
-      const accountId = parts[2];
-
-      if (namespace === "hedera") {
-        this.connectionState = {
-          accountId,
-          network: networkOrChainId as "mainnet" | "testnet",
-          isConnected: true,
-          namespace: "hedera",
-          chainId: `hedera:${networkOrChainId}`,
-        };
-      } else if (namespace === "eip155") {
-        this.connectionState = {
-          accountId,
-          network: networkOrChainId === "295" ? "mainnet" : "testnet",
-          isConnected: true,
-          namespace: "eip155",
-          chainId: `eip155:${networkOrChainId}`,
-        };
-      }
-    }
+    // DAppConnector manages events internally
+    // Events are configured during initialization:
+    // - HederaSessionEvent.ChainChanged
+    // - HederaSessionEvent.AccountsChanged
+    // Signers are automatically updated by DAppConnector
   }
 
   /**
@@ -336,32 +206,19 @@ class HederaWalletService {
    * Restore existing session on startup
    */
   private async restoreExistingSession(): Promise<WalletConnection | null> {
-    if (!this.hederaProvider) return null;
+    if (!this.dAppConnector) return null;
 
     try {
-      // First, try to get active accounts from provider
-      const accounts = this.hederaProvider.getAccountAddresses();
-
-      if (accounts && accounts.length > 0) {
-        this.updateConnectionStateFromAccount(accounts[0]);
-        console.log("Restored active session:", this.connectionState);
-        
-        // Save the restored session
-        this.saveSession();
-        
-        return this.connectionState;
-      }
-
-      // If no active accounts, try to load from localStorage
+      // Try to load saved session from localStorage
       const savedSession = this.loadSavedSession();
       if (savedSession) {
-        console.log("Found saved session, but no active connection");
-        // Don't set as connected, just return the saved data
+        console.log("Found saved session in localStorage");
+        // Note: The actual connection will be re-established when user interacts
+        // DAppConnector will handle session restoration automatically
         return savedSession;
       }
     } catch (error) {
       // Silently handle errors during session restoration
-      // This is expected when there's no existing session or provider not connected
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       if (!errorMessage.includes("Not initialized")) {
@@ -374,18 +231,19 @@ class HederaWalletService {
 
   /**
    * Connect wallet with optional namespace selection
+   * Note: DAppConnector only supports hedera namespace, eip155 parameter is kept for compatibility
    */
   async connectWallet(
-    namespace: "hedera" | "eip155" = "hedera"
+    _namespace: "hedera" | "eip155" = "hedera"
   ): Promise<WalletConnection> {
     if (!this.isInitialized) {
       await this.initialize();
     }
 
-    if (!this.hederaProvider) {
+    if (!this.dAppConnector) {
       throw new WalletError(
         WalletErrorCode.NOT_CONNECTED,
-        "HederaProvider not initialized"
+        "DAppConnector not initialized"
       );
     }
 
@@ -395,168 +253,41 @@ class HederaWalletService {
         return this.connectionState;
       }
 
-      // Select the appropriate adapter
-      const adapter =
-        namespace === "hedera" ? this.nativeAdapter : this.evmAdapter;
-      if (!adapter) {
-        throw new WalletError(
-          WalletErrorCode.INITIALIZATION_FAILED,
-          `${namespace} adapter not initialized`
-        );
-      }
+      console.log("Opening WalletConnect modal...");
 
-      console.log("Starting wallet connection...");
+      // Open the WalletConnect modal and wait for session
+      const session = await this.dAppConnector.openModal();
 
-      // Show modal if available
-      if (this.modal) {
-        console.log("Opening WalletConnect modal...");
-      }
+      // Extract signers from the session
+      this.signers = this.createSignersFromSession(session);
 
-      // Connect using the adapter
-      // @ts-expect-error - ConnectParams type mismatch
-      const connectPromise = adapter.connect({});
+      // Update connection state with information from the first signer
+      if (this.signers.length > 0) {
+        const firstSigner = this.signers[0];
+        const accountId = firstSigner.getAccountId().toString();
 
-      // Wait for connection to be established
-      return new Promise((resolve, reject) => {
-        // Increase timeout to 120 seconds to give user more time
-        const timeout = setTimeout(() => {
-          // Close modal if open
-          if (this.modal) {
-            try {
-              this.modal.closeModal();
-            } catch (e) {
-              // Ignore modal close errors
-            }
-          }
-          
-          reject(
-            new WalletError(
-              WalletErrorCode.CONNECTION_TIMEOUT,
-              "La connexion a expiré. Veuillez vérifier que HashPack est installé et ouvert, puis réessayez."
-            )
-          );
-        }, 120000); // 120 second timeout
-
-        let checkCount = 0;
-        const maxChecks = 240; // 2 minutes max (240 * 500ms)
-
-        const checkConnection = async () => {
-          checkCount++;
-
-          // Check if connection state is set
-          if (this.connectionState?.isConnected) {
-            clearTimeout(timeout);
-            
-            // Close modal if open
-            if (this.modal) {
-              try {
-                this.modal.closeModal();
-              } catch (e) {
-                // Ignore modal close errors
-              }
-            }
-            
-            console.log("Wallet connected successfully:", this.connectionState);
-            resolve(this.connectionState);
-            return;
-          }
-
-          // Check for accounts from provider
-          try {
-            const accounts = this.hederaProvider?.getAccountAddresses();
-            if (accounts && accounts.length > 0) {
-              this.updateConnectionStateFromAccount(accounts[0]);
-
-              if (this.connectionState) {
-                clearTimeout(timeout);
-                
-                // Close modal if open
-                if (this.modal) {
-                  try {
-                    this.modal.closeModal();
-                  } catch (e) {
-                    // Ignore modal close errors
-                  }
-                }
-                
-                console.log("Wallet connected successfully:", this.connectionState);
-                
-                // Save session to localStorage
-                this.saveSession();
-                
-                resolve(this.connectionState);
-                return;
-              }
-            }
-          } catch (error) {
-            // Log errors for debugging but continue checking
-            if (checkCount % 10 === 0) {
-              console.log(`Connection check ${checkCount}:`, error);
-            }
-          }
-
-          if (checkCount >= maxChecks) {
-            clearTimeout(timeout);
-            
-            // Close modal if open
-            if (this.modal) {
-              try {
-                this.modal.closeModal();
-              } catch (e) {
-                // Ignore modal close errors
-              }
-            }
-            
-            reject(
-              new WalletError(
-                WalletErrorCode.CONNECTION_REJECTED,
-                "La connexion a été fermée ou rejetée. Veuillez vérifier HashPack et réessayer."
-              )
-            );
-          } else {
-            setTimeout(checkConnection, 500);
-          }
+        this.connectionState = {
+          accountId,
+          network:
+            env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
+              ? "mainnet"
+              : "testnet",
+          isConnected: true,
+          namespace: "hedera",
+          chainId: `hedera:${env.NEXT_PUBLIC_HEDERA_NETWORK}`,
         };
 
-        // Start checking for connection
-        checkConnection();
+        // Save session to localStorage
+        this.saveSession();
 
-        // Also wait for the connect promise to resolve/reject
-        connectPromise.catch((error: unknown) => {
-          clearTimeout(timeout);
-          
-          // Close modal if open
-          if (this.modal) {
-            try {
-              this.modal.closeModal();
-            } catch (e) {
-              // Ignore modal close errors
-            }
-          }
-          
-          console.error("Connect promise rejected:", error);
-          
-          const errorMessage = error?.message || String(error);
-          
-          if (errorMessage.includes("Proposal expired")) {
-            reject(
-              new WalletError(
-                WalletErrorCode.CONNECTION_TIMEOUT,
-                "La demande de connexion a expiré. Veuillez ouvrir HashPack et réessayer rapidement."
-              )
-            );
-          } else if (errorMessage.includes("User rejected") || errorMessage.includes("rejected")) {
-            reject(
-              new WalletError(
-                WalletErrorCode.CONNECTION_REJECTED,
-                "Connexion refusée dans HashPack"
-              )
-            );
-          } else {
-            reject(error);
-          }
-        });
-      });
+        console.log("Wallet connected successfully:", this.connectionState);
+        return this.connectionState;
+      }
+
+      throw new WalletError(
+        WalletErrorCode.CONNECTION_REJECTED,
+        "No signers created from session"
+      );
     } catch (error: unknown) {
       if (error instanceof WalletError) {
         throw error;
@@ -573,15 +304,18 @@ class HederaWalletService {
           WalletErrorCode.CONNECTION_REJECTED,
           "Connection rejected in HashPack"
         );
-      } else if (errorMessage.includes("timeout")) {
+      } else if (
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("Proposal expired")
+      ) {
         throw new WalletError(
           WalletErrorCode.CONNECTION_TIMEOUT,
           "Connection timeout. Please try again."
         );
-      } else if (errorMessage.includes("Proposal expired")) {
+      } else if (errorMessage.includes("Project ID")) {
         throw new WalletError(
-          WalletErrorCode.CONNECTION_TIMEOUT,
-          "Connection request expired. Please try again."
+          WalletErrorCode.INVALID_PROJECT_ID,
+          "Invalid WalletConnect Project ID"
         );
       } else if (
         errorMessage.includes("network") ||
@@ -602,30 +336,57 @@ class HederaWalletService {
   }
 
   /**
-   * Sign a native Hedera transaction using hedera_signTransaction
+   * Create DAppSigner instances from a WalletConnect session
+   */
+  private createSignersFromSession(session: SessionTypes.Struct): DAppSigner[] {
+    const signers: DAppSigner[] = [];
+
+    // Extract accounts from the session namespaces
+    const accounts = Object.values(session.namespaces).flatMap(
+      (namespace) => namespace.accounts
+    );
+
+    for (const account of accounts) {
+      // Format: hedera:testnet:0.0.12345 or hedera:mainnet:0.0.12345
+      const parts = account.split(":");
+      if (parts.length >= 3 && parts[0] === "hedera") {
+        const accountId = parts[2];
+
+        // Create a signer via DAppConnector
+        const signer = this.dAppConnector!.getSigner(
+          AccountId.fromString(accountId)
+        );
+
+        signers.push(signer);
+      }
+    }
+
+    return signers;
+  }
+
+  /**
+   * Sign a native Hedera transaction using DAppSigner
    */
   async signTransaction(transaction: Transaction): Promise<Transaction> {
-    if (!this.connectionState || !this.hederaProvider) {
+    if (!this.connectionState || !this.dAppConnector) {
       throw new WalletError(
         WalletErrorCode.NOT_CONNECTED,
         "Wallet not connected"
       );
     }
 
-    if (this.connectionState.namespace !== "hedera") {
-      throw new WalletError(
-        WalletErrorCode.INVALID_TRANSACTION,
-        "Native Hedera transactions require hedera namespace"
-      );
-    }
-
     try {
-      // Use HederaProvider's hedera_signTransaction method
-      const signedTransaction =
-        await this.hederaProvider.hedera_signTransaction({
-          signerAccountId: `hedera:${this.connectionState.network}:${this.connectionState.accountId}`,
-          transactionBody: transaction,
-        });
+      // Get the first signer (primary account)
+      const signer = this.signers[0];
+      if (!signer) {
+        throw new WalletError(
+          WalletErrorCode.NOT_CONNECTED,
+          "No signer available"
+        );
+      }
+
+      // Sign the transaction using DAppSigner
+      const signedTransaction = await signer.signTransaction(transaction);
 
       return signedTransaction;
     } catch (error) {
@@ -681,31 +442,28 @@ class HederaWalletService {
   }
 
   /**
-   * Sign a message using hedera_signMessage
+   * Sign a message using DAppConnector
    */
   async signMessage(message: string): Promise<{ signatureMap: string }> {
-    if (!this.connectionState || !this.hederaProvider) {
+    if (!this.connectionState || !this.dAppConnector) {
       throw new WalletError(
         WalletErrorCode.NOT_CONNECTED,
         "Wallet not connected"
       );
     }
 
-    if (this.connectionState.namespace !== "hedera") {
-      throw new WalletError(
-        WalletErrorCode.INVALID_TRANSACTION,
-        "Message signing requires hedera namespace"
-      );
-    }
-
     try {
-      // Use HederaProvider's hedera_signMessage method
-      const result = await this.hederaProvider.hedera_signMessage({
-        signerAccountId: `hedera:${this.connectionState.network}:${this.connectionState.accountId}`,
+      // Format signerAccountId in HIP-30 format (hedera:network:accountId)
+      const signerAccountId = `hedera:${this.connectionState.network}:${this.connectionState.accountId}`;
+
+      // Use DAppConnector's signMessage method
+      const result = await this.dAppConnector.signMessage({
+        signerAccountId,
         message,
       });
 
-      return result;
+      // DAppConnector returns JsonRpcResult wrapper, extract the actual result
+      return result as unknown as { signatureMap: string };
     } catch (error) {
       if (error instanceof WalletError) {
         throw error;
@@ -737,18 +495,15 @@ class HederaWalletService {
    */
   async disconnectWallet(): Promise<void> {
     try {
-      // Close modal if open
-      if (this.modal) {
-        try {
-          this.modal.closeModal();
-        } catch (e) {
-          // Ignore modal close errors
+      if (this.dAppConnector) {
+        // Disconnect all signers
+        for (const signer of this.signers) {
+          await this.dAppConnector.disconnect(signer.topic);
         }
       }
 
-      if (this.hederaProvider) {
-        await this.hederaProvider.disconnect();
-      }
+      // Clear signers array
+      this.signers = [];
 
       // Clear connection state
       this.connectionState = null;

@@ -122,7 +122,6 @@ export function WalletConnection({
         if (
           key &&
           (key.includes("walletconnect") ||
-            key.includes("reown") ||
             key.includes("wc@2"))
         ) {
           keysToRemove.push(key);

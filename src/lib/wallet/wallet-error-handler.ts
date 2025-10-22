@@ -82,61 +82,166 @@ const ERROR_MESSAGES: Record<WalletErrorCode, string> = {
 
 /**
  * Détecte le code d'erreur approprié basé sur le message d'erreur
+ * Enhanced for HederaProvider and AppKit error detection
  */
 function detectErrorCode(error: Error): WalletErrorCode {
   const message = error.message.toLowerCase();
+  const errorObj = error as Error & { code?: string; name?: string };
+  const errorCode = errorObj.code?.toLowerCase() || "";
+  const errorName = errorObj.name?.toLowerCase() || "";
   
-  // Erreurs de connexion
-  if (message.includes('timeout') || message.includes('timed out')) {
+  // Erreurs de connexion - Enhanced detection
+  if (
+    message.includes('timeout') || 
+    message.includes('timed out') ||
+    message.includes('proposal expired') ||
+    message.includes('time limit') ||
+    errorCode.includes('timeout') ||
+    errorName.includes('timeout')
+  ) {
     return WalletErrorCode.CONNECTION_TIMEOUT;
   }
-  if (message.includes('rejected') || message.includes('user rejected') || message.includes('user denied')) {
+  if (
+    message.includes('rejected') || 
+    message.includes('user rejected') || 
+    message.includes('user denied') ||
+    message.includes('cancelled') ||
+    message.includes('denied') ||
+    errorCode.includes('rejected') ||
+    errorCode.includes('denied') ||
+    errorName.includes('rejection')
+  ) {
     return WalletErrorCode.CONNECTION_REJECTED;
   }
-  if (message.includes('not installed') || message.includes('no provider')) {
+  if (
+    message.includes('not installed') || 
+    message.includes('no provider') ||
+    message.includes('wallet not found') ||
+    message.includes('no wallet') ||
+    message.includes('missing wallet') ||
+    errorCode.includes('wallet_not_found') ||
+    errorName.includes('walletnotfound')
+  ) {
     return WalletErrorCode.WALLET_NOT_INSTALLED;
   }
-  if (message.includes('project id') || message.includes('projectid') || message.includes('invalid project')) {
+  if (
+    message.includes('project id') || 
+    message.includes('projectid') || 
+    message.includes('invalid project') ||
+    message.includes('missing project') ||
+    errorCode.includes('project_id') ||
+    errorName.includes('projectid')
+  ) {
     return WalletErrorCode.INVALID_PROJECT_ID;
   }
-  if (message.includes('network') || message.includes('fetch failed') || message.includes('connection failed')) {
+  if (
+    message.includes('network') || 
+    message.includes('fetch failed') || 
+    message.includes('connection failed') ||
+    message.includes('cors') ||
+    message.includes('unreachable') ||
+    message.includes('dns') ||
+    errorCode.includes('network') ||
+    errorName.includes('network')
+  ) {
     return WalletErrorCode.NETWORK_ERROR;
   }
   
-  // Erreurs de session
-  if (message.includes('session expired') || message.includes('expired session')) {
+  // Erreurs de session - Enhanced detection
+  if (
+    message.includes('session expired') || 
+    message.includes('expired session') ||
+    message.includes('session timeout') ||
+    errorCode.includes('session_expired') ||
+    errorName.includes('sessionexpired')
+  ) {
     return WalletErrorCode.SESSION_EXPIRED;
   }
-  if (message.includes('session not found') || message.includes('no session') || message.includes('missing session')) {
+  if (
+    message.includes('session not found') || 
+    message.includes('no session') || 
+    message.includes('missing session') ||
+    message.includes('session unavailable') ||
+    errorCode.includes('session_not_found') ||
+    errorName.includes('sessionnotfound')
+  ) {
     return WalletErrorCode.SESSION_NOT_FOUND;
   }
-  if (message.includes('invalid session') || message.includes('session invalid')) {
+  if (
+    message.includes('invalid session') || 
+    message.includes('session invalid') ||
+    message.includes('malformed session') ||
+    errorCode.includes('invalid_session') ||
+    errorName.includes('invalidsession')
+  ) {
     return WalletErrorCode.INVALID_SESSION;
   }
   
-  // Erreurs de transaction
-  if (message.includes('transaction rejected') || message.includes('user rejected transaction')) {
+  // Erreurs de transaction - Enhanced detection
+  if (
+    message.includes('transaction rejected') || 
+    message.includes('user rejected transaction') ||
+    message.includes('signing rejected') ||
+    message.includes('message rejected') ||
+    errorCode.includes('transaction_rejected') ||
+    errorName.includes('transactionrejected')
+  ) {
     return WalletErrorCode.TRANSACTION_REJECTED;
   }
-  if (message.includes('transaction failed') || message.includes('failed to execute')) {
+  if (
+    message.includes('transaction failed') || 
+    message.includes('failed to execute') ||
+    message.includes('signing failed') ||
+    message.includes('execution failed') ||
+    errorCode.includes('transaction_failed') ||
+    errorName.includes('transactionfailed')
+  ) {
     return WalletErrorCode.TRANSACTION_FAILED;
   }
-  if (message.includes('invalid transaction') || message.includes('malformed transaction')) {
+  if (
+    message.includes('invalid transaction') || 
+    message.includes('malformed transaction') ||
+    message.includes('bad transaction') ||
+    message.includes('transaction format') ||
+    errorCode.includes('invalid_transaction') ||
+    errorName.includes('invalidtransaction')
+  ) {
     return WalletErrorCode.INVALID_TRANSACTION;
   }
-  if (message.includes('insufficient') || message.includes('not enough balance')) {
+  if (
+    message.includes('insufficient') || 
+    message.includes('not enough balance') ||
+    message.includes('balance too low') ||
+    message.includes('insufficient funds') ||
+    errorCode.includes('insufficient_balance') ||
+    errorName.includes('insufficientbalance')
+  ) {
     return WalletErrorCode.INSUFFICIENT_BALANCE;
   }
   
-  // Erreurs générales
-  if (message.includes('not connected') || message.includes('no connection')) {
+  // Erreurs générales - Enhanced detection
+  if (
+    message.includes('not connected') || 
+    message.includes('no connection') ||
+    message.includes('disconnected') ||
+    message.includes('connection lost') ||
+    errorCode.includes('not_connected') ||
+    errorName.includes('notconnected')
+  ) {
     return WalletErrorCode.NOT_CONNECTED;
   }
-  if (message.includes('initialization failed') || message.includes('failed to initialize')) {
+  if (
+    message.includes('initialization failed') || 
+    message.includes('failed to initialize') ||
+    message.includes('init failed') ||
+    message.includes('setup failed') ||
+    errorCode.includes('initialization_failed') ||
+    errorName.includes('initializationfailed')
+  ) {
     return WalletErrorCode.INITIALIZATION_FAILED;
   }
   
-  // Erreurs v1 (legacy)
+  // Erreurs v1 (legacy) - Keep existing patterns
   if (message.includes("can't convert undefined to object")) {
     return WalletErrorCode.WALLETCONNECT_CONFIG_ERROR;
   }

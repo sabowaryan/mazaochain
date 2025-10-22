@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getWalletService } from "@/lib/wallet/wallet-service-factory";
 import {
   WalletConnection,
   WalletBalances,
@@ -45,14 +44,27 @@ export function useWallet(): UseWalletReturn {
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<WalletErrorCode | null>(null);
+  const [walletService, setWalletService] = useState<any>(null);
 
   const { user } = useAuth();
 
-  // Get the wallet service (DAppConnector-based)
-  const walletService = getWalletService();
+  // Load wallet service dynamically
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !walletService) {
+      import("@/lib/wallet/wallet-service-factory").then(async (module) => {
+        const service = await module.getWalletService();
+        setWalletService(service);
+      }).catch(err => {
+        console.error('Failed to load wallet service:', err);
+        setError('Failed to load wallet service');
+      });
+    }
+  }, [walletService]);
 
   // Load balances function
   const loadBalances = useCallback(async (accountId?: string) => {
+    if (!walletService) return;
+    
     setIsLoadingBalances(true);
     try {
       const walletBalances = await walletService.getAccountBalance(
@@ -87,6 +99,8 @@ export function useWallet(): UseWalletReturn {
   // Initialize wallet service and restore existing session
   useEffect(() => {
     const initializeWallet = async () => {
+      if (!walletService) return;
+      
       setIsRestoring(true);
       try {
         await walletService.initialize();
@@ -125,6 +139,8 @@ export function useWallet(): UseWalletReturn {
 
   // Poll wallet service state to detect connection changes
   useEffect(() => {
+    if (!walletService) return;
+    
     const pollInterval = setInterval(() => {
       const currentState = walletService.getConnectionState();
       
@@ -175,7 +191,7 @@ export function useWallet(): UseWalletReturn {
 
   const connectWallet = useCallback(
     async (selectedNamespace: "hedera" | "eip155" = "hedera") => {
-      if (isConnecting || isConnected) return;
+      if (isConnecting || isConnected || !walletService) return;
 
       setIsConnecting(true);
       setError(null);
@@ -246,6 +262,8 @@ export function useWallet(): UseWalletReturn {
   );
 
   const disconnectWallet = useCallback(async () => {
+    if (!walletService) return;
+    
     try {
       await walletService.disconnectWallet();
 

@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Label";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { FarmerProfileForm } from "@/components/profiles/FarmerProfileForm";
+import { ClientOnly } from "@/components/ClientOnly";
 
-export default function FarmerProfilePage() {
+function FarmerProfileContent() {
   const { user, profile, loading: authLoading, initialized } = useAuth();
   const {
     profileData: farmerProfile,
@@ -289,5 +290,13 @@ export default function FarmerProfilePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function FarmerProfilePage() {
+  return (
+    <ClientOnly fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>}>
+      <FarmerProfileContent />
+    </ClientOnly>
   );
 }

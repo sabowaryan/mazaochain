@@ -3,7 +3,8 @@
 "use client";
 
 import { useCallback } from "react";
-import { Transaction } from "@hashgraph/sdk";
+// Type for Hedera SDK Transaction (to avoid direct imports during build)
+type Transaction = any;
 import { useWalletModalContext } from "@/contexts/WalletModalContext";
 
 export function useWalletModal() {

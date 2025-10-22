@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/client'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 import { usdcTransferService } from './usdc-transfer'
 import { transactionReceiptService } from './transaction-receipt'
 import type { 
@@ -14,15 +15,23 @@ import type {
 } from '@/types/lender'
 
 export class LenderService {
-  private supabase = createClient()
+  private async getSupabaseClient() {
+    // Use server client during build/server-side, browser client on client-side
+    if (typeof window === 'undefined') {
+      return await createServerClient()
+    }
+    return createBrowserClient()
+  }
 
   /**
    * Get available loan opportunities for lenders
    */
   async getAvailableLoanOpportunities(): Promise<LoanOpportunity[]> {
     try {
+      const supabase = await this.getSupabaseClient()
+      
       // Get approved loans that don't have a lender yet
-      const { data: loans, error } = await this.supabase
+      const { data: loans, error } = await supabase
         .from('loans')
         .select(`
           *,
@@ -53,10 +62,10 @@ export class LenderService {
           const farmerProfile = (loan.borrower as any)?.farmer_profiles
           
           // Get the most recent evaluation for this farmer
-          const { data: evaluations } = await this.supabase
+          const { data: evaluations } = await supabase
             .from('crop_evaluations')
             .select('*')
-            .eq('farmer_id', loan.borrower_id)
+            .eq('farmer_id', loan.borrower_id!)
             .order('created_at', { ascending: false })
             .limit(1);
           
@@ -65,7 +74,7 @@ export class LenderService {
           // Get cooperative info if cooperative_id exists
           let cooperativeName = 'Non affilié';
           if (farmerProfile?.cooperative_id) {
-            const { data: coopProfile } = await this.supabase
+            const { data: coopProfile } = await supabase
               .from('cooperative_profiles')
               .select('nom')
               .eq('user_id', farmerProfile.cooperative_id)
@@ -121,8 +130,10 @@ export class LenderService {
    */
   async getLenderPortfolio(lenderId: string): Promise<LenderPortfolio> {
     try {
+      const supabase = await this.getSupabaseClient()
+      
       // Get lender profile
-      const { data: lenderProfile, error: profileError } = await this.supabase
+      const { data: lenderProfile, error: profileError } = await supabase
         .from('lender_profiles')
         .select('*')
         .eq('user_id', lenderId)
@@ -133,7 +144,7 @@ export class LenderService {
       }
 
       // Get active loans
-      const { data: activeLoans, error: activeError } = await this.supabase
+      const { data: activeLoans, error: activeError } = await supabase
         .from('loans')
         .select(`
           *,
@@ -149,7 +160,7 @@ export class LenderService {
       }
 
       // Get completed loans
-      const { data: completedLoans, error: completedError } = await this.supabase
+      const { data: completedLoans, error: completedError } = await supabase
         .from('loans')
         .select(`
           *,
@@ -247,8 +258,10 @@ export class LenderService {
     amount: number
   ): Promise<{ success: boolean; error?: string; commitmentId?: string }> {
     try {
+      const supabase = await this.getSupabaseClient()
+
       // Check if lender has sufficient funds
-      const { data: lenderProfile } = await this.supabase
+      const { data: lenderProfile } = await supabase
         .from('lender_profiles')
         .select('available_funds, institution_name')
         .eq('user_id', lenderId)
@@ -262,7 +275,7 @@ export class LenderService {
       }
 
       // Get lender's wallet address
-      const { data: lenderWallet } = await this.supabase
+      const { data: lenderWallet } = await supabase
         .from('profiles')
         .select('wallet_address')
         .eq('id', lenderId)
@@ -292,7 +305,7 @@ export class LenderService {
       }
 
       // Update loan with lender information
-      const { error: loanUpdateError } = await this.supabase
+      const { error: loanUpdateError } = await supabase
         .from('loans')
         .update({ lender_id: lenderId })
         .eq('id', loanId)
@@ -313,7 +326,7 @@ export class LenderService {
       }
 
       // Update lender's available funds
-      const { error: fundsUpdateError } = await this.supabase
+      const { error: fundsUpdateError } = await supabase
         .from('lender_profiles')
         .update({ 
           available_funds: (lenderProfile.available_funds || 0) - amount 
@@ -338,14 +351,14 @@ export class LenderService {
       })
 
       // Send notification to borrower
-      const { data: loan } = await this.supabase
+      const { data: loan } = await supabase
         .from('loans')
         .select('borrower_id, principal')
         .eq('id', loanId)
         .single()
 
       if (loan) {
-        await this.supabase.rpc('send_notification', {
+        await supabase.rpc('send_notification', {
           recipient_id: loan.borrower_id || '',
           notification_title: 'Financement sécurisé',
           notification_message: `Votre prêt de ${loan.principal} USDC a été financé par ${lenderProfile.institution_name}`,
@@ -374,8 +387,10 @@ export class LenderService {
     repaymentAmount: number
   ): Promise<{ success: boolean; error?: string; distributionId?: string }> {
     try {
+      const supabase = await this.getSupabaseClient()
+
       // Get loan details
-      const { data: loan, error: loanError } = await this.supabase
+      const { data: loan, error: loanError } = await supabase
         .from('loans')
         .select('*')
         .eq('id', loanId)
@@ -389,7 +404,7 @@ export class LenderService {
       }
 
       // Get lender's wallet address
-      const { data: lenderWallet } = await this.supabase
+      const { data: lenderWallet } = await supabase
         .from('profiles')
         .select('wallet_address')
         .eq('id', loan.lender_id)
@@ -417,14 +432,14 @@ export class LenderService {
       }
 
       // Update lender's available funds
-      const { data: lenderProfile } = await this.supabase
+      const { data: lenderProfile } = await supabase
         .from('lender_profiles')
         .select('available_funds')
         .eq('user_id', loan.lender_id)
         .single()
 
       if (lenderProfile) {
-        await this.supabase
+        await supabase
           .from('lender_profiles')
           .update({ 
             available_funds: (lenderProfile.available_funds || 0) + repaymentAmount 
@@ -446,7 +461,7 @@ export class LenderService {
       })
 
       // Send notification to lender
-      await this.supabase.rpc('send_notification', {
+      await supabase.rpc('send_notification', {
         recipient_id: loan.lender_id,
         notification_title: 'Remboursement reçu',
         notification_message: `Remboursement de ${repaymentAmount} USDC reçu pour le prêt ${loanId}`,
@@ -473,8 +488,10 @@ export class LenderService {
     loanId: string
   ): Promise<{ success: boolean; error?: string; liquidationAmount?: number }> {
     try {
+      const supabase = await this.getSupabaseClient()
+
       // Get loan details
-      const { data: loan, error: loanError } = await this.supabase
+      const { data: loan, error: loanError } = await supabase
         .from('loans')
         .select('*')
         .eq('id', loanId)
@@ -501,7 +518,7 @@ export class LenderService {
       const liquidationValue = Math.min(loan.collateral_amount, loan.principal * 1.1) // Principal + 10% penalty
 
       // Get lender's wallet address
-      const { data: lenderWallet } = await this.supabase
+      const { data: lenderWallet } = await supabase
         .from('profiles')
         .select('wallet_address')
         .eq('id', loan.lender_id)
@@ -519,7 +536,7 @@ export class LenderService {
         lenderWallet.wallet_address,
         liquidationValue,
         loanId,
-        (collateralTokens as unknown)[0]?.tokenId
+        (collateralTokens as any)[0]?.tokenId
       )
 
       if (!liquidationResult.success) {
@@ -530,20 +547,20 @@ export class LenderService {
       }
 
       // Update loan status to defaulted
-      await this.supabase
+      await supabase
         .from('loans')
         .update({ status: 'defaulted' })
         .eq('id', loanId)
 
       // Update lender's available funds
-      const { data: lenderProfile } = await this.supabase
+      const { data: lenderProfile } = await supabase
         .from('lender_profiles')
         .select('available_funds')
         .eq('user_id', loan.lender_id)
         .single()
 
       if (lenderProfile) {
-        await this.supabase
+        await supabase
           .from('lender_profiles')
           .update({ 
             available_funds: (lenderProfile.available_funds || 0) + liquidationValue 
@@ -565,7 +582,7 @@ export class LenderService {
       })
 
       // Send notification to lender
-      await this.supabase.rpc('send_notification', {
+      await supabase.rpc('send_notification', {
         recipient_id: loan.lender_id,
         notification_title: 'Collatéral liquidé',
         notification_message: `Collatéral liquidé pour ${liquidationValue} USDC suite au défaut de paiement`,
@@ -646,8 +663,10 @@ export class LenderService {
    */
   private async calculateRiskAssessment(farmerId: string, evaluation: unknown): Promise<RiskAssessment> {
     try {
+      const supabase = await this.getSupabaseClient()
+
       // Get farmer's history
-      const { data: farmerLoans } = await this.supabase
+      const { data: farmerLoans } = await supabase
         .from('loans')
         .select('status')
         .eq('borrower_id', farmerId)
@@ -664,7 +683,7 @@ export class LenderService {
         riskFactors.push('Historique de crédit faible')
       }
       
-      if (!evaluation || evaluation.rendement_historique < 1000) {
+      if (!evaluation || (evaluation as any).rendement_historique < 1000) {
         riskFactors.push('Rendement historique faible')
       }
 
@@ -679,7 +698,7 @@ export class LenderService {
 
       return {
         farmerCreditScore,
-        cropHistoricalYield: evaluation?.rendement_historique || 1000,
+        cropHistoricalYield: (evaluation as any)?.rendement_historique || 1000,
         marketPriceVolatility: 15, // Default volatility
         collateralizationRatio: 200, // 200% collateral ratio
         overallRisk,

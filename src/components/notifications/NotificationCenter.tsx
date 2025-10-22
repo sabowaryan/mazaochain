@@ -85,7 +85,7 @@ export function NotificationCenter() {
       );
 
       // Transform data to match Notification interface
-      const transformedData = (data || []).map((item: unknown) => ({
+      const transformedData = (data || []).map((item: any) => ({
         id: item.id,
         type: item.type as NotificationType,
         title: item.title,

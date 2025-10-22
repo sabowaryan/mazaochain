@@ -18,9 +18,11 @@ import { WalletErrorCode } from '@/types/wallet';
 
 // Mock modules
 vi.mock('@hashgraph/hedera-wallet-connect');
+vi.mock('@reown/appkit');
 vi.mock('@hashgraph/sdk');
 vi.mock('@/lib/config/env');
 vi.mock('@/lib/wallet/wallet-error-handler');
+vi.mock('@/lib/wallet/appkit-config');
 vi.mock('@/lib/supabase/client', () => ({
   createClient: vi.fn(() => ({
     from: vi.fn(() => ({
@@ -39,8 +41,10 @@ vi.mock('@/hooks/useAuth', () => ({
 
 // Import mocked modules
 const hederaWalletConnect = await import('@hashgraph/hedera-wallet-connect');
+const reownAppKit = await import('@reown/appkit');
 const hederaSdk = await import('@hashgraph/sdk');
 const envModule = await import('@/lib/config/env');
+const appKitConfig = await import('@/lib/wallet/appkit-config');
 
 
 // Setup SDK mock
@@ -64,6 +68,7 @@ describe('Wallet v2 Integration Tests', () => {
   let mockHederaProvider: any;
   let mockNativeAdapter: any;
   let mockEvmAdapter: any;
+  let mockAppKitInstance: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,11 +90,22 @@ describe('Wallet v2 Integration Tests', () => {
     mockNativeAdapter = {
       setUniversalProvider: vi.fn().mockResolvedValue(undefined),
       connect: vi.fn().mockResolvedValue(undefined),
+      request: vi.fn().mockResolvedValue({ signatureMap: 'mock-signature' }),
     };
 
     mockEvmAdapter = {
       setUniversalProvider: vi.fn().mockResolvedValue(undefined),
       connect: vi.fn().mockResolvedValue(undefined),
+      request: vi.fn().mockResolvedValue({ signatureMap: 'mock-signature' }),
+    };
+
+    // Create mock AppKit instance
+    mockAppKitInstance = {
+      open: vi.fn().mockResolvedValue(undefined),
+      close: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      getState: vi.fn().mockReturnValue({}),
+      subscribeState: vi.fn(),
     };
 
     // Mock HederaProvider.init
@@ -98,11 +114,18 @@ describe('Wallet v2 Integration Tests', () => {
       return config.namespace === 'hedera' ? mockNativeAdapter : mockEvmAdapter;
     });
 
+    // Mock createAppKit function
+    vi.mocked(reownAppKit.createAppKit).mockReturnValue(mockAppKitInstance);
+    
+    // Mock initializeAppKit function
+    vi.mocked(appKitConfig.initializeAppKit).mockReturnValue(mockAppKitInstance);
+
     // Reset service state
     (hederaWalletService as any).isInitialized = false;
     (hederaWalletService as any).hederaProvider = null;
     (hederaWalletService as any).nativeAdapter = null;
     (hederaWalletService as any).evmAdapter = null;
+    (hederaWalletService as any).appKitInstance = null;
     (hederaWalletService as any).connectionState = null;
   });
 
@@ -135,11 +158,16 @@ describe('Wallet v2 Integration Tests', () => {
         ],
       };
 
-      // Setup mocks
-      mockNativeAdapter.connect.mockImplementation(async () => {
+      // Setup mocks for AppKit-based connection
+      mockAppKitInstance.open.mockImplementation(async () => {
         // Simulate async connection
         await new Promise(resolve => setTimeout(resolve, 100));
-        mockHederaProvider.getAccountAddresses.mockReturnValue(['hedera:testnet:0.0.123456']);
+        // Update AppKit state to simulate successful connection
+        mockAppKitInstance.getState.mockReturnValue({
+          address: '0.0.123456',
+          chainId: 'hedera:testnet',
+          isConnected: true,
+        });
       });
 
       global.fetch = vi.fn().mockResolvedValue({
@@ -196,7 +224,7 @@ describe('Wallet v2 Integration Tests', () => {
     });
 
     it('should handle connection rejection gracefully', async () => {
-      mockNativeAdapter.connect.mockRejectedValue(new Error('User rejected connection'));
+      mockAppKitInstance.open.mockRejectedValue(new Error('User rejected connection'));
 
       const { result } = renderHook(() => useWallet());
 
@@ -219,7 +247,7 @@ describe('Wallet v2 Integration Tests', () => {
     });
 
     it('should handle network errors during connection', async () => {
-      mockNativeAdapter.connect.mockRejectedValue(new Error('Network error'));
+      mockAppKitInstance.open.mockRejectedValue(new Error('Network error'));
 
       const { result } = renderHook(() => useWallet());
 
@@ -244,9 +272,12 @@ describe('Wallet v2 Integration Tests', () => {
 
   describe('Session Restoration After Page Reload', () => {
     it('should restore existing session on initialization', async () => {
-      // Mock existing session - provider returns accounts when connected
-      mockHederaProvider.session = { topic: 'test-session' };
-      mockHederaProvider.getAccountAddresses = vi.fn().mockReturnValue(['hedera:testnet:0.0.123456']);
+      // Mock existing session - AppKit returns connected state
+      mockAppKitInstance.getState.mockReturnValue({
+        address: '0.0.123456',
+        chainId: 'hedera:testnet',
+        isConnected: true,
+      });
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -286,8 +317,11 @@ describe('Wallet v2 Integration Tests', () => {
     });
 
     it('should handle restoration of EVM namespace session', async () => {
-      mockHederaProvider.session = { topic: 'test-session-evm' };
-      mockHederaProvider.getAccountAddresses = vi.fn().mockReturnValue(['eip155:296:0.0.789012']);
+      mockAppKitInstance.getState.mockReturnValue({
+        address: '0.0.789012',
+        chainId: 'eip155:296',
+        isConnected: true,
+      });
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -315,11 +349,8 @@ describe('Wallet v2 Integration Tests', () => {
     });
 
     it('should handle no existing session gracefully', async () => {
-      // No session, getAccountAddresses throws
-      mockHederaProvider.session = null;
-      mockHederaProvider.getAccountAddresses = vi.fn(() => {
-        throw new Error('Not initialized. Please call connect()');
-      });
+      // No session, AppKit returns empty state
+      mockAppKitInstance.getState.mockReturnValue({});
 
       const { result } = renderHook(() => useWallet());
 
@@ -334,8 +365,11 @@ describe('Wallet v2 Integration Tests', () => {
     });
 
     it('should handle corrupted session data gracefully', async () => {
-      mockHederaProvider.session = { topic: 'corrupted' };
-      mockHederaProvider.getAccountAddresses = vi.fn().mockReturnValue(['invalid:format']);
+      mockAppKitInstance.getState.mockReturnValue({
+        address: 'invalid:format',
+        chainId: 'corrupted',
+        isConnected: false,
+      });
 
       const { result } = renderHook(() => useWallet());
 
@@ -447,9 +481,13 @@ describe('Wallet v2 Integration Tests', () => {
       expect(result.current.isConnected).toBe(false);
 
       // Setup for reconnection with new account
-      mockNativeAdapter.connect.mockImplementation(async () => {
+      mockAppKitInstance.open.mockImplementation(async () => {
         await new Promise(resolve => setTimeout(resolve, 50));
-        mockHederaProvider.getAccountAddresses.mockReturnValue(['hedera:testnet:0.0.999999']);
+        mockAppKitInstance.getState.mockReturnValue({
+          address: '0.0.999999',
+          chainId: 'hedera:testnet',
+          isConnected: true,
+        });
       });
 
       // Reconnect
@@ -643,13 +681,16 @@ describe('Wallet v2 Integration Tests', () => {
       const message = 'Test message for signing';
       const mockSignature = { signatureMap: 'mock-signature-data' };
 
-      mockHederaProvider.hedera_signMessage.mockResolvedValue(mockSignature);
+      mockNativeAdapter.request.mockResolvedValue(mockSignature);
 
       const signature = await hederaWalletService.signMessage(message);
 
-      expect(mockHederaProvider.hedera_signMessage).toHaveBeenCalledWith({
-        signerAccountId: 'hedera:testnet:0.0.123456',
-        message,
+      expect(mockNativeAdapter.request).toHaveBeenCalledWith({
+        method: 'hedera_signMessage',
+        params: {
+          signerAccountId: '0.0.123456',
+          message,
+        },
       });
 
       expect(signature).toEqual(mockSignature);
@@ -662,7 +703,7 @@ describe('Wallet v2 Integration Tests', () => {
         expect(result.current.isConnected).toBe(true);
       });
 
-      mockHederaProvider.hedera_signMessage.mockRejectedValue(
+      mockNativeAdapter.request.mockRejectedValue(
         new Error('User rejected message signing')
       );
 
@@ -695,7 +736,7 @@ describe('Wallet v2 Integration Tests', () => {
 
       // Get the accountsChanged handler
       const accountsChangedHandler = mockHederaProvider.on.mock.calls.find(
-        (call: any) => call[0] === 'accountsChanged'
+        (call: unknown) => call[0] === 'accountsChanged'
       )?.[1];
 
       expect(accountsChangedHandler).toBeDefined();

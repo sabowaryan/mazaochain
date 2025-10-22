@@ -284,8 +284,7 @@
 /* —————————————— 
    Configuration Tailwind (keyframes + animations) 
    —————————————— */
-@utilities {
-  @layer base {
+@layer base {
     /* Reset global */
     *,
     *::before,
@@ -331,9 +330,9 @@
       background: var(--color-primary-800);
       color: var(--color-primary-100);
     }
-  }
+}
 
-  @layer components {
+@layer components {
     .container {
       width: 100%;
       max-width: 1200px;
@@ -345,9 +344,9 @@
       overflow-wrap: break-word;
       hyphens: auto;
     }
-  }
+}
 
-  /* Keyframes */
+/* Keyframes */
   @keyframes fade-in {
     from {
       opacity: 0;
@@ -428,7 +427,7 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-foreground);
   }
-}
+
 /* 
 Mobile-first responsive design enhancements */
 @layer utilities {

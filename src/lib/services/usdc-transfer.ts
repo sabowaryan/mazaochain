@@ -1,15 +1,15 @@
-import {
-  Client,
-  TransferTransaction,
-  AccountId,
-  PrivateKey,
-  Hbar,
-  TokenId,
-  TransactionResponse,
-  TransactionReceipt,
-  Status,
-} from "@hashgraph/sdk";
 import { env } from "@/lib/config/env";
+
+// Types for Hedera SDK (to avoid direct imports during build)
+type Client = any;
+type TransferTransaction = any;
+type AccountId = any;
+type PrivateKey = any;
+type Hbar = any;
+type TokenId = any;
+type TransactionResponse = any;
+type TransactionReceipt = any;
+type Status = any;
 
 export interface USDCTransferRequest {
   fromAccountId: string;
@@ -57,9 +57,12 @@ class USDCTransferService {
     // Lazy initialization - will be done when first method is called
   }
 
-  private initializeClient() {
+  private async initializeClient() {
     if (!this.client) {
       try {
+        // Dynamic import to avoid build-time issues
+        const { Client, AccountId, PrivateKey } = await import("@hashgraph/sdk");
+        
         // Initialize Hedera client
         this.client = env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
           ? Client.forMainnet()
@@ -81,10 +84,13 @@ class USDCTransferService {
    * Transfer USDC from one account to another
    */
   async transferUSDC(request: USDCTransferRequest): Promise<USDCTransferResult> {
-    this.initializeClient();
+    await this.initializeClient();
     
     try {
       console.log(`Initiating USDC transfer: ${request.amount} USDC from ${request.fromAccountId} to ${request.toAccountId}`);
+
+      // Dynamic import to avoid build-time issues
+      const { TransferTransaction, TokenId, AccountId, Hbar, Status } = await import("@hashgraph/sdk");
 
       // Convert USDC amount to smallest unit (considering 6 decimals)
       const transferAmount = Math.floor(request.amount * Math.pow(10, this.USDC_DECIMALS));
@@ -171,10 +177,13 @@ class USDCTransferService {
    * Escrow collateral tokens for a loan
    */
   async escrowCollateral(request: EscrowRequest): Promise<EscrowResult> {
-    this.initializeClient();
+    await this.initializeClient();
     
     try {
       console.log(`Escrowing collateral: ${request.amount} tokens of ${request.tokenId} for loan ${request.loanId}`);
+
+      // Dynamic import to avoid build-time issues
+      const { TransferTransaction, TokenId, AccountId, Hbar, Status } = await import("@hashgraph/sdk");
 
       // Convert amount to token units (assuming 6 decimals for MazaoTokens)
       const tokenAmount = Math.floor(request.amount * Math.pow(10, 6));
@@ -233,10 +242,13 @@ class USDCTransferService {
     toAccountId: string,
     loanId: string
   ): Promise<EscrowResult> {
-    this.initializeClient();
+    await this.initializeClient();
     
     try {
       console.log(`Releasing collateral: ${amount} tokens of ${tokenId} from escrow for loan ${loanId}`);
+
+      // Dynamic import to avoid build-time issues
+      const { TransferTransaction, TokenId, AccountId, Hbar, Status } = await import("@hashgraph/sdk");
 
       // Convert amount to token units
       const tokenAmount = Math.floor(amount * Math.pow(10, 6));
@@ -285,10 +297,10 @@ class USDCTransferService {
    * Get USDC balance for an account
    */
   async getUSDCBalance(accountId: string): Promise<number> {
-    this.initializeClient();
+    await this.initializeClient();
     
     try {
-      const { AccountBalanceQuery } = await import("@hashgraph/sdk");
+      const { AccountBalanceQuery, AccountId, TokenId } = await import("@hashgraph/sdk");
       
       const balanceQuery = new AccountBalanceQuery()
         .setAccountId(AccountId.fromString(accountId));

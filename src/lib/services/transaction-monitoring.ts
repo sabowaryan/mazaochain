@@ -44,7 +44,7 @@ class TransactionMonitoringService {
 
       if (error) throw error;
 
-      return data?.map((tx: unknown) => ({
+      return data?.map((tx: any) => ({
         id: tx.id,
         type: tx.type,
         fromAddress: tx.from_address,

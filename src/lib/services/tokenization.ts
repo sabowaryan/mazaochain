@@ -40,7 +40,8 @@ export class TokenizationService {
       await this.updateTokenizationStatus(tokenizationRecord.id, 'minting')
 
       // Execute tokenization on Hedera
-      const tokenizationResult = await hederaTokenService.tokenizeApprovedEvaluation(
+      const { mazaoContractsService } = await import('./mazao-contracts');
+      const tokenizationResult = await mazaoContractsService.tokenizeApprovedEvaluation(
         request.evaluationId,
         request.cropType,
         request.farmerId,

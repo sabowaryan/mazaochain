@@ -13,8 +13,22 @@ import { CropEvaluationService } from "@/lib/services/crop-evaluation";
 import { EvaluationDetails } from "@/components/crop-evaluation/EvaluationDetails";
 import { CROP_TYPES } from "@/types/crop-evaluation";
 import type { Tables } from "@/lib/supabase/database.types";
-import { useMazaoContracts } from "@/hooks/useMazaoContracts";
 import { notificationService } from "@/lib/services/notification";
+
+// Hook chargé dynamiquement
+const useMazaoContracts = () => {
+  const [hook, setHook] = useState<any>(null);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      import('@/hooks/useMazaoContracts').then(module => {
+        setHook(() => module.useMazaoContracts);
+      });
+    }
+  }, []);
+  
+  return hook ? hook() : { tokenizeEvaluation: async () => ({ success: false, error: 'Service not loaded' }), loading: false };
+};
 
 interface PendingEvaluationsReviewProps {
   cooperativeId: string;
@@ -271,7 +285,7 @@ export function PendingEvaluationsReview({
           <EvaluationDetails
             evaluation={selectedEvaluation as any}
             farmerName={(selectedEvaluation as any).farmer?.nom}
-            farmerLocation={(selectedEvaluation as unknown).farmer?.localisation}
+            farmerLocation={(selectedEvaluation as any).farmer?.localisation}
             showActions={false}
           />
         )}
@@ -281,19 +295,19 @@ export function PendingEvaluationsReview({
             <Button
               variant="destructive"
               onClick={() =>
-                handleRejectEvaluation((selectedEvaluation as unknown).id)
+                handleRejectEvaluation((selectedEvaluation as any).id)
               }
-              loading={processingId === (selectedEvaluation as unknown).id}
+              loading={processingId === (selectedEvaluation as any).id}
               disabled={processingId !== null}
             >
               Rejeter
             </Button>
             <Button
               onClick={() =>
-                handleApproveEvaluation((selectedEvaluation as unknown).id)
+                handleApproveEvaluation((selectedEvaluation as any).id)
               }
               loading={
-                processingId === (selectedEvaluation as unknown).id ||
+                processingId === (selectedEvaluation as any).id ||
                 contractsLoading
               }
               disabled={processingId !== null || contractsLoading}

@@ -3,6 +3,6 @@ export { WalletConnection } from './WalletConnection';
 export { WalletBalance } from './WalletBalance';
 export { WalletStatus } from './WalletStatus';
 
-// Re-export types from the new service
-export type { WalletConnection as WalletConnectionType, WalletBalances, TokenBalance } from '@/lib/wallet/hedera-wallet';
+// Re-export types from the wallet types
+export type { WalletConnection as WalletConnectionType, WalletBalances, TokenBalance } from '@/types/wallet';
 export { WalletTest } from './WalletTest';

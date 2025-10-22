@@ -1,8 +1,24 @@
 // Wallet integration test page
 'use client';
 
-import { WalletTest } from '@/components/wallet/WalletTest';
-import { WalletConnectionTest } from '@/components/wallet/WalletConnectionTest';
+import dynamic from 'next/dynamic';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+
+const WalletTest = dynamic(
+  () => import('@/components/wallet/WalletTest').then(mod => ({ default: mod.WalletTest })),
+  { 
+    ssr: false,
+    loading: () => <LoadingSpinner size="lg" />
+  }
+);
+
+const WalletConnectionTest = dynamic(
+  () => import('@/components/wallet/WalletConnectionTest').then(mod => ({ default: mod.WalletConnectionTest })),
+  { 
+    ssr: false,
+    loading: () => <LoadingSpinner size="lg" />
+  }
+);
 
 export default function TestWalletPage() {
   return (

@@ -63,6 +63,16 @@ describe("AppKit Integration", () => {
       expect(typeof service.getActiveNamespace).toBe("function");
     });
 
+    it("should have adapter getter methods", () => {
+      const service = getWalletService() as any;
+      
+      // Check adapter getter methods exist
+      expect(typeof service.getNativeAdapter).toBe("function");
+      expect(typeof service.getEvmAdapter).toBe("function");
+      expect(typeof service.getAdapters).toBe("function");
+      expect(typeof service.getActiveAdapter).toBe("function");
+    });
+
     it("should return consistent service instance", () => {
       const service1 = getWalletService();
       const service2 = getWalletService();
@@ -132,5 +142,41 @@ describe("Service Interface Compatibility", () => {
   it("should return null for namespace when not connected", () => {
     const service = getWalletService();
     expect(service.getActiveNamespace()).toBeNull();
+  });
+});
+
+describe("HederaAdapter Integration", () => {
+  it("should have adapter getter methods available", () => {
+    const service = getWalletService() as any;
+    
+    // Verify adapter methods exist
+    expect(service.getNativeAdapter).toBeDefined();
+    expect(service.getEvmAdapter).toBeDefined();
+    expect(service.getAdapters).toBeDefined();
+    expect(service.getActiveAdapter).toBeDefined();
+  });
+
+  it("should return null for adapters before initialization", () => {
+    const service = getWalletService() as any;
+    
+    // Before initialization, adapters should be null
+    expect(service.getNativeAdapter()).toBeNull();
+    expect(service.getEvmAdapter()).toBeNull();
+  });
+
+  it("should return empty array for getAdapters before initialization", () => {
+    const service = getWalletService() as any;
+    
+    // Before initialization, should return empty array
+    const adapters = service.getAdapters();
+    expect(Array.isArray(adapters)).toBe(true);
+    expect(adapters.length).toBe(0);
+  });
+
+  it("should return null for active adapter when not connected", () => {
+    const service = getWalletService() as unknown;
+    
+    // When not connected, active adapter should be null
+    expect(service.getActiveAdapter()).toBeNull();
   });
 });

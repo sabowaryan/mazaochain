@@ -2,14 +2,16 @@
 
 // Wallet Service Factory
 // Provides a unified interface for wallet operations using HederaWalletService
+// Updated to use HederaProvider + AppKit integration
 
-import { hederaWalletService } from "./hedera-wallet";
 import type { WalletConnection, WalletBalances } from "@/types/wallet";
-import { Transaction } from "@hashgraph/sdk";
+// Type for Hedera SDK Transaction (to avoid direct imports during build)
+type Transaction = any;
 
 /**
  * Unified Wallet Service Interface
  * Defines the contract for wallet operations
+ * Requirements: 11.2 - Maintain IWalletService interface contract
  */
 export interface IWalletService {
   initialize(): Promise<void>;
@@ -25,10 +27,31 @@ export interface IWalletService {
   getActiveNamespace(): "hedera" | "eip155" | null;
 }
 
+// Cache for the wallet service instance
+let walletServiceInstance: IWalletService | null = null;
+
 /**
  * Get the wallet service instance
- * Returns the HederaWalletService with DAppConnector
+ * Returns the updated HederaWalletService with HederaProvider and AppKit integration
+ * Requirements: 11.1 - Ensure factory returns the updated HederaWalletService
+ * Requirements: 11.3 - Verify singleton pattern for service instance
  */
-export function getWalletService(): IWalletService {
-  return hederaWalletService as IWalletService;
+export async function getWalletService(): Promise<IWalletService> {
+  if (!walletServiceInstance) {
+    // Dynamic import to avoid SSR issues
+    const { hederaWalletService } = await import("./hedera-wallet");
+    walletServiceInstance = hederaWalletService as IWalletService;
+  }
+  return walletServiceInstance;
+}
+
+/**
+ * Check if the service is using AppKit integration
+ * This function indicates that the service is now using HederaProvider + AppKit
+ * Requirements: 11.4 - Ensure backward compatibility with existing code
+ */
+export function isUsingAppKit(): boolean {
+  // The service now always uses HederaProvider + AppKit integration
+  // This replaces the previous DAppConnector implementation
+  return true;
 }

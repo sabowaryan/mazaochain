@@ -316,27 +316,27 @@ export class LoanService {
         const loanData = loan;
 
         // Extract borrower info from nested structure
-        const borrowerInfo = loanData.borrower
+        const borrowerInfo = (loanData as any).borrower
           ? {
-              id: loanData.borrower.id,
+              id: (loanData as any).borrower.id,
               nom:
-                loanData.borrower.farmer_profiles?.nom || "Agriculteur inconnu",
+                (loanData as any).borrower.farmer_profiles?.nom || "Agriculteur inconnu",
               email: "email@example.com",
             }
           : undefined;
 
         // Extract lender info
-        const lenderInfo = loanData.lender
+        const lenderInfo = (loanData as any).lender
           ? {
-              id: loanData.lender.id,
+              id: (loanData as any).lender.id,
               institution_name:
-                loanData.lender.lender_profiles?.institution_name ||
+                (loanData as any).lender.lender_profiles?.institution_name ||
                 "Prêteur inconnu",
             }
           : undefined;
 
         return {
-          ...loanData,
+          ...(loanData as any),
           borrower: borrowerInfo,
           lender: lenderInfo,
         };

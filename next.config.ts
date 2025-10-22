@@ -10,7 +10,7 @@ const nextConfig = {
       // Polyfills pour les modules Node.js côté client
       crypto: "crypto-browserify",
       stream: "stream-browserify",
-      buffer: "buffer/",
+      buffer: "buffer",
     },
     resolveExtensions: [".mdx", ".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
@@ -19,7 +19,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   // Webpack configuration (utilisé uniquement pour les builds de production)
-  webpack: (config: { externals: string[]; resolve: { fallback: any; }; plugins: any[]; }, { isServer }: unknown) => {
+  webpack: (config: { externals: string[]; resolve: { fallback: any; }; plugins: any[]; }, { isServer }: { isServer: boolean }) => {
     // Externaliser les modules problématiques (recommandation Reown Appkit)
     config.externals.push("pino-pretty", "lokijs", "encoding");
 
@@ -28,6 +28,17 @@ const nextConfig = {
     config.plugins.push(
       new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],
+        process: 'process/browser',
+      })
+    );
+
+    // Ajouter les constantes Buffer nécessaires pour Hedera SDK
+    config.plugins.push(
+      new webpack.DefinePlugin({
+        'Buffer.constants': JSON.stringify({
+          MAX_LENGTH: 2147483647,
+          MAX_STRING_LENGTH: 536870888
+        })
       })
     );
 
@@ -40,7 +51,8 @@ const nextConfig = {
         tls: false,
         crypto: require.resolve("crypto-browserify"),
         stream: require.resolve("stream-browserify"),
-        buffer: require.resolve("buffer/"),
+        buffer: require.resolve("buffer"),
+        process: require.resolve("process/browser"),
       };
     }
 

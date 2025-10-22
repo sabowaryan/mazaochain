@@ -2,16 +2,39 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslations } from '@/components/TranslationProvider';
-import { useMazaoContracts } from '@/hooks/useMazaoContracts';
-import { useWallet } from '@/hooks/useWallet';
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RequireAuth } from '@/components/auth/AuthGuard';
-import { PendingEvaluationsReview } from '@/components/cooperative/PendingEvaluationsReview';
-import { LoanApprovalList } from '@/components/cooperative/LoanApprovalList';
-import { WalletConnection } from '@/components/wallet/WalletConnection';
+import { ClientOnly } from '@/components/ClientOnly';
+import dynamic from 'next/dynamic';
+
+// Chargement dynamique des composants qui utilisent Hedera SDK
+const PendingEvaluationsReview = dynamic(
+  () => import('@/components/cooperative/PendingEvaluationsReview').then(mod => ({ default: mod.PendingEvaluationsReview })),
+  { 
+    ssr: false,
+    loading: () => <LoadingSpinner size="sm" />
+  }
+);
+
+const LoanApprovalList = dynamic(
+  () => import('@/components/cooperative/LoanApprovalList').then(mod => ({ default: mod.LoanApprovalList })),
+  { 
+    ssr: false,
+    loading: () => <LoadingSpinner size="sm" />
+  }
+);
+
+const WalletConnection = dynamic(
+  () => import('@/components/wallet/WalletConnection').then(mod => ({ default: mod.WalletConnection })),
+  { 
+    ssr: false,
+    loading: () => <div className="animate-pulse bg-gray-200 h-20 rounded"></div>
+  }
+);
+
 
 interface CooperativeStats {
   totalMembers: number;
@@ -50,8 +73,6 @@ interface LoanRequest {
 function CooperativeDashboardContent() {
   const { user, profile, loading: authLoading } = useAuth();
   const t = useTranslations('cooperative');
-  const { loading: contractsLoading } = useMazaoContracts();
-  const { isConnected } = useWallet();
   
   const [stats, setStats] = useState<CooperativeStats>({
     totalMembers: 0,
@@ -120,14 +141,14 @@ function CooperativeDashboardContent() {
     };
 
     loadCooperativeData();
-  }, [user.id, profile, user]);
+  }, [user?.id, profile, user]);
 
 
 
   // Le AuthGuard s'occupe déjà de vérifier l'authentification
   // On affiche juste un loader si les données sont en cours de chargement
 
-  if (isLoading || contractsLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner size="lg" />
@@ -148,11 +169,11 @@ function CooperativeDashboardContent() {
       </div>
 
       {/* Wallet Connection */}
-      {!isConnected && (
+      <ClientOnly fallback={<div className="animate-pulse bg-gray-200 h-20 rounded mb-8"></div>}>
         <div className="mb-8">
           <WalletConnection showBalances={false} />
         </div>
-      )}
+      </ClientOnly>
 
       {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -315,16 +336,20 @@ function CooperativeDashboardContent() {
         {activeTab === 'evaluations' && (
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Évaluations en attente de validation</h3>
-            <PendingEvaluationsReview 
-              cooperativeId={user?.id || ''}
-            />
+            <ClientOnly fallback={<LoadingSpinner size="lg" />}>
+              <PendingEvaluationsReview 
+                cooperativeId={user?.id || ''}
+              />
+            </ClientOnly>
           </Card>
         )}
 
         {activeTab === 'loans' && (
           <Card className="p-6">
             <h3 className="text-lg font-semibold mb-4">Demandes de prêt en attente</h3>
-            <LoanApprovalList />
+            <ClientOnly fallback={<LoadingSpinner size="lg" />}>
+              <LoanApprovalList />
+            </ClientOnly>
           </Card>
         )}
 
@@ -347,7 +372,9 @@ function CooperativeDashboardContent() {
 export default function CooperativeDashboard() {
   return (
     <RequireAuth requiredRoles={['cooperative', 'admin']}>
-      <CooperativeDashboardContent />
+      <ClientOnly fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>}>
+        <CooperativeDashboardContent />
+      </ClientOnly>
     </RequireAuth>
   );
 }

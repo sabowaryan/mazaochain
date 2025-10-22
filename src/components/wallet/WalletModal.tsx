@@ -27,14 +27,9 @@ export function WalletModal({
   onReject,
   hideButtons = false,
 }: WalletModalProps) {
-  console.log('🟪 [WalletModal] Render with isOpen:', isOpen, 'title:', title);
-  
   if (!isOpen) {
-    console.log('🟪 [WalletModal] Not rendering - isOpen is false');
     return null;
   }
-  
-  console.log('🟪 [WalletModal] Rendering modal!');
 
   const getIconColor = () => {
     switch (type) {

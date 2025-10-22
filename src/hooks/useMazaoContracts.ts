@@ -1,5 +1,37 @@
-import { useState, useCallback } from 'react';
-import { mazaoContractsService, type MazaoTokenInfo, type LoanInfo, type ContractInteractionResult } from '@/lib/services/mazao-contracts';
+"use client";
+
+import { useState, useCallback, useEffect } from 'react';
+
+// Types importés directement pour éviter les imports de services pendant le SSR
+export interface MazaoTokenInfo {
+  tokenId: string;
+  farmer: string;
+  estimatedValue: number;
+  cropType: string;
+  harvestDate: number;
+  isActive: boolean;
+  totalSupply: number;
+  createdAt: number;
+  tokenSymbol: string;
+}
+
+export interface LoanInfo {
+  loanId: string;
+  borrower: string;
+  collateralTokenId: string;
+  principal: number;
+  duration: number;
+  interestRate: number;
+  status: number;
+  createdAt: number;
+}
+
+export interface ContractInteractionResult {
+  success: boolean;
+  transactionId?: string;
+  data?: unknown;
+  error?: string;
+}
 
 export interface UseMazaoContractsReturn {
   // State
@@ -63,10 +95,27 @@ export interface UseMazaoContractsReturn {
 export function useMazaoContracts(): UseMazaoContractsReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mazaoContractsService, setMazaoContractsService] = useState<any>(null);
+
+  // Chargement dynamique du service uniquement côté client
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !mazaoContractsService) {
+      import('@/lib/services/mazao-contracts').then(module => {
+        setMazaoContractsService(module.mazaoContractsService);
+      }).catch(err => {
+        console.error('Failed to load mazao contracts service:', err);
+        setError('Failed to load contracts service');
+      });
+    }
+  }, [mazaoContractsService]);
 
   const handleAsyncOperation = useCallback(async <T>(
     operation: () => Promise<T>
   ): Promise<T> => {
+    if (!mazaoContractsService) {
+      throw new Error('Contracts service not loaded yet');
+    }
+
     setLoading(true);
     setError(null);
     
@@ -80,7 +129,7 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mazaoContractsService]);
 
   const createCropToken = useCallback(async (
     farmerAddress: string,
@@ -88,7 +137,7 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     cropType: string,
     harvestDate: number,
     tokenSymbol: string
-  ) => {
+  ): Promise<ContractInteractionResult> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.createCropToken(
         farmerAddress,
@@ -104,7 +153,7 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     tokenId: string,
     amount: number,
     recipientAddress: string
-  ) => {
+  ): Promise<ContractInteractionResult> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.mintTokens(tokenId, amount, recipientAddress)
     );
@@ -113,19 +162,19 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
   const getFarmerBalanceForToken = useCallback(async (
     farmerAddress: string,
     tokenId: string
-  ) => {
+  ): Promise<number> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.getFarmerBalanceForToken(farmerAddress, tokenId)
     );
   }, [handleAsyncOperation]);
 
-  const getFarmerTotalBalance = useCallback(async (farmerAddress: string) => {
+  const getFarmerTotalBalance = useCallback(async (farmerAddress: string): Promise<number> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.getFarmerTotalBalance(farmerAddress)
     );
   }, [handleAsyncOperation]);
 
-  const getTokenDetails = useCallback(async (tokenId: string) => {
+  const getTokenDetails = useCallback(async (tokenId: string): Promise<MazaoTokenInfo | null> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.getTokenDetails(tokenId)
     );
@@ -136,7 +185,7 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     principal: number,
     duration: number,
     interestRate: number
-  ) => {
+  ): Promise<ContractInteractionResult> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.requestLoan(
         collateralTokenId,
@@ -147,19 +196,19 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     );
   }, [handleAsyncOperation]);
 
-  const getLoanDetails = useCallback(async (loanId: string) => {
+  const getLoanDetails = useCallback(async (loanId: string): Promise<LoanInfo | null> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.getLoanDetails(loanId)
     );
   }, [handleAsyncOperation]);
 
-  const getNextTokenId = useCallback(async () => {
+  const getNextTokenId = useCallback(async (): Promise<number> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.getNextTokenId()
     );
   }, [handleAsyncOperation]);
 
-  const getNextLoanId = useCallback(async () => {
+  const getNextLoanId = useCallback(async (): Promise<number> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.getNextLoanId()
     );
@@ -172,7 +221,12 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     farmerAddress: string,
     estimatedValue: number,
     harvestDate: number
-  ) => {
+  ): Promise<{
+    success: boolean;
+    tokenId?: string;
+    transactionIds?: string[];
+    error?: string;
+  }> => {
     return handleAsyncOperation(() =>
       mazaoContractsService.tokenizeApprovedEvaluation(
         evaluationId,

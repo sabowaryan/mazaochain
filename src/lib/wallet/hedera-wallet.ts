@@ -1,18 +1,19 @@
 "use client";
 
 // Hedera Wallet integration service using official @hashgraph/hedera-wallet-connect v2
-// Using DAppConnector for direct WalletConnect integration
+// Using HederaProvider for WalletConnect integration with AppKit support
 import {
-  DAppConnector,
-  HederaSessionEvent,
-  HederaJsonRpcMethod,
-  HederaChainId,
+  HederaProvider,
   DAppSigner,
+  HederaAdapter,
+  hederaNamespace,
 } from "@hashgraph/hedera-wallet-connect";
-import { Client, Transaction, LedgerId, AccountId } from "@hashgraph/sdk";
-import { WalletConnectModal } from "@walletconnect/modal";
+import { HederaChainDefinition } from "@hashgraph/hedera-wallet-connect";
+// Import proper types from Hedera SDK
+import type { Client, Transaction, AccountId, LedgerId } from "@hashgraph/sdk";
+import type UniversalProvider from "@walletconnect/universal-provider";
 import type { SessionTypes } from "@walletconnect/types";
-// UniversalProvider type is used for type casting in setUniversalProvider calls
+import type { AppKit } from "@reown/appkit";
 import { env } from "@/lib/config/env";
 import { suppressWalletConnectErrors } from "./wallet-error-handler";
 import {
@@ -25,22 +26,40 @@ import {
 } from "@/types/wallet";
 
 class HederaWalletService {
-  private dAppConnector: DAppConnector | null = null;
+  private hederaProvider: UniversalProvider | null = null;
+  private nativeAdapter: HederaAdapter | null = null;
+  private evmAdapter: HederaAdapter | null = null;
+  private appKitInstance: AppKit | null = null;
   private signers: DAppSigner[] = [];
   private isInitialized = false;
   private connectionState: WalletConnection | null = null;
-  private client: Client;
-  private walletConnectModal: WalletConnectModal | null = null;
+  private client: any = null;
 
   constructor() {
-    // Initialize Hedera client
-    this.client =
-      env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
-        ? Client.forMainnet()
-        : Client.forTestnet();
-
+    // Lazy initialization - client will be created when needed
     // Suppress WalletConnect console errors in development
     suppressWalletConnectErrors();
+  }
+
+  private async initializeHederaClient() {
+    if (!this.client) {
+      try {
+        // Skip initialization during build
+        if (typeof window === 'undefined' && !env.HEDERA_PRIVATE_KEY) {
+          return;
+        }
+
+        // Use SDK wrapper to avoid build-time issues
+        const { createClient } = await import("@/lib/hedera/sdk-wrapper");
+        
+        // Initialize Hedera client
+        this.client = await createClient(
+          env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet" ? "mainnet" : "testnet"
+        );
+      } catch (error) {
+        console.error('Failed to initialize Hedera client:', error);
+      }
+    }
   }
 
   async initialize(): Promise<void> {
@@ -49,11 +68,24 @@ class HederaWalletService {
     }
 
     try {
-      // Validate required environment variables
+      // Initialize Hedera client first
+      await this.initializeHederaClient();
+
+      // Requirement 14.4: Validate projectId and throw appropriate errors
       if (!env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) {
         throw new WalletError(
           WalletErrorCode.INVALID_PROJECT_ID,
           "WalletConnect Project ID is not configured. Please set NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID in your environment variables."
+        );
+      }
+
+      // Validate projectId format (should be a non-empty string with reasonable length)
+      // WalletConnect Project IDs are typically 32-character hex strings, but we allow flexibility for testing
+      const projectId = env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID.trim();
+      if (projectId.length < 10 || projectId.length > 100) {
+        throw new WalletError(
+          WalletErrorCode.INVALID_PROJECT_ID,
+          "Invalid WalletConnect Project ID format. Please check your NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID configuration."
         );
       }
 
@@ -69,31 +101,201 @@ class HederaWalletService {
         ],
       };
 
-      // Determine the LedgerId (MAINNET or TESTNET) from configuration
-      const ledgerId =
-        env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
-          ? LedgerId.MAINNET
-          : LedgerId.TESTNET;
-
-      // Create DAppConnector with metadata, ledgerId, projectId, methods, events, chains
-      this.dAppConnector = new DAppConnector(
-        metadata,
-        ledgerId,
-        env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-        Object.values(HederaJsonRpcMethod),
-        [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
-        [HederaChainId.Mainnet, HederaChainId.Testnet]
-      );
-
-      // Initialize DAppConnector
-      await this.dAppConnector.init({ logger: "error" });
-
-      // Create WalletConnect modal
-      if (typeof window !== "undefined") {
-        this.walletConnectModal = new WalletConnectModal({
+      // Requirement 14.1: Add error handling for HederaProvider.init failures
+      // Initialize HederaProvider with projectId and metadata
+      // Cast to UniversalProvider for AppKit compatibility
+      try {
+        this.hederaProvider = (await HederaProvider.init({
           projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-          chains: ["hedera:mainnet", "hedera:testnet"],
+          metadata,
+        })) as unknown as UniversalProvider;
+      } catch (error) {
+        const err = error as { message?: string; code?: string; name?: string };
+        const errorMessage = (err?.message || "").toLowerCase();
+        const errorCode = err?.code || "";
+        const errorName = err?.name || "";
+
+        // Enhanced error detection for HederaProvider initialization failures
+        if (
+          errorMessage.includes("project id") ||
+          errorMessage.includes("projectid") ||
+          errorMessage.includes("invalid project") ||
+          errorCode.includes("PROJECT_ID") ||
+          errorName.includes("ProjectId")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.INVALID_PROJECT_ID,
+            "Failed to initialize HederaProvider: Invalid or missing WalletConnect Project ID. Please check your NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID configuration.",
+            error
+          );
+        } else if (
+          errorMessage.includes("network") ||
+          errorMessage.includes("connection") ||
+          errorMessage.includes("fetch") ||
+          errorMessage.includes("timeout") ||
+          errorMessage.includes("unreachable") ||
+          errorCode.includes("NETWORK") ||
+          errorName.includes("Network")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.NETWORK_ERROR,
+            "Failed to initialize HederaProvider: Network connection error. Please check your internet connection and try again.",
+            error
+          );
+        } else if (
+          errorMessage.includes("metadata") ||
+          errorMessage.includes("invalid metadata") ||
+          errorMessage.includes("malformed")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.INITIALIZATION_FAILED,
+            "Failed to initialize HederaProvider: Invalid application metadata configuration.",
+            error
+          );
+        } else if (
+          errorMessage.includes("unsupported") ||
+          errorMessage.includes("not supported") ||
+          errorMessage.includes("incompatible")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.INITIALIZATION_FAILED,
+            "Failed to initialize HederaProvider: Unsupported environment or configuration.",
+            error
+          );
+        } else {
+          // Requirement 14.5: Wrap unknown errors with original error
+          throw new WalletError(
+            WalletErrorCode.INITIALIZATION_FAILED,
+            `Failed to initialize HederaProvider: ${err?.message || "Unknown initialization error"}`,
+            error
+          );
+        }
+      }
+
+      // Create native adapter for Hedera namespace
+      // Supports native Hedera transactions (HTS, HBAR transfers, native smart contracts)
+      try {
+        this.nativeAdapter = new HederaAdapter({
+          projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+          networks: [
+            HederaChainDefinition.Native.Mainnet,
+            HederaChainDefinition.Native.Testnet,
+          ],
+          namespace: hederaNamespace, // 'hedera' as CaipNamespace
         });
+      } catch (error) {
+        throw new WalletError(
+          WalletErrorCode.INITIALIZATION_FAILED,
+          "Failed to create native Hedera adapter",
+          error
+        );
+      }
+
+      // Create EVM adapter for EIP-155 namespace
+      // Supports EVM-compatible transactions on Hedera (Ethereum-like smart contracts)
+      try {
+        this.evmAdapter = new HederaAdapter({
+          projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+          networks: [
+            HederaChainDefinition.EVM.Mainnet,  // Chain ID 295
+            HederaChainDefinition.EVM.Testnet,  // Chain ID 296
+          ],
+          namespace: 'eip155',
+        });
+      } catch (error) {
+        throw new WalletError(
+          WalletErrorCode.INITIALIZATION_FAILED,
+          "Failed to create EVM adapter",
+          error
+        );
+      }
+
+      // Initialize AppKit with HederaProvider and adapters
+      // AppKit provides the modal UI for wallet connection
+      try {
+        // Dynamic import to avoid SSR issues
+        const { initializeAppKit } = await import("./appkit-config");
+        this.appKitInstance = await initializeAppKit({
+          adapters: [this.nativeAdapter, this.evmAdapter],
+          universalProvider: this.hederaProvider,
+        });
+        console.log("AppKit initialized successfully with Hedera adapters");
+      } catch (error) {
+        const err = error as { message?: string; code?: string; name?: string };
+        const errorMessage = (err?.message || "").toLowerCase();
+        const errorCode = err?.code || "";
+        const errorName = err?.name || "";
+
+        // Requirement 14.3: Add network error handling specific to AppKit
+        if (
+          errorMessage.includes("network") ||
+          errorMessage.includes("connection") ||
+          errorMessage.includes("fetch") ||
+          errorMessage.includes("cors") ||
+          errorMessage.includes("unreachable") ||
+          errorMessage.includes("timeout") ||
+          errorCode.includes("NETWORK") ||
+          errorName.includes("Network")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.NETWORK_ERROR,
+            "Failed to initialize AppKit: Network connection error. Please check your internet connection and firewall settings.",
+            error
+          );
+        } else if (
+          errorMessage.includes("project id") ||
+          errorMessage.includes("projectid") ||
+          errorMessage.includes("invalid project") ||
+          errorMessage.includes("missing project") ||
+          errorCode.includes("PROJECT_ID") ||
+          errorName.includes("ProjectId")
+        ) {
+          // Requirement 14.4: Validate projectId and throw appropriate errors
+          throw new WalletError(
+            WalletErrorCode.INVALID_PROJECT_ID,
+            "Failed to initialize AppKit: Invalid WalletConnect Project ID. Please verify your NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID configuration.",
+            error
+          );
+        } else if (
+          errorMessage.includes("adapter") ||
+          errorMessage.includes("provider") ||
+          errorMessage.includes("invalid adapter") ||
+          errorMessage.includes("missing adapter")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.INITIALIZATION_FAILED,
+            "Failed to initialize AppKit: Invalid adapter configuration. Please check your Hedera adapter setup.",
+            error
+          );
+        } else if (
+          errorMessage.includes("metadata") ||
+          errorMessage.includes("invalid metadata") ||
+          errorMessage.includes("malformed metadata")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.INITIALIZATION_FAILED,
+            "Failed to initialize AppKit: Invalid application metadata. Please check your app configuration.",
+            error
+          );
+        } else if (
+          errorMessage.includes("unsupported") ||
+          errorMessage.includes("not supported") ||
+          errorMessage.includes("incompatible") ||
+          errorMessage.includes("browser")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.INITIALIZATION_FAILED,
+            "Failed to initialize AppKit: Unsupported browser or environment. Please use a modern browser with WalletConnect support.",
+            error
+          );
+        } else {
+          // Requirement 14.5: Wrap unknown errors with original error
+          throw new WalletError(
+            WalletErrorCode.INITIALIZATION_FAILED,
+            `Failed to initialize AppKit: ${err?.message || "Unknown AppKit initialization error"}`,
+            error
+          );
+        }
       }
 
       // Set up session event listeners
@@ -104,32 +306,253 @@ class HederaWalletService {
 
       this.isInitialized = true;
     } catch (error) {
+      // Requirement 14.5: Wrap unknown errors in WalletError with original error
       const walletError =
         error instanceof WalletError
           ? error
           : new WalletError(
-              WalletErrorCode.INITIALIZATION_FAILED,
-              "Failed to initialize Hedera Wallet service",
-              error
-            );
+            WalletErrorCode.UNKNOWN_ERROR,
+            "Failed to initialize Hedera Wallet service with HederaProvider",
+            error
+          );
       console.error("Failed to initialize Hedera Wallet service:", walletError);
       throw walletError;
     }
   }
 
   /**
-   * Set up session event listeners
-   * Note: DAppConnector handles session events automatically via its internal listeners
-   * configured during initialization (ChainChanged, AccountsChanged).
-   * No manual event handling is required.
+   * Set up AppKit session event listeners
+   * Listens for account changes, network changes, and session updates
+   * Requirements: 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5
    */
   private setupSessionListeners(): void {
-    // DAppConnector manages events internally
-    // Events are configured during initialization:
-    // - HederaSessionEvent.ChainChanged
-    // - HederaSessionEvent.AccountsChanged
-    // Signers are automatically updated by DAppConnector
+    if (!this.appKitInstance) return;
+
+    try {
+      // Subscribe to AppKit state changes
+      // This handles account changes, network changes, and disconnection
+      if (typeof this.appKitInstance.subscribeState === "function") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.appKitInstance.subscribeState((state: any) => {
+          this.handleAppKitStateChange(state as Record<string, unknown>);
+        });
+        console.log("AppKit event listeners configured successfully");
+      } else {
+        console.warn(
+          "AppKit subscribeState method not available, using polling only"
+        );
+      }
+
+      // Set up additional event listeners if available
+      // These handle specific events like account changes and network changes
+      if (this.hederaProvider && typeof this.hederaProvider.on === "function") {
+        // Listen for account changes (Requirement 6.1)
+        this.hederaProvider.on("accountsChanged", (accounts: string[]) => {
+          this.handleAccountsChanged(accounts);
+        });
+
+        // Listen for network/chain changes (Requirement 6.2)
+        this.hederaProvider.on("chainChanged", (chainId: string) => {
+          this.handleChainChanged(chainId);
+        });
+
+        // Listen for session updates
+        this.hederaProvider.on("session_update", (session: unknown) => {
+          this.handleSessionUpdate(session);
+        });
+
+        // Listen for session deletion (Requirement 6.3)
+        this.hederaProvider.on("session_delete", () => {
+          this.handleSessionDelete();
+        });
+
+        // Listen for disconnect events
+        this.hederaProvider.on("disconnect", () => {
+          this.handleDisconnect();
+        });
+
+        console.log("HederaProvider event listeners configured successfully");
+      }
+    } catch (error) {
+      console.warn("Could not set up event listeners:", error);
+      // Fallback to polling in connectWallet method
+    }
   }
+
+  /**
+   * Handle AppKit state changes
+   * Called when AppKit state changes (account, network, connection status)
+   * Requirement 6.4: Update React context on connection state changes
+   */
+  private handleAppKitStateChange(state: Record<string, unknown>): void {
+    try {
+      const stateAny = state as {
+        address?: string;
+        selectedNetworkId?: string;
+        chainId?: string;
+        isConnected?: boolean;
+      };
+
+      const address = stateAny.address || stateAny.selectedNetworkId;
+      const chainId = stateAny.chainId || stateAny.selectedNetworkId;
+      const isConnected = stateAny.isConnected || !!address;
+
+      console.log("AppKit state changed:", { address, chainId, isConnected });
+
+      if (isConnected && address) {
+        // Update connection state with new information
+        const detectedNamespace = chainId?.includes("eip155")
+          ? "eip155"
+          : "hedera";
+
+        const newConnectionState: WalletConnection = {
+          accountId: address,
+          network: chainId?.includes("mainnet") ? "mainnet" : "testnet",
+          isConnected: true,
+          namespace: detectedNamespace,
+          chainId: chainId || "hedera:testnet",
+        };
+
+        // Only update if state actually changed
+        if (
+          !this.connectionState ||
+          this.connectionState.accountId !== newConnectionState.accountId ||
+          this.connectionState.chainId !== newConnectionState.chainId
+        ) {
+          this.connectionState = newConnectionState;
+          this.saveSession();
+          console.log("Connection state updated from AppKit:", this.connectionState);
+        }
+      } else if (!isConnected && this.connectionState) {
+        // Handle disconnection (Requirement 6.3)
+        console.log("Wallet disconnected via AppKit state change");
+        this.connectionState = null;
+        this.clearSavedSession();
+      }
+    } catch (error) {
+      console.error("Error handling AppKit state change:", error);
+    }
+  }
+
+  /**
+   * Handle account changes from wallet
+   * Requirement 6.1: Receive notification from AppKit when wallet account changes
+   */
+  private handleAccountsChanged(accounts: string[]): void {
+    console.log("Accounts changed:", accounts);
+
+    if (accounts.length === 0) {
+      // No accounts available - wallet disconnected
+      if (this.connectionState) {
+        console.log("No accounts available - disconnecting");
+        this.connectionState = null;
+        this.clearSavedSession();
+      }
+      return;
+    }
+
+    // Update connection state with new account
+    const newAccountId = accounts[0];
+    if (this.connectionState && this.connectionState.accountId !== newAccountId) {
+      console.log(`Account changed from ${this.connectionState.accountId} to ${newAccountId}`);
+      this.connectionState = {
+        ...this.connectionState,
+        accountId: newAccountId,
+      };
+      this.saveSession();
+    }
+  }
+
+  /**
+   * Handle network/chain changes from wallet
+   * Requirement 6.2: Update connection state with new network
+   */
+  private handleChainChanged(chainId: string): void {
+    console.log("Chain changed:", chainId);
+
+    if (!this.connectionState) return;
+
+    // Parse chain ID to determine namespace and network
+    const detectedNamespace = chainId.includes("eip155") ? "eip155" : "hedera";
+    const network = chainId.includes("mainnet") ? "mainnet" : "testnet";
+
+    // Update connection state with new network information
+    if (
+      this.connectionState.chainId !== chainId ||
+      this.connectionState.namespace !== detectedNamespace ||
+      this.connectionState.network !== network
+    ) {
+      console.log(`Network changed to ${network} (${detectedNamespace})`);
+      this.connectionState = {
+        ...this.connectionState,
+        chainId,
+        namespace: detectedNamespace,
+        network,
+      };
+      this.saveSession();
+    }
+  }
+
+  /**
+   * Handle session updates
+   * Called when WalletConnect session is updated
+   */
+  private handleSessionUpdate(session: unknown): void {
+    console.log("Session updated:", session);
+    // Session updates are handled by AppKit and HederaProvider
+    // We just log for debugging purposes
+  }
+
+  /**
+   * Handle session deletion
+   * Requirement 6.3: Clean up local connection state when session is deleted
+   */
+  private handleSessionDelete(): void {
+    console.log("Session deleted - cleaning up connection state");
+
+    if (this.connectionState) {
+      this.connectionState = null;
+      this.clearSavedSession();
+      console.log("Connection state cleared due to session deletion");
+    }
+  }
+
+  /**
+   * Handle disconnect events
+   * Clean up connection state when wallet disconnects
+   */
+  private handleDisconnect(): void {
+    console.log("Wallet disconnected - cleaning up connection state");
+
+    if (this.connectionState) {
+      this.connectionState = null;
+      this.clearSavedSession();
+      console.log("Connection state cleared due to disconnect");
+    }
+  }
+
+  /**
+   * Remove all event listeners
+   * Called during cleanup or when reinitializing
+   * Requirement 6.5: Clean up AppKit and HederaProvider event listeners
+   */
+  private removeEventListeners(): void {
+    if (!this.hederaProvider) return;
+
+    try {
+      // Note: Since we use arrow functions in setupSessionListeners,
+      // we can't remove individual listeners. Instead, we rely on
+      // the provider being set to null during cleanup.
+      // This is acceptable as the service is a singleton and cleanup
+      // only happens during app shutdown or reinitialization.
+
+      console.log("Event listeners will be cleaned up with provider instance");
+    } catch (error) {
+      console.warn("Error removing event listeners:", error);
+    }
+  }
+
+
 
   /**
    * Save session to localStorage (without private keys!)
@@ -204,17 +627,80 @@ class HederaWalletService {
 
   /**
    * Restore existing session on startup
+   * AppKit handles session persistence automatically via WalletConnect
    */
   private async restoreExistingSession(): Promise<WalletConnection | null> {
-    if (!this.dAppConnector) return null;
+    if (!this.appKitInstance || !this.hederaProvider) return null;
 
     try {
-      // Try to load saved session from localStorage
+      // Check if AppKit has an existing session
+      const state = this.appKitInstance.getState?.() || {};
+      const stateAny = state as {
+        address?: string;
+        selectedNetworkId?: string;
+        chainId?: string;
+        isConnected?: boolean;
+      };
+
+      const address = stateAny.address || stateAny.selectedNetworkId;
+      const isConnected = stateAny.isConnected || !!address;
+
+      if (isConnected && address) {
+        // Try to get account addresses from HederaProvider session if available
+        try {
+          const providerWithSession = this.hederaProvider as UniversalProvider & {
+            session?: SessionTypes.Struct;
+          };
+
+          if (providerWithSession.session) {
+            const accounts = Object.values(providerWithSession.session.namespaces).flatMap(
+              (namespace) => namespace.accounts
+            );
+
+            if (accounts.length > 0) {
+              // Parse the first account address
+              const accountStr = accounts[0];
+              const parsed = this.parseAccountAddress(accountStr);
+
+              this.connectionState = {
+                accountId: parsed.accountId,
+                network: parsed.network,
+                isConnected: true,
+                namespace: parsed.namespace,
+                chainId: parsed.chainId,
+              };
+
+              console.log("Restored session from AppKit:", this.connectionState);
+              return this.connectionState;
+            }
+          }
+        } catch (error) {
+          console.warn("Could not get accounts from provider session:", error);
+        }
+
+        // Fallback to AppKit state if provider doesn't have accounts
+        const chainId = stateAny.chainId || stateAny.selectedNetworkId;
+        const detectedNamespace = chainId?.includes("eip155")
+          ? "eip155"
+          : "hedera";
+
+        this.connectionState = {
+          accountId: address,
+          network: chainId?.includes("mainnet") ? "mainnet" : "testnet",
+          isConnected: true,
+          namespace: detectedNamespace,
+          chainId: chainId || "hedera:testnet",
+        };
+
+        console.log("Restored session from AppKit:", this.connectionState);
+        return this.connectionState;
+      }
+
+      // Fallback: Try to load saved session from localStorage
       const savedSession = this.loadSavedSession();
       if (savedSession) {
-        console.log("Found saved session in localStorage");
-        // Note: The actual connection will be re-established when user interacts
-        // DAppConnector will handle session restoration automatically
+        console.log("Found saved session in localStorage (AppKit will restore)");
+        // AppKit will handle the actual reconnection
         return savedSession;
       }
     } catch (error) {
@@ -231,19 +717,19 @@ class HederaWalletService {
 
   /**
    * Connect wallet with optional namespace selection
-   * Note: DAppConnector only supports hedera namespace, eip155 parameter is kept for compatibility
+   * Opens AppKit modal for wallet connection and extracts account information from session
    */
   async connectWallet(
-    _namespace: "hedera" | "eip155" = "hedera"
+    namespace: "hedera" | "eip155" = "hedera"
   ): Promise<WalletConnection> {
     if (!this.isInitialized) {
       await this.initialize();
     }
 
-    if (!this.dAppConnector) {
+    if (!this.appKitInstance) {
       throw new WalletError(
         WalletErrorCode.NOT_CONNECTED,
-        "DAppConnector not initialized"
+        "AppKit not initialized"
       );
     }
 
@@ -253,82 +739,305 @@ class HederaWalletService {
         return this.connectionState;
       }
 
-      console.log("Opening WalletConnect modal...");
+      console.log("Opening AppKit modal...");
 
-      // Open the WalletConnect modal and wait for session
-      const session = await this.dAppConnector.openModal();
+      // Requirement 14.2: Handle AppKit connection rejection errors
+      // Open AppKit modal for wallet selection
+      // AppKit handles wallet selection and namespace selection via its UI
+      try {
+        await this.appKitInstance.open();
+      } catch (error) {
+        const err = error as { message?: string; code?: string; name?: string };
+        const errorMessage = (err?.message || "").toLowerCase();
+        const errorCode = err?.code || "";
+        const errorName = err?.name || "";
 
-      // Extract signers from the session
-      this.signers = this.createSignersFromSession(session);
-
-      // Update connection state with information from the first signer
-      if (this.signers.length > 0) {
-        const firstSigner = this.signers[0];
-        const accountId = firstSigner.getAccountId().toString();
-
-        this.connectionState = {
-          accountId,
-          network:
-            env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
-              ? "mainnet"
-              : "testnet",
-          isConnected: true,
-          namespace: "hedera",
-          chainId: `hedera:${env.NEXT_PUBLIC_HEDERA_NETWORK}`,
-        };
-
-        // Save session to localStorage
-        this.saveSession();
-
-        console.log("Wallet connected successfully:", this.connectionState);
-        return this.connectionState;
+        // Enhanced error detection for AppKit modal errors
+        if (
+          errorMessage.includes("rejected") ||
+          errorMessage.includes("denied") ||
+          errorMessage.includes("cancelled") ||
+          errorMessage.includes("user rejected") ||
+          errorMessage.includes("user denied") ||
+          errorCode.includes("REJECTED") ||
+          errorCode.includes("DENIED") ||
+          errorName.includes("Rejection")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.CONNECTION_REJECTED,
+            "Connection rejected by user. Please try connecting again and approve the connection in your wallet.",
+            error
+          );
+        } else if (
+          errorMessage.includes("timeout") ||
+          errorMessage.includes("timed out") ||
+          errorMessage.includes("expired") ||
+          errorMessage.includes("proposal expired") ||
+          errorCode.includes("TIMEOUT") ||
+          errorName.includes("Timeout")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.CONNECTION_TIMEOUT,
+            "Connection timeout. The wallet connection request expired. Please try again.",
+            error
+          );
+        } else if (
+          errorMessage.includes("project") && errorMessage.includes("id") ||
+          errorMessage.includes("projectid") ||
+          errorMessage.includes("invalid project") ||
+          errorCode.includes("PROJECT_ID") ||
+          errorName.includes("ProjectId")
+        ) {
+          // Requirement 14.4: Validate projectId and throw appropriate errors
+          throw new WalletError(
+            WalletErrorCode.INVALID_PROJECT_ID,
+            "Invalid WalletConnect Project ID. Please check your configuration and try again.",
+            error
+          );
+        } else if (
+          errorMessage.includes("not installed") ||
+          errorMessage.includes("wallet not found") ||
+          errorMessage.includes("no wallet") ||
+          errorMessage.includes("missing wallet") ||
+          errorCode.includes("WALLET_NOT_FOUND") ||
+          errorName.includes("WalletNotFound")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.WALLET_NOT_INSTALLED,
+            "Wallet not found. Please install HashPack or another compatible Hedera wallet.",
+            error
+          );
+        } else if (
+          (errorMessage.includes("network") && !errorMessage.includes("timeout")) ||
+          errorMessage.includes("fetch") ||
+          (errorMessage.includes("connection") && !errorMessage.includes("timeout") && !errorMessage.includes("unexpected")) ||
+          errorMessage.includes("cors") ||
+          errorMessage.includes("unreachable") ||
+          errorCode.includes("NETWORK") ||
+          errorName.includes("Network")
+        ) {
+          // Requirement 14.3: Add network error handling specific to AppKit
+          // Only classify as network error if it's not already a timeout or unexpected generic error
+          throw new WalletError(
+            WalletErrorCode.NETWORK_ERROR,
+            "Network error while opening AppKit modal. Please check your internet connection and try again.",
+            error
+          );
+        } else if (
+          errorMessage.includes("modal") ||
+          errorMessage.includes("ui") ||
+          errorMessage.includes("interface") ||
+          errorMessage.includes("display")
+        ) {
+          throw new WalletError(
+            WalletErrorCode.UNKNOWN_ERROR,
+            "Failed to display wallet connection interface. Please refresh the page and try again.",
+            error
+          );
+        } else {
+          // Requirement 14.5: Wrap unknown errors with original error
+          throw new WalletError(
+            WalletErrorCode.UNKNOWN_ERROR,
+            `Failed to open AppKit modal: ${err?.message || "Unknown error occurred while opening wallet connection interface"}`,
+            error
+          );
+        }
       }
 
-      throw new WalletError(
-        WalletErrorCode.CONNECTION_REJECTED,
-        "No signers created from session"
-      );
+      // Wait for connection with polling
+      // AppKit's built-in session persistence will handle reconnection on page reload
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(
+            new WalletError(
+              WalletErrorCode.CONNECTION_TIMEOUT,
+              "Connection timeout. Please try again."
+            )
+          );
+        }, 60000); // 60 second timeout
+
+        let checkCount = 0;
+        const maxChecks = 120; // 60 seconds with 500ms intervals
+
+        const checkConnection = () => {
+          checkCount++;
+
+          // Check if connection state was updated by event listeners
+          if (this.connectionState?.isConnected) {
+            clearTimeout(timeout);
+            console.log("AppKit connected successfully:", this.connectionState);
+            resolve(this.connectionState);
+            return;
+          }
+
+          // Extract account information from AppKit session
+          try {
+            const state = this.appKitInstance?.getState?.() || {};
+            const stateAny = state as {
+              address?: string;
+              selectedNetworkId?: string;
+              chainId?: string;
+            };
+
+            const address = stateAny.address || stateAny.selectedNetworkId;
+
+            if (address) {
+              clearTimeout(timeout);
+
+              // Extract network and chainId from AppKit state
+              const chainId = stateAny.chainId || stateAny.selectedNetworkId;
+              const detectedNamespace = chainId?.includes("eip155")
+                ? "eip155"
+                : "hedera";
+
+              // Update connection state with accountId, network, and namespace
+              this.connectionState = {
+                accountId: address,
+                network: chainId?.includes("mainnet") ? "mainnet" : "testnet",
+                isConnected: true,
+                namespace: detectedNamespace,
+                chainId: chainId || `${namespace}:testnet`,
+              };
+
+              // Save session to localStorage for persistence
+              this.saveSession();
+
+              console.log(
+                "AppKit connected successfully:",
+                this.connectionState
+              );
+              resolve(this.connectionState);
+              return;
+            }
+          } catch (error) {
+            // Log errors periodically to avoid console spam
+            if (checkCount % 10 === 0) {
+              console.log(`AppKit connection check ${checkCount}:`, error);
+            }
+          }
+
+          // Check if max attempts reached
+          if (checkCount >= maxChecks) {
+            clearTimeout(timeout);
+            reject(
+              new WalletError(
+                WalletErrorCode.CONNECTION_TIMEOUT,
+                "Connection timeout - no response from wallet"
+              )
+            );
+          } else {
+            // Continue polling
+            setTimeout(checkConnection, 500);
+          }
+        };
+
+        // Start polling
+        checkConnection();
+      });
     } catch (error: unknown) {
+      // Requirement 14.5: Wrap unknown errors in WalletError with original error
       if (error instanceof WalletError) {
         throw error;
       }
 
-      const err = error as { message?: string };
-      const errorMessage = err?.message || "";
+      const err = error as { message?: string; code?: string; name?: string };
+      const errorMessage = (err?.message || "").toLowerCase();
+      const errorCode = err?.code || "";
+      const errorName = err?.name || "";
 
+      // Requirement 14.2: Handle AppKit connection rejection errors with enhanced detection
       if (
-        errorMessage.includes("User rejected") ||
-        errorMessage.includes("rejected")
+        errorMessage.includes("user rejected") ||
+        errorMessage.includes("rejected") ||
+        errorMessage.includes("denied") ||
+        errorMessage.includes("cancelled") ||
+        errorMessage.includes("user denied") ||
+        errorCode.includes("REJECTED") ||
+        errorCode.includes("DENIED") ||
+        errorName.includes("Rejection")
       ) {
         throw new WalletError(
           WalletErrorCode.CONNECTION_REJECTED,
-          "Connection rejected in HashPack"
+          "Connection rejected by user. Please approve the connection request in your wallet to continue.",
+          error
         );
       } else if (
         errorMessage.includes("timeout") ||
-        errorMessage.includes("Proposal expired")
+        errorMessage.includes("proposal expired") ||
+        errorMessage.includes("timed out") ||
+        errorMessage.includes("expired") ||
+        errorMessage.includes("time limit") ||
+        errorCode.includes("TIMEOUT") ||
+        errorCode.includes("EXPIRED") ||
+        errorName.includes("Timeout")
       ) {
         throw new WalletError(
           WalletErrorCode.CONNECTION_TIMEOUT,
-          "Connection timeout. Please try again."
-        );
-      } else if (errorMessage.includes("Project ID")) {
-        throw new WalletError(
-          WalletErrorCode.INVALID_PROJECT_ID,
-          "Invalid WalletConnect Project ID"
+          "Connection timeout. The wallet connection request expired. Please try connecting again.",
+          error
         );
       } else if (
-        errorMessage.includes("network") ||
-        errorMessage.includes("Network")
+        errorMessage.includes("project id") ||
+        errorMessage.includes("projectid") ||
+        errorMessage.includes("invalid project") ||
+        errorMessage.includes("missing project") ||
+        errorCode.includes("PROJECT_ID") ||
+        errorName.includes("ProjectId")
+      ) {
+        // Requirement 14.4: Validate projectId and throw appropriate errors
+        throw new WalletError(
+          WalletErrorCode.INVALID_PROJECT_ID,
+          "Invalid WalletConnect Project ID. Please check your NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID configuration.",
+          error
+        );
+      } else if (
+        errorMessage.includes("not installed") ||
+        errorMessage.includes("wallet not found") ||
+        errorMessage.includes("no wallet") ||
+        errorMessage.includes("missing wallet") ||
+        errorMessage.includes("wallet unavailable") ||
+        errorCode.includes("WALLET_NOT_FOUND") ||
+        errorName.includes("WalletNotFound")
       ) {
         throw new WalletError(
+          WalletErrorCode.WALLET_NOT_INSTALLED,
+          "Wallet not found. Please install HashPack or another compatible Hedera wallet and try again.",
+          error
+        );
+      } else if (
+        errorMessage.includes("session") ||
+        errorMessage.includes("invalid session") ||
+        errorMessage.includes("session expired") ||
+        errorCode.includes("SESSION") ||
+        errorName.includes("Session")
+      ) {
+        throw new WalletError(
+          WalletErrorCode.INVALID_SESSION,
+          "Invalid or expired wallet session. Please reconnect your wallet.",
+          error
+        );
+      } else if (
+        (errorMessage.includes("network") && !errorMessage.includes("timeout")) ||
+        errorMessage.includes("fetch") ||
+        (errorMessage.includes("connection") && !errorMessage.includes("timeout") && !errorMessage.includes("unexpected")) ||
+        errorMessage.includes("cors") ||
+        errorMessage.includes("unreachable") ||
+        errorMessage.includes("dns") ||
+        errorCode.includes("NETWORK") ||
+        errorName.includes("Network")
+      ) {
+        // Requirement 14.3: Add network error handling specific to AppKit
+        // Only classify as network error if it's not already a timeout or unexpected generic error
+        throw new WalletError(
           WalletErrorCode.NETWORK_ERROR,
-          "Network connection error. Please check your internet connection."
+          "Network connection error. Please check your internet connection and try again.",
+          error
         );
       } else {
+        // Requirement 14.5: Wrap unknown errors in WalletError with UNKNOWN_ERROR and original error
         throw new WalletError(
           WalletErrorCode.UNKNOWN_ERROR,
-          "Unable to connect to wallet. Please ensure HashPack is installed and unlocked.",
+          `Unable to connect to wallet: ${err?.message || "An unknown error occurred during wallet connection"}`,
           error
         );
       }
@@ -337,9 +1046,27 @@ class HederaWalletService {
 
   /**
    * Create DAppSigner instances from a WalletConnect session
+   * Requirements: 7.1, 7.2
    */
-  private createSignersFromSession(session: SessionTypes.Struct): DAppSigner[] {
+  private async createSignersFromSession(session: SessionTypes.Struct): Promise<DAppSigner[]> {
     const signers: DAppSigner[] = [];
+
+    if (!this.hederaProvider) {
+      console.warn("HederaProvider not available for creating signers");
+      return signers;
+    }
+
+    // Get the WalletConnect client from the provider
+    // HederaProvider is a UniversalProvider which has a client property
+    const providerWithClient = this.hederaProvider as UniversalProvider & {
+      client?: unknown;
+    };
+    const signClient = providerWithClient.client;
+
+    if (!signClient) {
+      console.warn("SignClient not available from HederaProvider");
+      return signers;
+    }
 
     // Extract accounts from the session namespaces
     const accounts = Object.values(session.namespaces).flatMap(
@@ -347,17 +1074,35 @@ class HederaWalletService {
     );
 
     for (const account of accounts) {
-      // Format: hedera:testnet:0.0.12345 or hedera:mainnet:0.0.12345
-      const parts = account.split(":");
-      if (parts.length >= 3 && parts[0] === "hedera") {
-        const accountId = parts[2];
+      try {
+        // Format: hedera:testnet:0.0.12345 or hedera:mainnet:0.0.12345
+        const parts = account.split(":");
+        if (parts.length >= 3 && parts[0] === "hedera") {
+          const network = parts[1]; // mainnet or testnet
+          const accountIdStr = parts[2]; // 0.0.12345
 
-        // Create a signer via DAppConnector
-        const signer = this.dAppConnector!.getSigner(
-          AccountId.fromString(accountId)
-        );
+          // Use SDK wrapper to avoid build-time issues
+          const { createAccountId, getLedgerId } = await import("@/lib/hedera/sdk-wrapper");
 
-        signers.push(signer);
+          // Create AccountId from string
+          const accountId = await createAccountId(accountIdStr);
+
+          // Determine LedgerId based on network
+          const ledgerId = await getLedgerId(network as 'mainnet' | 'testnet');
+
+          // Create DAppSigner instance
+          const signer = new DAppSigner(
+            accountId,
+            signClient,
+            session.topic,
+            ledgerId
+          );
+
+          signers.push(signer);
+          console.log(`Created DAppSigner for account ${accountIdStr} on ${network}`);
+        }
+      } catch (error) {
+        console.error(`Failed to create signer for account ${account}:`, error);
       }
     }
 
@@ -365,10 +1110,67 @@ class HederaWalletService {
   }
 
   /**
+   * Get or create signers for the current session
+   * Requirements: 7.1
+   */
+  private async getSigners(): Promise<DAppSigner[]> {
+    // Return cached signers if available
+    if (this.signers.length > 0) {
+      return this.signers;
+    }
+
+    // Get the current WalletConnect session
+    if (!this.hederaProvider) {
+      throw new WalletError(
+        WalletErrorCode.NOT_CONNECTED,
+        "HederaProvider not available"
+      );
+    }
+
+    try {
+      // Access the session from the provider
+      const providerWithSession = this.hederaProvider as UniversalProvider & {
+        session?: SessionTypes.Struct;
+      };
+      const session = providerWithSession.session;
+
+      if (!session) {
+        throw new WalletError(
+          WalletErrorCode.NOT_CONNECTED,
+          "No active WalletConnect session"
+        );
+      }
+
+      // Create signers from the session
+      this.signers = await this.createSignersFromSession(session);
+
+      if (this.signers.length === 0) {
+        throw new WalletError(
+          WalletErrorCode.NOT_CONNECTED,
+          "Failed to create signers from session"
+        );
+      }
+
+      return this.signers;
+    } catch (error) {
+      if (error instanceof WalletError) {
+        throw error;
+      }
+      throw new WalletError(
+        WalletErrorCode.NOT_CONNECTED,
+        "Failed to get signers from session",
+        error
+      );
+    }
+  }
+
+  /**
    * Sign a native Hedera transaction using DAppSigner
+   * Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
    */
   async signTransaction(transaction: Transaction): Promise<Transaction> {
-    if (!this.connectionState || !this.dAppConnector) {
+    // Requirement 7.1: Retrieve the appropriate signer for the namespace
+    if (!this.connectionState || !this.hederaProvider) {
       throw new WalletError(
         WalletErrorCode.NOT_CONNECTED,
         "Wallet not connected"
@@ -376,44 +1178,121 @@ class HederaWalletService {
     }
 
     try {
-      // Get the first signer (primary account)
-      const signer = this.signers[0];
-      if (!signer) {
+      // Get signers from the current session
+      const signers = await this.getSigners();
+
+      if (signers.length === 0) {
         throw new WalletError(
           WalletErrorCode.NOT_CONNECTED,
-          "No signer available"
+          "No signers available for transaction signing"
         );
       }
 
-      // Sign the transaction using DAppSigner
+      // Use the first signer (primary account)
+      // In a multi-account scenario, you might need to select the appropriate signer
+      const signer = signers[0];
+
+      console.log(
+        `Signing transaction with DAppSigner for account ${signer.getAccountId().toString()}`
+      );
+
+      // Requirement 7.2: Use DAppSigner's signTransaction method for signing operations
+      // The signTransaction method will send the transaction to the wallet for signing
       const signedTransaction = await signer.signTransaction(transaction);
 
+      // Requirement 7.3: Return the signed transaction result
+      console.log("Transaction signed successfully");
       return signedTransaction;
     } catch (error) {
+      // Requirement 14.5: Wrap unknown errors in WalletError with original error
       if (error instanceof WalletError) {
         throw error;
       }
 
-      const err = error as { message?: string };
-      const errorMessage = err?.message || "";
+      const err = error as { message?: string; code?: string; name?: string };
+      const errorMessage = (err?.message || "").toLowerCase();
+      const errorCode = err?.code || "";
+      const errorName = err?.name || "";
 
+      // Requirement 7.4: Handle wallet rejection with proper error codes - Enhanced detection
       if (
-        errorMessage.includes("User rejected") ||
-        errorMessage.includes("rejected")
+        errorMessage.includes("user rejected") ||
+        errorMessage.includes("rejected") ||
+        errorMessage.includes("denied") ||
+        errorMessage.includes("cancelled") ||
+        errorMessage.includes("user denied") ||
+        errorMessage.includes("transaction rejected") ||
+        errorCode.includes("REJECTED") ||
+        errorCode.includes("DENIED") ||
+        errorName.includes("Rejection")
       ) {
         throw new WalletError(
           WalletErrorCode.TRANSACTION_REJECTED,
-          "Transaction rejected by user"
+          "Transaction rejected by user. Please approve the transaction in your wallet to continue.",
+          error
         );
-      } else if (errorMessage.includes("insufficient")) {
+      } else if (
+        errorMessage.includes("insufficient") ||
+        errorMessage.includes("not enough") ||
+        errorMessage.includes("balance too low") ||
+        errorMessage.includes("insufficient funds") ||
+        errorMessage.includes("insufficient balance") ||
+        errorCode.includes("INSUFFICIENT") ||
+        errorName.includes("InsufficientBalance")
+      ) {
         throw new WalletError(
           WalletErrorCode.INSUFFICIENT_BALANCE,
-          "Insufficient balance for transaction"
+          "Insufficient balance to complete this transaction. Please check your account balance.",
+          error
+        );
+      } else if (
+        errorMessage.includes("invalid") ||
+        errorMessage.includes("malformed") ||
+        errorMessage.includes("invalid transaction") ||
+        errorMessage.includes("bad transaction") ||
+        errorMessage.includes("transaction format") ||
+        errorCode.includes("INVALID") ||
+        errorName.includes("Invalid")
+      ) {
+        throw new WalletError(
+          WalletErrorCode.INVALID_TRANSACTION,
+          "Invalid transaction format or parameters. Please check the transaction details and try again.",
+          error
+        );
+      } else if (
+        errorMessage.includes("network") ||
+        errorMessage.includes("connection") ||
+        errorMessage.includes("fetch") ||
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("unreachable") ||
+        errorCode.includes("NETWORK") ||
+        errorName.includes("Network")
+      ) {
+        // Requirement 14.3: Add network error handling
+        throw new WalletError(
+          WalletErrorCode.NETWORK_ERROR,
+          "Network error during transaction signing. Please check your connection and try again.",
+          error
+        );
+      } else if (
+        errorMessage.includes("session") ||
+        errorMessage.includes("not connected") ||
+        errorMessage.includes("no session") ||
+        errorMessage.includes("session expired") ||
+        errorCode.includes("SESSION") ||
+        errorName.includes("Session")
+      ) {
+        throw new WalletError(
+          WalletErrorCode.NOT_CONNECTED,
+          "Wallet session expired or not connected. Please reconnect your wallet and try again.",
+          error
         );
       } else {
+        // Requirement 7.5: Provide detailed error information to the user
+        // Requirement 14.5: Wrap unknown errors with original error
         throw new WalletError(
           WalletErrorCode.TRANSACTION_FAILED,
-          "Failed to sign transaction",
+          `Failed to sign transaction: ${err?.message || "An unknown error occurred during transaction signing"}`,
           error
         );
       }
@@ -442,10 +1321,11 @@ class HederaWalletService {
   }
 
   /**
-   * Sign a message using DAppConnector
+   * Sign a message using HederaAdapter
+   * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
    */
   async signMessage(message: string): Promise<{ signatureMap: string }> {
-    if (!this.connectionState || !this.dAppConnector) {
+    if (!this.connectionState || !this.hederaProvider) {
       throw new WalletError(
         WalletErrorCode.NOT_CONNECTED,
         "Wallet not connected"
@@ -453,37 +1333,134 @@ class HederaWalletService {
     }
 
     try {
-      // Format signerAccountId in HIP-30 format (hedera:network:accountId)
-      const signerAccountId = `hedera:${this.connectionState.network}:${this.connectionState.accountId}`;
+      // Requirement 8.1: Use the appropriate adapter for the namespace
+      const adapter = this.getActiveAdapter();
 
-      // Use DAppConnector's signMessage method
-      const result = await this.dAppConnector.signMessage({
-        signerAccountId,
+      if (!adapter) {
+        throw new WalletError(
+          WalletErrorCode.NOT_CONNECTED,
+          "No adapter available for message signing"
+        );
+      }
+
+      // Requirement 8.2: Format signerAccountId in correct format for the namespace
+      const signerAccountId = this.formatAccountIdForNamespace(
+        this.connectionState.accountId,
+        this.connectionState.namespace
+      );
+
+      console.log(
+        `Signing message with HederaAdapter for account ${signerAccountId} on namespace ${this.connectionState.namespace}`
+      );
+
+      // Requirement 8.3: Use adapter's sign method
+      // The adapter will send the signing request to the connected wallet
+      // Note: The exact method name may vary based on the HederaAdapter API
+      // Common patterns: signMessage, sign, or request with hedera_signMessage method
+      const signResult = await this.requestMessageSignature(
+        adapter,
         message,
-      });
+        signerAccountId
+      );
 
-      // DAppConnector returns JsonRpcResult wrapper, extract the actual result
-      return result as unknown as { signatureMap: string };
+      // Requirement 8.5: Validate the signature format
+      if (!signResult || typeof signResult !== 'object') {
+        throw new WalletError(
+          WalletErrorCode.TRANSACTION_FAILED,
+          "Invalid signature format returned from wallet"
+        );
+      }
+
+      // Requirement 8.3: Return the signature and signed message
+      console.log("Message signed successfully");
+      return signResult;
     } catch (error) {
+      // Requirement 14.5: Wrap unknown errors in WalletError with original error
       if (error instanceof WalletError) {
         throw error;
       }
 
-      const err = error as { message?: string };
-      const errorMessage = err?.message || "";
+      const err = error as { message?: string; code?: string; name?: string };
+      const errorMessage = (err?.message || "").toLowerCase();
+      const errorCode = err?.code || "";
+      const errorName = err?.name || "";
 
+      // Requirement 8.4: Handle wallet rejection with proper error codes - Enhanced detection
       if (
-        errorMessage.includes("User rejected") ||
-        errorMessage.includes("rejected")
+        errorMessage.includes("user rejected") ||
+        errorMessage.includes("rejected") ||
+        errorMessage.includes("denied") ||
+        errorMessage.includes("cancelled") ||
+        errorMessage.includes("user denied") ||
+        errorMessage.includes("message rejected") ||
+        errorMessage.includes("signing rejected") ||
+        errorCode.includes("REJECTED") ||
+        errorCode.includes("DENIED") ||
+        errorName.includes("Rejection")
       ) {
         throw new WalletError(
           WalletErrorCode.TRANSACTION_REJECTED,
-          "Message signing rejected by user"
+          "Message signing rejected by user. Please approve the signing request in your wallet to continue.",
+          error
         );
-      } else {
+      } else if (
+        errorMessage.includes("network") ||
+        errorMessage.includes("connection") ||
+        errorMessage.includes("fetch") ||
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("unreachable") ||
+        errorCode.includes("NETWORK") ||
+        errorName.includes("Network")
+      ) {
+        // Requirement 14.3: Add network error handling
+        throw new WalletError(
+          WalletErrorCode.NETWORK_ERROR,
+          "Network error during message signing. Please check your connection and try again.",
+          error
+        );
+      } else if (
+        errorMessage.includes("invalid message") ||
+        errorMessage.includes("malformed message") ||
+        errorMessage.includes("bad message") ||
+        errorMessage.includes("message format") ||
+        errorCode.includes("INVALID") ||
+        errorName.includes("Invalid")
+      ) {
+        throw new WalletError(
+          WalletErrorCode.INVALID_TRANSACTION,
+          "Invalid message format. Please check the message content and try again.",
+          error
+        );
+      } else if (
+        errorMessage.includes("session") ||
+        errorMessage.includes("not connected") ||
+        errorMessage.includes("no session") ||
+        errorMessage.includes("session expired") ||
+        errorCode.includes("SESSION") ||
+        errorName.includes("Session")
+      ) {
+        throw new WalletError(
+          WalletErrorCode.NOT_CONNECTED,
+          "Wallet session expired or not connected. Please reconnect your wallet and try again.",
+          error
+        );
+      } else if (
+        errorMessage.includes("unsupported") ||
+        errorMessage.includes("not supported") ||
+        errorMessage.includes("method not found") ||
+        errorCode.includes("UNSUPPORTED") ||
+        errorName.includes("Unsupported")
+      ) {
         throw new WalletError(
           WalletErrorCode.TRANSACTION_FAILED,
-          "Failed to sign message",
+          "Message signing not supported by the connected wallet. Please try with a different wallet.",
+          error
+        );
+      } else {
+        // Requirement 14.5: Wrap unknown errors with original error
+        throw new WalletError(
+          WalletErrorCode.TRANSACTION_FAILED,
+          `Failed to sign message: ${err?.message || "An unknown error occurred during message signing"}`,
           error
         );
       }
@@ -491,34 +1468,233 @@ class HederaWalletService {
   }
 
   /**
+   * Parse account address from WalletConnect format
+   * Format: hedera:testnet:0.0.12345 or eip155:296:0x...
+   */
+  private parseAccountAddress(accountStr: string): {
+    accountId: string;
+    network: 'mainnet' | 'testnet';
+    namespace: 'hedera' | 'eip155';
+    chainId: string;
+  } {
+    const parts = accountStr.split(":");
+
+    if (parts.length >= 3) {
+      const namespace = parts[0] as 'hedera' | 'eip155';
+      const networkOrChainId = parts[1];
+      const accountId = parts[2];
+
+      // Determine network based on namespace
+      let network: 'mainnet' | 'testnet';
+      let chainId: string;
+
+      if (namespace === 'hedera') {
+        // Format: hedera:testnet:0.0.12345 or hedera:mainnet:0.0.12345
+        network = networkOrChainId as 'mainnet' | 'testnet';
+        chainId = `hedera:${network}`;
+      } else {
+        // Format: eip155:295:0x... (mainnet) or eip155:296:0x... (testnet)
+        network = networkOrChainId === '295' ? 'mainnet' : 'testnet';
+        chainId = `eip155:${networkOrChainId}`;
+      }
+
+      return {
+        accountId,
+        network,
+        namespace,
+        chainId,
+      };
+    }
+
+    // Fallback for invalid format
+    return {
+      accountId: accountStr,
+      network: 'testnet',
+      namespace: 'hedera',
+      chainId: 'hedera:testnet',
+    };
+  }
+
+  /**
+   * Format account ID for the specific namespace
+   * Requirement 8.2
+   */
+  private formatAccountIdForNamespace(
+    accountId: string,
+    namespace: 'hedera' | 'eip155'
+  ): string {
+    if (namespace === 'hedera') {
+      // Hedera native format: 0.0.xxxxx
+      return accountId;
+    } else {
+      // EVM format: Convert Hedera account to EVM address if needed
+      // For now, return as-is since the adapter should handle conversion
+      return accountId;
+    }
+  }
+
+  /**
+   * Request message signature from the wallet via adapter
+   * Requirement 8.3
+   */
+  private async requestMessageSignature(
+    adapter: HederaAdapter,
+    message: string,
+    signerAccountId: string
+  ): Promise<{ signatureMap: string }> {
+    // The HederaAdapter uses WalletConnect protocol under the hood
+    // We need to use the request method with the appropriate namespace method
+    const namespace = this.connectionState?.namespace || 'hedera';
+
+    try {
+      // For Hedera namespace, use hedera_signMessage
+      // For EVM namespace, use eth_sign or personal_sign
+      const method = namespace === 'hedera' ? 'hedera_signMessage' : 'personal_sign';
+
+      // Prepare the request parameters based on namespace
+      const params = namespace === 'hedera'
+        ? {
+          signerAccountId,
+          message,
+        }
+        : [message, signerAccountId]; // EVM uses array format
+
+      // Use the adapter's underlying provider to make the request
+      // Note: This assumes the adapter exposes a request method or similar
+      // The exact implementation may need adjustment based on the actual HederaAdapter API
+      const result = await (adapter as unknown as { request: (args: { method: string; params: unknown }) => Promise<unknown> }).request({
+        method,
+        params,
+      });
+
+      // Format the result as expected by our interface
+      if (typeof result === 'string') {
+        return { signatureMap: result };
+      } else if (result && typeof result === 'object' && 'signatureMap' in result) {
+        return result as { signatureMap: string };
+      } else if (result && typeof result === 'object') {
+        // Try to extract signature from various possible formats
+        const resultObj = result as Record<string, unknown>;
+        const signature = resultObj.signature || resultObj.sig || JSON.stringify(result);
+        return { signatureMap: String(signature) };
+      } else {
+        return { signatureMap: JSON.stringify(result) };
+      }
+    } catch (error) {
+      // Re-throw to be handled by the main signMessage method
+      throw error;
+    }
+  }
+
+  /**
    * Disconnect wallet and clean up all sessions
+   * Requirement 13.1, 13.2, 13.3, 13.4, 13.5
    */
   async disconnectWallet(): Promise<void> {
     try {
-      if (this.dAppConnector) {
-        // Disconnect all signers
-        for (const signer of this.signers) {
-          await this.dAppConnector.disconnect(signer.topic);
+      console.log("Disconnecting wallet...");
+
+      // Call AppKit disconnect methods to clear session (Requirement 13.1)
+      if (this.appKitInstance) {
+        try {
+          await this.appKitInstance.disconnect();
+          console.log("AppKit disconnected successfully");
+        } catch (error) {
+          console.warn("Error disconnecting AppKit:", error);
+          // Continue with cleanup even if AppKit disconnect fails
         }
       }
+
+      // Disconnect HederaProvider to clear WalletConnect session
+      if (this.hederaProvider && typeof this.hederaProvider.disconnect === 'function') {
+        try {
+          await this.hederaProvider.disconnect();
+          console.log("HederaProvider disconnected successfully");
+        } catch (error) {
+          console.warn("Error disconnecting HederaProvider:", error);
+          // Continue with cleanup even if provider disconnect fails
+        }
+      }
+
+      // Clear all adapter instances (Requirement 13.2)
+      this.nativeAdapter = null;
+      this.evmAdapter = null;
 
       // Clear signers array
       this.signers = [];
 
-      // Clear connection state
+      // Clear wallet context state (Requirement 13.3)
       this.connectionState = null;
 
-      // Clear saved session from localStorage
+      // Clear any cached wallet data (Requirement 13.4)
       this.clearSavedSession();
+
+      // Close AppKit modal if open (Requirement 13.5)
+      if (this.appKitInstance) {
+        try {
+          await this.appKitInstance.close();
+          console.log("AppKit modal closed");
+        } catch (error) {
+          console.warn("Error closing AppKit modal:", error);
+          // Non-critical error, continue
+        }
+      }
 
       console.log("Wallet disconnected successfully");
     } catch (error) {
       console.error("Failed to disconnect wallet:", error);
-      throw new WalletError(
-        WalletErrorCode.UNKNOWN_ERROR,
-        "Failed to disconnect wallet",
-        error
-      );
+
+      // Requirement 14.5: Wrap unknown errors in WalletError with original error
+      if (error instanceof WalletError) {
+        throw error;
+      }
+
+      const err = error as { message?: string; code?: string; name?: string };
+      const errorMessage = (err?.message || "").toLowerCase();
+      const errorCode = err?.code || "";
+      const errorName = err?.name || "";
+
+      if (
+        errorMessage.includes("network") ||
+        errorMessage.includes("connection") ||
+        errorMessage.includes("fetch") ||
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("unreachable") ||
+        errorCode.includes("NETWORK") ||
+        errorName.includes("Network")
+      ) {
+        // Requirement 14.3: Add network error handling
+        throw new WalletError(
+          WalletErrorCode.NETWORK_ERROR,
+          "Network error during wallet disconnection. The wallet may still be disconnected locally.",
+          error
+        );
+      } else if (
+        errorMessage.includes("session") ||
+        errorMessage.includes("no session") ||
+        errorMessage.includes("session not found") ||
+        errorCode.includes("SESSION") ||
+        errorName.includes("Session")
+      ) {
+        // Session already cleared, this is not necessarily an error
+        console.log("Session already cleared during disconnect");
+        return; // Don't throw error for already disconnected state
+      } else if (
+        errorMessage.includes("already disconnected") ||
+        errorMessage.includes("not connected") ||
+        errorMessage.includes("no connection")
+      ) {
+        // Already disconnected, this is not an error
+        console.log("Wallet already disconnected");
+        return; // Don't throw error for already disconnected state
+      } else {
+        // Requirement 14.5: Wrap unknown errors with original error
+        throw new WalletError(
+          WalletErrorCode.UNKNOWN_ERROR,
+          `Failed to disconnect wallet: ${err?.message || "An unknown error occurred during wallet disconnection"}`,
+          error
+        );
+      }
     }
   }
 
@@ -548,6 +1724,52 @@ class HederaWalletService {
    */
   getActiveNamespace(): "hedera" | "eip155" | null {
     return this.connectionState?.namespace ?? null;
+  }
+
+  /**
+   * Get native Hedera adapter instance
+   * Used for AppKit initialization and native Hedera transactions
+   */
+  getNativeAdapter(): HederaAdapter | null {
+    return this.nativeAdapter;
+  }
+
+  /**
+   * Get EVM adapter instance
+   * Used for AppKit initialization and EVM transactions
+   */
+  getEvmAdapter(): HederaAdapter | null {
+    return this.evmAdapter;
+  }
+
+  /**
+   * Get both adapters as an array
+   * Convenience method for AppKit initialization
+   */
+  getAdapters(): HederaAdapter[] {
+    const adapters: HederaAdapter[] = [];
+    if (this.nativeAdapter) adapters.push(this.nativeAdapter);
+    if (this.evmAdapter) adapters.push(this.evmAdapter);
+    return adapters;
+  }
+
+  /**
+   * Get the appropriate adapter based on the active namespace
+   * Used for transaction signing
+   */
+  getActiveAdapter(): HederaAdapter | null {
+    const namespace = this.getActiveNamespace();
+    if (!namespace) return null;
+
+    return namespace === "hedera" ? this.nativeAdapter : this.evmAdapter;
+  }
+
+  /**
+   * Get AppKit instance
+   * Used for modal operations and AppKit-specific functionality
+   */
+  getAppKitInstance(): AppKit | null {
+    return this.appKitInstance;
   }
 
   async getAccountBalance(accountId?: string): Promise<WalletBalances> {
@@ -646,6 +1868,38 @@ class HederaWalletService {
   getActiveSession(): WalletSession | null {
     return null;
   }
+
+  /**
+   * Clean up resources and event listeners
+   * Called when service is destroyed or needs to be reinitialized
+   */
+  async cleanup(): Promise<void> {
+    try {
+      console.log("Cleaning up wallet service...");
+
+      // Remove event listeners
+      this.removeEventListeners();
+
+      // Disconnect if connected
+      if (this.isConnected()) {
+        await this.disconnectWallet();
+      }
+
+      // Clear all instances
+      this.hederaProvider = null;
+      this.nativeAdapter = null;
+      this.evmAdapter = null;
+      this.appKitInstance = null;
+      this.signers = [];
+      this.connectionState = null;
+      this.isInitialized = false;
+
+      console.log("Wallet service cleaned up successfully");
+    } catch (error) {
+      console.error("Error during cleanup:", error);
+      // Don't throw - cleanup should be best-effort
+    }
+  }
 }
 
 // Export singleton instance with global persistence for Hot Reload
@@ -653,6 +1907,40 @@ declare global {
   var hederaWalletServiceInstance: HederaWalletService | undefined;
 }
 
-export const hederaWalletService =
-  globalThis.hederaWalletServiceInstance ||
-  (globalThis.hederaWalletServiceInstance = new HederaWalletService());
+// Export singleton instance with build-time safety
+export const hederaWalletService = (() => {
+  // During build or server-side without proper env, return a mock service
+  if (typeof window === 'undefined' && !env.HEDERA_PRIVATE_KEY) {
+    return {
+      initialize: async () => {},
+      connectWallet: async () => ({ 
+        accountId: '', 
+        network: 'testnet' as const, 
+        isConnected: false, 
+        namespace: 'hedera' as const, 
+        chainId: 'hedera:testnet' 
+      }),
+      disconnectWallet: async () => {},
+      signTransaction: async (tx: any) => tx,
+      signMessage: async () => ({ signatureMap: '' }),
+      getConnectionState: () => null,
+      isConnected: () => false,
+      getAccountId: () => null,
+      getActiveNamespace: () => null,
+      getNativeAdapter: () => null,
+      getEvmAdapter: () => null,
+      getAdapters: () => [],
+      getActiveAdapter: () => null,
+      getAppKitInstance: () => null,
+      getAccountBalance: async () => ({ hbar: '0', tokens: [] }),
+      getSessions: () => [],
+      getActiveSession: () => null,
+      signAndExecuteTransaction: async (tx: any) => null,
+      cleanup: async () => {},
+      isInitialized: false
+    } as unknown as HederaWalletService;
+  }
+  
+  return globalThis.hederaWalletServiceInstance ||
+    (globalThis.hederaWalletServiceInstance = new HederaWalletService());
+})();

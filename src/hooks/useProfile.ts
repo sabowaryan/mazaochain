@@ -129,7 +129,7 @@ export function useProfile<T = any>(role?: UserRole): UseProfileReturn<T> {
           result = await supabase
             .from(tableInfo.table as any)
             .update(updateData)
-            .eq("id", (profileData as unknown).id)
+            .eq("id", (profileData as any).id)
             .select()
             .single();
         } else {
@@ -140,7 +140,7 @@ export function useProfile<T = any>(role?: UserRole): UseProfileReturn<T> {
           };
 
           result = await supabase
-            .from(tableInfo.table as unknown)
+            .from(tableInfo.table as any)
             .insert([newProfileData])
             .select()
             .single();
@@ -214,7 +214,7 @@ export function useProfile<T = any>(role?: UserRole): UseProfileReturn<T> {
         }
 
         const { data, error: fetchError } = await supabase
-          .from(tableInfo.table as unknown)
+          .from(tableInfo.table as any)
           .select(tableInfo.fields)
           .eq("user_id", user.id)
           .single();

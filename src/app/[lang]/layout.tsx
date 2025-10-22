@@ -4,7 +4,8 @@ import { ClientNavigation } from "@/components/ClientNavigation";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/pwa/ServiceWorkerRegistration";
-import { MobileNavigation } from "@/components/navigation/MobileNavigation";
+import { ConditionalMobileNavigation } from "@/components/navigation/ConditionalMobileNavigation";
+import { ConditionalMain } from "@/components/layout/ConditionalMain";
 import { WalletErrorSuppressor } from "@/components/WalletErrorSuppressor";
 import { getDictionary } from './dictionaries';
 import { TranslationProvider } from '@/components/TranslationProvider';
@@ -72,10 +73,12 @@ export default async function RootLayout({
                 <WalletErrorSuppressor />
                 <ServiceWorkerRegistration />
                 <ClientNavigation />
-                <main className="min-h-screen pb-16 md:pb-0">{children}</main>
-                <MobileNavigation />
+                <ConditionalMain>{children}</ConditionalMain>
+                <ConditionalMobileNavigation />
+                <div className="offline-indicator-container">
+                  <OfflineIndicator />
+                </div>
                 <PWAInstallPrompt />
-                <OfflineIndicator />
               </WalletModalGlobalProvider>
             </AuthProvider>
           </TranslationProvider>

@@ -12,6 +12,26 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { WalletBalance } from "@/components/wallet/WalletBalance";
 import { WalletConnection } from "@/components/wallet/WalletConnection";
 import { QuickActions } from "@/components/dashboard/QuickActions";
+import {
+  ClockIcon,
+  ChartBarIcon,
+  ArrowTrendingUpIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  EyeIcon,
+  CalendarDaysIcon,
+  UserIcon,
+  HomeIcon,
+  BanknotesIcon
+} from '@heroicons/react/24/outline';
+import {
+  CurrencyDollarIcon as CurrencyDollarIconSolid,
+  BanknotesIcon as BanknotesIconSolid,
+  SparklesIcon as SparklesIconSolid,
+  CheckCircleIcon as CheckCircleIconSolid
+} from '@heroicons/react/24/solid';
+import { SparklesIcon } from "@heroicons/react/16/solid";
+import { ClipboardDocumentListIcon } from "@heroicons/react/16/solid";
 
 interface FarmerStats {
   totalCropValue: number;
@@ -51,11 +71,11 @@ export default function FarmerDashboard() {
         const cachedData = sessionStorage.getItem(cacheKey);
         const cacheTime = sessionStorage.getItem(`${cacheKey}_time`);
         const now = Date.now();
-        
+
         // Utiliser le cache s'il a moins de 30 secondes
         if (cachedData && cacheTime && (now - parseInt(cacheTime)) < 30000) {
           const { evaluations, loans } = JSON.parse(cachedData);
-          
+
           // Calculer les statistiques depuis le cache
           const totalCropValue = evaluations
             .filter((e: { status: string }) => e.status === "approved")
@@ -78,7 +98,7 @@ export default function FarmerDashboard() {
             pendingEvaluations: pendingEvaluationsCount,
             mazaoTokens: 0, // Sera chargé depuis la blockchain
           });
-          
+
           setIsLoading(false);
           return;
         }
@@ -96,13 +116,13 @@ export default function FarmerDashboard() {
         const evaluations = Array.isArray(evaluationsData?.data)
           ? evaluationsData.data
           : Array.isArray(evaluationsData)
-          ? evaluationsData
-          : [];
+            ? evaluationsData
+            : [];
         const loans = Array.isArray(loansData?.data)
           ? loansData.data
           : Array.isArray(loansData)
-          ? loansData
-          : [];
+            ? loansData
+            : [];
 
         // Mettre en cache les données
         sessionStorage.setItem(cacheKey, JSON.stringify({ evaluations, loans }));
@@ -171,219 +191,256 @@ export default function FarmerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-        {/* En-tête */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
-            {t("dashboard.title")}
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600">
-            Bienvenue, {profile?.farmer_profiles?.nom || user?.email}
-          </p>
+        {/* En-tête moderne */}
+        <div className="mb-8 lg:mb-12">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <HomeIcon className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1">
+                  Tableau de bord
+                </h1>
+                <div className="flex items-center space-x-2 text-gray-600">
+                  <UserIcon className="w-4 h-4" />
+                  <p className="text-sm sm:text-base">
+                    Bienvenue, {profile?.farmer_profiles?.nom || user?.email}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
+              <CalendarDaysIcon className="w-4 h-4" />
+              <span>{new Date().toLocaleDateString('fr-FR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}</span>
+            </div>
+          </div>
         </div>
 
-        {/* Wallet Connection */}
+        {/* Wallet Connection avec design amélioré */}
         {!isConnected && (
-          <div className="mb-6 sm:mb-8">
-            <WalletConnection showBalances={false} />
-          </div>
-        )}
-
-        {/* Wallet Balance */}
-        {isConnected && (
-          <div className="mb-6 sm:mb-8">
-            <WalletBalance />
-          </div>
-        )}
-
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-200">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1 truncate">
-                  {t("dashboard.cropValue")}
+          <div className="mb-8">
+            <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
+              <div className="p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <ExclamationTriangleIcon className="w-6 h-6 text-amber-600" />
+                  <h3 className="text-lg font-semibold text-amber-800">
+                    Connexion wallet requise
+                  </h3>
+                </div>
+                <p className="text-amber-700 mb-4">
+                  Connectez votre wallet pour accéder à toutes les fonctionnalités de la plateforme.
                 </p>
-                <p className="text-xl sm:text-2xl font-bold text-primary-600 truncate">
+                <WalletConnection showBalances={false} />
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Wallet Balance avec design amélioré */}
+        {isConnected && (
+          <div className="mb-8">
+            <Card className="bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+              <div className="p-6">
+                <div className="flex items-center space-x-3 mb-4">
+                  <CheckCircleIconSolid className="w-6 h-6 text-emerald-600" />
+                  <h3 className="text-lg font-semibold text-emerald-800">
+                    Wallet connecté
+                  </h3>
+                </div>
+                <WalletBalance />
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Statistiques modernes */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6 mb-8 lg:mb-12">
+          {/* Valeur des récoltes */}
+          <Card className="group farmer-stat-card relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-emerald-600/10"></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-emerald-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <CurrencyDollarIconSolid className="w-6 h-6 text-white" />
+                </div>
+                <ArrowTrendingUpIcon className="w-5 h-5 text-emerald-600 opacity-60" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-emerald-700 mb-1">
+                  Valeur des récoltes
+                </p>
+                <p className="text-2xl lg:text-3xl font-bold text-emerald-900">
                   ${stats.totalCropValue.toLocaleString()}
                 </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-primary-100 rounded-full flex-shrink-0 ml-3">
-                <svg
-                  className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"
-                  />
-                </svg>
+                <p className="text-xs text-emerald-600 mt-1">
+                  Récoltes approuvées
+                </p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-200">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1 truncate">
-                  {t("dashboard.activeLoans")}
+          {/* Prêts actifs */}
+          <Card className="group farmer-stat-card relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/10"></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-blue-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <BanknotesIconSolid className="w-6 h-6 text-white" />
+                </div>
+                <ChartBarIcon className="w-5 h-5 text-blue-600 opacity-60" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-700 mb-1">
+                  Prêts actifs
                 </p>
-                <p className="text-xl sm:text-2xl font-bold text-secondary-600">
+                <p className="text-2xl lg:text-3xl font-bold text-blue-900">
                   {stats.activeLoans}
                 </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-secondary-100 rounded-full flex-shrink-0 ml-3">
-                <svg
-                  className="w-5 h-5 sm:w-6 sm:h-6 text-secondary-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
+                <p className="text-xs text-blue-600 mt-1">
+                  En cours de remboursement
+                </p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-200">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1 truncate">
-                  {t("dashboard.pendingEvaluations")}
+          {/* Évaluations en attente */}
+          <Card className="group farmer-stat-card relative overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-amber-600/10"></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-amber-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <ClipboardDocumentListIcon className="w-6 h-6 text-white" />
+                </div>
+                <ClockIcon className="w-5 h-5 text-amber-600 opacity-60" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-amber-700 mb-1">
+                  Évaluations en attente
                 </p>
-                <p className="text-xl sm:text-2xl font-bold text-warning-600">
+                <p className="text-2xl lg:text-3xl font-bold text-amber-900">
                   {stats.pendingEvaluations}
                 </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-warning-100 rounded-full flex-shrink-0 ml-3">
-                <svg
-                  className="w-5 h-5 sm:w-6 sm:h-6 text-warning-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                  />
-                </svg>
+                <p className="text-xs text-amber-600 mt-1">
+                  En cours de validation
+                </p>
               </div>
             </div>
           </Card>
 
-          <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-200">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1 truncate">
+          {/* Tokens MAZAO */}
+          <Card className="group farmer-stat-card relative overflow-hidden bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-xl hover:scale-105 transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-purple-600/10"></div>
+            <div className="relative p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 bg-purple-500 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <SparklesIconSolid className="w-6 h-6 text-white" />
+                </div>
+                <SparklesIcon className="w-5 h-5 text-purple-600 opacity-60" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-purple-700 mb-1">
                   Tokens MAZAO
                 </p>
-                <p className="text-xl sm:text-2xl font-bold text-success-600 truncate">
+                <p className="text-2xl lg:text-3xl font-bold text-purple-900">
                   {stats.mazaoTokens.toLocaleString()}
                 </p>
-              </div>
-              <div className="p-2 sm:p-3 bg-success-100 rounded-full flex-shrink-0 ml-3">
-                <svg
-                  className="w-5 h-5 sm:w-6 sm:h-6 text-success-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-                  />
-                </svg>
+                <p className="text-xs text-purple-600 mt-1">
+                  Tokens disponibles
+                </p>
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Actions rapides */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <QuickActions />
+        {/* Section principale avec actions et activité */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
+          {/* Actions rapides - Composant réutilisable */}
+          <div className="xl:col-span-2">
+            <QuickActions />
+          </div>
 
-          <Card className="p-4 sm:p-6 hover:shadow-lg transition-shadow duration-200">
-            <div className="flex items-center gap-2 mb-4">
-              <svg
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <h3 className="text-base sm:text-lg font-semibold">
-                Activité récente
-              </h3>
-            </div>
-            <div className="space-y-3 text-xs sm:text-sm">
-              <div className="flex items-center justify-between py-2 border-b border-gray-100 hover:bg-gray-50 px-2 rounded transition-colors">
-                <span className="flex-1 truncate">
-                  Évaluation manioc approuvée
-                </span>
-                <span className="text-success-600 font-medium ml-2 flex-shrink-0">
-                  +12,000 MAZAO
-                </span>
+          {/* Activité récente - Version améliorée */}
+          <div className="xl:col-span-1">
+            <Card className="p-6 hover:shadow-xl transition-all duration-300 h-full">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-2 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg">
+                  <ClockIcon className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Activité récente</h3>
               </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100 hover:bg-gray-50 px-2 rounded transition-colors">
-                <span className="flex-1 truncate">Prêt de 5,000 USDC reçu</span>
-                <span className="text-primary-600 font-medium ml-2 flex-shrink-0">
-                  Actif
-                </span>
+
+              <div className="space-y-4">
+                {/* Activité 1 */}
+                <div className="activity-item flex items-start space-x-3 p-3 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors duration-200">
+                  <div className="p-1.5 bg-emerald-500 rounded-full flex-shrink-0 mt-0.5">
+                    <CheckCircleIcon className="w-3 h-3 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      Évaluation manioc approuvée
+                    </p>
+                    <p className="text-xs text-gray-600">Il y a 2 heures</p>
+                    <p className="text-sm font-semibold text-emerald-600 mt-1">
+                      +12,000 MAZAO
+                    </p>
+                  </div>
+                </div>
+
+                {/* Activité 2 */}
+                <div className="activity-item flex items-start space-x-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-200">
+                  <div className="p-1.5 bg-blue-500 rounded-full flex-shrink-0 mt-0.5">
+                    <BanknotesIcon className="w-3 h-3 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      Prêt de 5,000 USDC reçu
+                    </p>
+                    <p className="text-xs text-gray-600">Hier</p>
+                    <p className="text-sm font-semibold text-blue-600 mt-1">
+                      Actif
+                    </p>
+                  </div>
+                </div>
+
+                {/* Activité 3 */}
+                <div className="activity-item flex items-start space-x-3 p-3 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors duration-200">
+                  <div className="p-1.5 bg-amber-500 rounded-full flex-shrink-0 mt-0.5">
+                    <ClockIcon className="w-3 h-3 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      Évaluation café en attente
+                    </p>
+                    <p className="text-xs text-gray-600">Il y a 3 jours</p>
+                    <p className="text-sm font-semibold text-amber-600 mt-1">
+                      En cours
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between py-2 hover:bg-gray-50 px-2 rounded transition-colors">
-                <span className="flex-1 truncate">
-                  Évaluation café en attente
-                </span>
-                <span className="text-warning-600 font-medium ml-2 flex-shrink-0">
-                  En cours
-                </span>
-              </div>
-            </div>
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() =>
-                  router.push(`/${lang}/dashboard/farmer/portfolio`)
-                }
-              >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+
+              {/* Bouton voir plus */}
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <Button
+                  variant="outline"
+                  className="w-full group hover:bg-gray-50"
+                  onClick={() => router.push(`/${lang}/dashboard/farmer/portfolio`)}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                  />
-                </svg>
-                Voir tout le portfolio
-              </Button>
-            </div>
-          </Card>
+                  <EyeIcon className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                  Voir tout le portfolio
+                </Button>
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

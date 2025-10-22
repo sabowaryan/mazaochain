@@ -53,7 +53,7 @@ export function Logo({
           alt="MazaoChain Logo"
           width={sizeDimensions[size].width}
           height={sizeDimensions[size].height}
-          className={cn(sizeClasses[size], className)}
+          className={cn(sizeClasses[size], "align-middle", className)}
           priority
         />
       );
@@ -70,10 +70,10 @@ export function Logo({
           };
         case "inverse":
           return {
-            leaf: "fill-secondary-500 stroke-secondary-600",
-            leafVein: "stroke-secondary-600",
-            bars: "fill-primary-500",
-            circle: "stroke-secondary-400",
+            leaf: "fill-white stroke-white",
+            leafVein: "stroke-white",
+            bars: "fill-emerald-200",
+            circle: "stroke-white/50",
           };
         default:
           return {
@@ -91,7 +91,7 @@ export function Logo({
     return (
       <svg
         viewBox="0 0 100 100"
-        className={cn(sizeClasses[size], className)}
+        className={cn(sizeClasses[size], "align-middle", className)}
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
@@ -169,8 +169,8 @@ export function Logo({
         };
       case "inverse":
         return {
-          mazao: "text-secondary-500",
-          chain: "text-primary-600",
+          mazao: "text-white",
+          chain: "text-emerald-200",
         };
       default:
         return {
@@ -187,7 +187,7 @@ export function Logo({
   }: {
     size: keyof typeof textSizeClasses;
   }) => (
-    <span className={cn("font-bold tracking-tight", textSizeClasses[textSize])}>
+    <span className={cn("font-bold tracking-tight leading-none", textSizeClasses[textSize])}>
       <span className={textColors.mazao}>Mazao</span>
       <span className={textColors.chain}>Chain</span>
     </span>
@@ -203,9 +203,15 @@ export function Logo({
 
   // variant === 'full'
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <LogoIcon />
-      {showText && <LogoText size={size} />}
+    <div className={cn("logo-container", className)}>
+      <div className="logo-icon">
+        <LogoIcon />
+      </div>
+      {showText && (
+        <div className="logo-text">
+          <LogoText size={size} />
+        </div>
+      )}
     </div>
   );
 }
@@ -229,8 +235,8 @@ export function SidebarLogo({ collapsed = false }: { collapsed?: boolean }) {
   );
 }
 
-export function AuthLogo() {
-  return <Logo variant="full" size="xl" className="justify-center" />;
+export function AuthLogo({ className, colorScheme = "default" }: { className?: string; colorScheme?: "default" | "monochrome" | "inverse" }) {
+  return <Logo variant="full" size="xl" className={className} colorScheme={colorScheme} />;
 }
 
 export function NavbarLogo() {

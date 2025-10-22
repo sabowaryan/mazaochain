@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { useTranslations } from '@/components/TranslationProvider';
 
 export function OfflineIndicator() {
   const t = useTranslations('pwa');
+  const pathname = usePathname();
   const [isOnline, setIsOnline] = useState(true);
   const [showOfflineMessage, setShowOfflineMessage] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -99,16 +101,28 @@ export function OfflineIndicator() {
     }
   }, [isOnline, showOfflineMessage]);
 
-  if (!showOfflineMessage && isOnline) {
+  // Hide on auth pages to avoid interference with the clean design
+  const isAuthPage = pathname?.includes('/auth/');
+  
+  if (isAuthPage || (!showOfflineMessage && isOnline)) {
     return null;
   }
 
   return (
-    <div className={`fixed top-4 left-4 right-4 md:left-auto md:right-4 md:max-w-sm rounded-lg shadow-lg p-3 z-50 transition-all duration-300 ${
-      isOnline 
-        ? 'bg-green-500 text-white' 
-        : 'bg-red-500 text-white'
-    }`}>
+    <div 
+      className={`
+        fixed top-4 z-50 transition-all duration-300 rounded-lg shadow-lg p-3
+        left-4 right-4 mx-auto max-w-sm
+        md:left-auto md:right-4 md:mx-0 md:w-80 md:max-w-none
+        ${isOnline ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}
+      `}
+      style={{
+        // Fallback positioning for problematic cases
+        position: 'fixed',
+        top: '1rem',
+        zIndex: 50
+      }}
+    >
       <div className="flex items-center space-x-2">
         <div className="flex-shrink-0">
           {isVerifying ? (

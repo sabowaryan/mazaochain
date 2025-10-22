@@ -2,13 +2,22 @@
 
 import { Navigation } from './Navigation';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 export function ClientNavigation() {
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Hide navigation on auth pages
+  const isAuthPage = pathname?.includes('/auth/');
+  
+  if (isAuthPage) {
+    return null;
+  }
 
   if (!mounted) {
     return (

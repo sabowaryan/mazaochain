@@ -13,6 +13,22 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { ROUTES, USER_ROLES } from '@/lib/constants'
 import { cn } from '@/lib/utils'
+import {
+  HomeIcon,
+  UserIcon,
+  BellIcon,
+  Cog6ToothIcon,
+  ArrowRightOnRectangleIcon,
+  ChevronDownIcon,
+  WalletIcon,
+  Bars3Icon,
+  XMarkIcon
+} from '@heroicons/react/24/outline'
+import {
+  HomeIcon as HomeIconSolid,
+  UserIcon as UserIconSolid,
+  BellIcon as BellIconSolid
+} from '@heroicons/react/24/solid'
 
 export function Navigation() {
   const { 
@@ -82,7 +98,7 @@ export function Navigation() {
   }
 
   return (
-    <nav className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border sticky top-0 z-50">
+    <nav className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-gray-200/50 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
@@ -93,16 +109,16 @@ export function Navigation() {
           </div>
 
           {/* Navigation Items - Desktop */}
-          <div className="hidden md:flex items-center space-x-6">
+          <div className="hidden lg:flex items-center space-x-1">
             {isAuthenticated && initialized && (
               <>
                 {getNavigationItems().map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="flex items-center gap-2 text-foreground/80 hover:text-foreground px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                    className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50/50"
                   >
-                    {item.icon}
+                    <HomeIcon className="w-4 h-4 mr-2 text-gray-500" />
                     {item.label}
                   </Link>
                 ))}
@@ -111,12 +127,12 @@ export function Navigation() {
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
             {/* Loading State */}
             {!initialized && (
               <div className="flex items-center gap-2">
                 <LoadingSpinner size="sm" />
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-gray-500">
                   {t('loading')}
                 </span>
               </div>
@@ -124,124 +140,137 @@ export function Navigation() {
 
             {/* Authenticated State */}
             {initialized && isAuthenticated ? (
-              <div className="flex items-center space-x-4">
-                {/* Auth Status - Mobile */}
-                <div className="md:hidden">
-                  <AuthStatus variant="badge" />
-                </div>
+              <div className="flex items-center space-x-3">
+                {/* Notifications */}
+                <button className="relative p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200">
+                  <BellIcon className="w-5 h-5" />
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
 
-                {/* Wallet & Notifications */}
-                <div className="hidden sm:flex items-center space-x-3">
-                  <WalletStatus />
-                  <NotificationBell />
+                {/* Wallet Connection */}
+                <div className="hidden xl:block">
+                  <div className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200">
+                    <WalletIcon className="w-4 h-4 text-emerald-600" />
+                    <WalletStatus />
+                  </div>
                 </div>
 
                 {/* User Menu */}
                 <div className="relative">
                   <button
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    className="flex items-center gap-2 p-2 rounded-md hover:bg-muted transition-colors"
+                    className="flex items-center space-x-3 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 p-2 hover:bg-emerald-50 transition-all duration-200 border border-gray-200 bg-white shadow-sm"
                   >
-                    <div className="hidden md:block">
-                      <AuthStatus variant="inline" />
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary-700">
+                    <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-sm">
+                      <span className="text-white text-sm font-semibold">
                         {user?.email?.charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <svg 
-                      className={cn(
-                        "w-4 h-4 transition-transform",
-                        isUserMenuOpen && "rotate-180"
-                      )} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <div className="hidden md:block text-left">
+                      <p className="text-gray-900 font-medium text-sm">
+                        {user?.email?.split('@')[0] || 'Utilisateur'}
+                      </p>
+                      <p className="text-gray-500 text-xs capitalize">
+                        {profile?.role === 'agriculteur' ? 'Agriculteur' : 
+                         profile?.role === 'cooperative' ? 'Coopérative' : 
+                         profile?.role === 'preteur' ? 'Prêteur' : 'Utilisateur'}
+                      </p>
+                    </div>
+                    <ChevronDownIcon className={cn(
+                      "w-4 h-4 text-gray-500 transition-transform duration-200",
+                      isUserMenuOpen && "rotate-180"
+                    )} />
                   </button>
 
-                  {/* Dropdown Menu */}
+                  {/* Dropdown Menu amélioré */}
                   {isUserMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-64 bg-popover border border-border rounded-md shadow-lg z-50">
-                      <div className="p-4 border-b border-border">
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-200/50 backdrop-blur-sm">
+                      <div className="px-4 py-3 border-b border-gray-100">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
-                            <span className="text-lg font-medium text-primary-700">
+                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-sm">
+                            <span className="text-white text-lg font-semibold">
                               {user?.email?.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-popover-foreground truncate">
-                              {user?.email}
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {user?.email?.split('@')[0] || 'Utilisateur'}
                             </p>
+                            <p className="text-xs text-gray-500">{user?.email}</p>
                             {profile && (
-                              <p className="text-xs text-muted-foreground capitalize">
-                                {profile.role} • {isValidated ? 'Validé' : 'En attente'}
+                              <p className="text-xs text-emerald-600 capitalize font-medium">
+                                {profile.role === 'agriculteur' ? 'Agriculteur' : 
+                                 profile.role === 'cooperative' ? 'Coopérative' : 
+                                 profile.role === 'preteur' ? 'Prêteur' : 'Utilisateur'} • {isValidated ? 'Validé' : 'En attente'}
                               </p>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="p-2">
+                      <div className="py-2">
                         {/* Mobile Navigation Items */}
-                        <div className="md:hidden space-y-1 mb-2">
+                        <div className="lg:hidden space-y-1 mb-2">
                           {getNavigationItems().map((item) => (
                             <Link
                               key={item.href}
                               href={item.href}
                               onClick={() => setIsUserMenuOpen(false)}
-                              className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors"
+                              className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
                             >
-                              {item.icon}
+                              <HomeIcon className="w-4 h-4" />
                               {item.label}
                             </Link>
                           ))}
-                          <div className="border-t border-border my-2"></div>
+                          <div className="border-t border-gray-100 my-2"></div>
                         </div>
 
                         {/* Profile Link */}
                         <Link
                           href={`${getDashboardRoute()}/profile`}
                           onClick={() => setIsUserMenuOpen(false)}
-                          className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors"
+                          className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
+                          <UserIcon className="w-4 h-4" />
                           {t('profile') || 'Mon profil'}
                         </Link>
 
-                        {/* Mobile Wallet & Notifications */}
-                        <div className="sm:hidden space-y-1 my-2">
-                          <div className="px-3 py-2">
-                            <WalletStatus />
+                        {/* Notifications */}
+                        <button className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                          <BellIcon className="w-4 h-4" />
+                          Notifications
+                        </button>
+
+                        {/* Settings */}
+                        <button className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors">
+                          <Cog6ToothIcon className="w-4 h-4" />
+                          Paramètres
+                        </button>
+
+                        {/* Mobile Wallet */}
+                        <div className="xl:hidden px-4 py-2 bg-gradient-to-r from-emerald-50 to-teal-50 mx-2 rounded-lg border border-emerald-200 mt-2">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <WalletIcon className="w-4 h-4 text-emerald-600" />
+                            <span className="text-sm font-medium text-emerald-700">Wallet</span>
                           </div>
-                          <div className="px-3 py-2">
-                            <NotificationBell />
-                          </div>
+                          <WalletStatus />
                         </div>
 
-                        <div className="border-t border-border my-2"></div>
+                        <div className="border-t border-gray-100 my-2"></div>
 
                         {/* Language Switcher */}
-                        <div className="px-3 py-2">
+                        <div className="px-4 py-2">
                           <LanguageSwitcher />
                         </div>
 
-                        <div className="border-t border-border my-2"></div>
+                        <div className="border-t border-gray-100 my-2"></div>
 
                         {/* Sign Out */}
                         <button
                           onClick={handleSignOut}
-                          className="w-full flex items-center gap-3 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                          </svg>
+                          <ArrowRightOnRectangleIcon className="w-4 h-4" />
                           {t('logout')}
                         </button>
                       </div>
@@ -254,12 +283,12 @@ export function Navigation() {
               <div className="flex items-center space-x-3">
                 <LanguageSwitcher />
                 <Link href={ROUTES.AUTH.LOGIN}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50">
                     {t('login')}
                   </Button>
                 </Link>
                 <Link href={ROUTES.AUTH.REGISTER}>
-                  <Button size="sm">
+                  <Button size="sm" className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg">
                     {t('register')}
                   </Button>
                 </Link>

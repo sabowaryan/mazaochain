@@ -6,6 +6,26 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from '@/components/TranslationProvider';
 import { ROUTES, USER_ROLES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import {
+  HomeIcon,
+  ClipboardDocumentListIcon,
+  BanknotesIcon,
+  ChartBarIcon,
+  UserIcon,
+  UserGroupIcon,
+  TargetIcon,
+  BriefcaseIcon
+} from '@heroicons/react/24/outline';
+import {
+  HomeIcon as HomeIconSolid,
+  ClipboardDocumentListIcon as ClipboardDocumentListIconSolid,
+  BanknotesIcon as BanknotesIconSolid,
+  ChartBarIcon as ChartBarIconSolid,
+  UserIcon as UserIconSolid,
+  UserGroupIcon as UserGroupIconSolid,
+  TargetIcon as TargetIconSolid,
+  BriefcaseIcon as BriefcaseIconSolid
+} from '@heroicons/react/24/solid';
 
 export function MobileNavigation() {
   const { profile, isAuthenticated } = useAuth();
@@ -22,22 +42,15 @@ export function MobileNavigation() {
         id: 'dashboard',
         label: t('dashboard'),
         href: getDashboardRoute(),
-        icon: (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6a2 2 0 01-2 2H10a2 2 0 01-2-2V5z" />
-          </svg>
-        )
+        icon: HomeIcon,
+        iconSolid: HomeIconSolid
       },
       {
         id: 'profile',
         label: t('profile'),
         href: getProfileRoute(),
-        icon: (
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        )
+        icon: UserIcon,
+        iconSolid: UserIconSolid
       }
     ];
 
@@ -48,31 +61,22 @@ export function MobileNavigation() {
           id: 'evaluations',
           label: t('evaluations'),
           href: '/dashboard/farmer/evaluations',
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          )
+          icon: ClipboardDocumentListIcon,
+          iconSolid: ClipboardDocumentListIconSolid
         },
         {
           id: 'loans',
           label: t('loans'),
           href: '/dashboard/farmer/loans',
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-            </svg>
-          )
+          icon: BanknotesIcon,
+          iconSolid: BanknotesIconSolid
         },
         {
           id: 'portfolio',
           label: t('portfolio'),
           href: '/dashboard/farmer/portfolio',
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          )
+          icon: ChartBarIcon,
+          iconSolid: ChartBarIconSolid
         }
       );
     } else if (profile.role === USER_ROLES.COOPERATIVE) {
@@ -81,21 +85,22 @@ export function MobileNavigation() {
           id: 'evaluations',
           label: t('evaluations'),
           href: '/dashboard/cooperative/evaluations',
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          )
+          icon: ClipboardDocumentListIcon,
+          iconSolid: ClipboardDocumentListIconSolid
         },
         {
           id: 'loans',
           label: t('loans'),
           href: '/dashboard/cooperative/loans',
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-            </svg>
-          )
+          icon: BanknotesIcon,
+          iconSolid: BanknotesIconSolid
+        },
+        {
+          id: 'members',
+          label: t('members') || 'Membres',
+          href: '/dashboard/cooperative/farmers',
+          icon: UserGroupIcon,
+          iconSolid: UserGroupIconSolid
         }
       );
     } else if (profile.role === USER_ROLES.PRETEUR) {
@@ -104,21 +109,15 @@ export function MobileNavigation() {
           id: 'opportunities',
           label: t('opportunities'),
           href: '/dashboard/lender/opportunities',
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-          )
+          icon: TargetIcon,
+          iconSolid: TargetIconSolid
         },
         {
           id: 'portfolio',
           label: t('portfolio'),
           href: '/dashboard/lender/portfolio',
-          icon: (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          )
+          icon: BriefcaseIcon,
+          iconSolid: BriefcaseIconSolid
         }
       );
     }
@@ -159,29 +158,63 @@ export function MobileNavigation() {
   const navigationItems = getNavigationItems();
 
   return (
-    <nav className="mobile-nav md:hidden">
-      <div className="flex justify-around items-center py-2">
-        {navigationItems.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            onClick={() => setActiveTab(item.id)}
-            className={cn(
-              'flex flex-col items-center justify-center p-2 rounded-lg transition-colors touch-target',
-              activeTab === item.id
-                ? 'text-primary-600 bg-primary-50'
-                : 'text-neutral-600 hover:text-primary-600 hover:bg-primary-50'
-            )}
-          >
-            <div className="mb-1">
-              {item.icon}
-            </div>
-            <span className="text-xs font-medium">
-              {item.label}
-            </span>
-          </Link>
-        ))}
+    <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-gray-200/50 md:hidden z-50 shadow-2xl">
+      <div className="grid grid-cols-5 h-20 px-2">
+        {navigationItems.map((item) => {
+          const isActive = activeTab === item.id;
+          const IconComponent = isActive ? item.iconSolid : item.icon;
+          
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              onClick={() => setActiveTab(item.id)}
+              className={cn(
+                'flex flex-col items-center justify-center space-y-1 transition-all duration-200 rounded-xl mx-1 my-2 relative',
+                isActive
+                  ? 'text-emerald-600 bg-emerald-50 shadow-sm'
+                  : 'text-gray-500 hover:text-emerald-600 hover:bg-emerald-50/50'
+              )}
+            >
+              {/* Indicateur actif */}
+              {isActive && (
+                <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-emerald-500 rounded-full"></div>
+              )}
+              
+              {/* Icône avec animation */}
+              <div className={cn(
+                'p-1 rounded-lg transition-all duration-200',
+                isActive ? 'scale-110' : 'scale-100'
+              )}>
+                <IconComponent className={cn(
+                  'w-6 h-6',
+                  isActive ? 'text-emerald-600' : 'text-gray-500'
+                )} />
+              </div>
+              
+              {/* Label */}
+              <span className={cn(
+                'text-xs font-medium transition-all duration-200',
+                isActive ? 'text-emerald-700' : 'text-gray-500'
+              )}>
+                {item.label}
+              </span>
+              
+              {/* Badge de notification pour certains éléments */}
+              {(item.id === 'evaluations' || item.id === 'loans') && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">2</span>
+                </div>
+              )}
+            </Link>
+          );
+        })}
       </div>
-    </nav>
+      
+      {/* Barre d'accueil pour les gestes */}
+      <div className="flex justify-center pb-2">
+        <div className="w-12 h-1 bg-gray-300 rounded-full"></div>
+      </div>
+    </div>
   );
 }

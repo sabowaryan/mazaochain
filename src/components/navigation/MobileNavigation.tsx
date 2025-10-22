@@ -6,6 +6,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from '@/components/TranslationProvider';
 import { ROUTES, USER_ROLES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { AnimatedIcon } from '@/components/ui/AnimatedIcon';
+import { NotificationBadge } from '@/components/ui/NotificationBadge';
+import { useHapticFeedback } from '@/components/ui/HapticFeedback';
 import {
   HomeIcon,
   ClipboardDocumentListIcon,
@@ -13,7 +16,7 @@ import {
   ChartBarIcon,
   UserIcon,
   UserGroupIcon,
-  TargetIcon,
+  EyeIcon,
   BriefcaseIcon
 } from '@heroicons/react/24/outline';
 import {
@@ -23,7 +26,7 @@ import {
   ChartBarIcon as ChartBarIconSolid,
   UserIcon as UserIconSolid,
   UserGroupIcon as UserGroupIconSolid,
-  TargetIcon as TargetIconSolid,
+  EyeIcon as EyeIconSolid,
   BriefcaseIcon as BriefcaseIconSolid
 } from '@heroicons/react/24/solid';
 
@@ -31,6 +34,7 @@ export function MobileNavigation() {
   const { profile, isAuthenticated } = useAuth();
   const t = useTranslations('navigation');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const { triggerHaptic } = useHapticFeedback();
 
   if (!isAuthenticated || !profile) {
     return null;
@@ -109,8 +113,8 @@ export function MobileNavigation() {
           id: 'opportunities',
           label: t('opportunities'),
           href: '/dashboard/lender/opportunities',
-          icon: TargetIcon,
-          iconSolid: TargetIconSolid
+          icon: EyeIcon,
+          iconSolid: EyeIconSolid
         },
         {
           id: 'portfolio',
@@ -168,7 +172,10 @@ export function MobileNavigation() {
             <Link
               key={item.id}
               href={item.href}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                triggerHaptic('light');
+              }}
               className={cn(
                 'flex flex-col items-center justify-center space-y-1 transition-all duration-200 rounded-xl mx-1 my-2 relative',
                 isActive
@@ -182,15 +189,13 @@ export function MobileNavigation() {
               )}
               
               {/* Icône avec animation */}
-              <div className={cn(
-                'p-1 rounded-lg transition-all duration-200',
-                isActive ? 'scale-110' : 'scale-100'
-              )}>
-                <IconComponent className={cn(
-                  'w-6 h-6',
-                  isActive ? 'text-emerald-600' : 'text-gray-500'
-                )} />
-              </div>
+              <AnimatedIcon
+                icon={item.icon}
+                iconSolid={item.iconSolid}
+                isActive={isActive}
+                size="lg"
+                className="p-1 rounded-lg"
+              />
               
               {/* Label */}
               <span className={cn(
@@ -201,11 +206,10 @@ export function MobileNavigation() {
               </span>
               
               {/* Badge de notification pour certains éléments */}
-              {(item.id === 'evaluations' || item.id === 'loans') && (
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">2</span>
-                </div>
-              )}
+              <NotificationBadge
+                count={item.id === 'evaluations' ? 3 : item.id === 'loans' ? 2 : 0}
+                show={item.id === 'evaluations' || item.id === 'loans'}
+              />
             </Link>
           );
         })}

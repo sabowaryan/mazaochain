@@ -60,7 +60,7 @@ export function MobileNavigation() {
 
     // Add role-specific navigation items
     if (profile.role === USER_ROLES.AGRICULTEUR) {
-      baseItems.splice(1, 0, 
+      baseItems.splice(1, 0,
         {
           id: 'evaluations',
           label: t('evaluations'),
@@ -131,7 +131,7 @@ export function MobileNavigation() {
 
   const getDashboardRoute = () => {
     if (!profile) return '/';
-    
+
     switch (profile.role) {
       case USER_ROLES.AGRICULTEUR:
         return '/dashboard/farmer';
@@ -146,7 +146,7 @@ export function MobileNavigation() {
 
   const getProfileRoute = () => {
     if (!profile) return '/';
-    
+
     switch (profile.role) {
       case USER_ROLES.AGRICULTEUR:
         return '/dashboard/farmer/profile';
@@ -167,7 +167,7 @@ export function MobileNavigation() {
         {navigationItems.map((item) => {
           const isActive = activeTab === item.id;
           const IconComponent = isActive ? item.iconSolid : item.icon;
-          
+
           return (
             <Link
               key={item.id}
@@ -187,7 +187,7 @@ export function MobileNavigation() {
               {isActive && (
                 <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-emerald-500 rounded-full"></div>
               )}
-              
+
               {/* Icône avec animation */}
               <AnimatedIcon
                 icon={item.icon}
@@ -196,7 +196,7 @@ export function MobileNavigation() {
                 size="lg"
                 className="p-1 rounded-lg"
               />
-              
+
               {/* Label */}
               <span className={cn(
                 'text-xs font-medium transition-all duration-200',
@@ -204,7 +204,7 @@ export function MobileNavigation() {
               )}>
                 {item.label}
               </span>
-              
+
               {/* Badge de notification pour certains éléments */}
               <NotificationBadge
                 count={item.id === 'evaluations' ? 3 : item.id === 'loans' ? 2 : 0}
@@ -214,7 +214,7 @@ export function MobileNavigation() {
           );
         })}
       </div>
-      
+
       {/* Barre d'accueil pour les gestes */}
       <div className="flex justify-center pb-2">
         <div className="w-12 h-1 bg-gray-300 rounded-full"></div>

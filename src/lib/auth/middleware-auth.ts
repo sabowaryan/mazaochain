@@ -198,20 +198,21 @@ export function extractAuthToken(request: Request): string | null {
 /**
  * Create redirect URL with return path
  * Options:
- * - 'query': Use query parameters (default, visible in URL)
+ * - 'query': Use query parameters (visible in URL)
  * - 'hash': Use URL hash (cleaner, but not sent to server)
- * - 'clean': No parameters (cleanest, requires client-side storage)
+ * - 'clean': No parameters (cleanest, requires client-side storage) - DEFAULT
  */
 export function createRedirectUrl(
   baseUrl: string,
   returnPath: string,
   reason?: string,
-  mode: "query" | "hash" | "clean" = "query"
+  mode: "query" | "hash" | "clean" = "clean"
 ): string {
   const url = new URL(baseUrl);
 
   if (mode === "clean") {
-    // Return clean URL - redirect info should be stored client-side
+    // Return clean URL - redirect info will be stored client-side
+    // Note: The actual storage should be handled by the component that triggers the redirect
     return url.toString();
   }
 
@@ -226,12 +227,30 @@ export function createRedirectUrl(
     return url.toString();
   }
 
-  // Default: query parameters
+  // Fallback: query parameters
   url.searchParams.set("returnUrl", returnPath);
   if (reason) {
     url.searchParams.set("reason", reason);
   }
   return url.toString();
+}
+
+/**
+ * Create clean redirect URL and return redirect info for client-side storage
+ * This is the recommended approach for clean URLs
+ */
+export function createCleanRedirectUrl(
+  baseUrl: string,
+  returnPath: string,
+  reason?: string
+): { url: string; redirectInfo: { returnUrl: string; reason?: string } } {
+  return {
+    url: new URL(baseUrl).toString(),
+    redirectInfo: {
+      returnUrl: returnPath,
+      reason,
+    },
+  };
 }
 
 /**

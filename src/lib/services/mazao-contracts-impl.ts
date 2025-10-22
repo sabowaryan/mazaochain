@@ -33,6 +33,15 @@ export interface ContractInteractionResult {
   error?: string;
 }
 
+export interface TokenHolding {
+  tokenId: string;
+  cropType: string;
+  amount: number;
+  estimatedValue: number;
+  harvestDate: string;
+  status: 'active' | 'harvested' | 'expired';
+}
+
 export class MazaoContractsServiceImpl {
   private client: any;
   private operatorAccountId: any;
@@ -104,6 +113,18 @@ export class MazaoContractsServiceImpl {
     } catch (error) {
       console.error("Error getting farmer total balance:", error);
       return 0;
+    }
+  }
+
+  async getFarmerTokenHoldings(farmerAddress: string): Promise<TokenHolding[]> {
+    try {
+      await this.initializeClient();
+      // Simplified implementation for build compatibility
+      // Return empty array for now - this would be implemented with real blockchain calls
+      return [];
+    } catch (error) {
+      console.error("Error getting farmer token holdings:", error);
+      return [];
     }
   }
 

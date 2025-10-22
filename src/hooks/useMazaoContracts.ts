@@ -15,6 +15,15 @@ export interface MazaoTokenInfo {
   tokenSymbol: string;
 }
 
+export interface TokenHolding {
+  tokenId: string;
+  cropType: string;
+  amount: number;
+  estimatedValue: number;
+  harvestDate: string;
+  status: 'active' | 'harvested' | 'expired';
+}
+
 export interface LoanInfo {
   loanId: string;
   borrower: string;
@@ -59,6 +68,8 @@ export interface UseMazaoContractsReturn {
   ) => Promise<number>;
   
   getFarmerTotalBalance: (farmerAddress: string) => Promise<number>;
+  
+  getFarmerTokenHoldings: (farmerAddress: string) => Promise<TokenHolding[]>;
   
   getTokenDetails: (tokenId: string) => Promise<MazaoTokenInfo | null>;
   
@@ -169,8 +180,17 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
   }, [handleAsyncOperation]);
 
   const getFarmerTotalBalance = useCallback(async (farmerAddress: string): Promise<number> => {
+    if (!mazaoContractsService) {
+      throw new Error('Contracts service not loaded yet');
+    }
     return handleAsyncOperation(() =>
       mazaoContractsService.getFarmerTotalBalance(farmerAddress)
+    );
+  }, [handleAsyncOperation, mazaoContractsService]);
+
+  const getFarmerTokenHoldings = useCallback(async (farmerAddress: string): Promise<TokenHolding[]> => {
+    return handleAsyncOperation(() =>
+      mazaoContractsService.getFarmerTokenHoldings(farmerAddress)
     );
   }, [handleAsyncOperation]);
 
@@ -246,6 +266,7 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     mintTokens,
     getFarmerBalanceForToken,
     getFarmerTotalBalance,
+    getFarmerTokenHoldings,
     getTokenDetails,
     requestLoan,
     getLoanDetails,

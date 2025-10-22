@@ -1,13 +1,15 @@
 import { LoginForm } from '@/components/auth/LoginForm';
+
 import { AuthLogo } from '@/components/ui/Logo';
-import { 
-  ShieldCheckIcon, 
-  CreditCardIcon, 
-  ChartBarIcon 
+import {
+  ShieldCheckIcon,
+  CreditCardIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 
 export default function LoginPage() {
   return (
+
     <div className="min-h-screen flex">
       {/* Left side - Hero section */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 relative overflow-hidden">
@@ -22,7 +24,7 @@ export default function LoginPage() {
               <span className="block text-emerald-200">MazaoChain</span>
             </h1>
             <p className="text-xl text-emerald-100 leading-relaxed max-w-screen-md">
-              La plateforme décentralisée qui révolutionne le financement agricole en RDC. 
+              La plateforme décentralisée qui révolutionne le financement agricole en RDC.
               Tokenisez vos récoltes, accédez au crédit et investissez dans l'agriculture durable.
             </p>
           </div>
@@ -53,13 +55,13 @@ export default function LoginPage() {
         <div className="absolute top-1/4 right-0 w-24 h-24 bg-teal-100/20 rounded-full translate-x-12 auth-decoration-float-delayed"></div>
         <div className="absolute bottom-0 right-0 w-40 h-40 bg-emerald-50/40 rounded-full translate-y-20 translate-x-20 auth-decoration-float-slow"></div>
         <div className="absolute bottom-1/3 left-0 w-20 h-20 bg-teal-50/30 rounded-full -translate-x-10 auth-decoration-float"></div>
-        
+
         <div className="w-full max-w-screen-md space-y-8 relative z-10">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-6">
             <AuthLogo className="h-10 w-auto auth-logo-mobile" colorScheme="default" />
           </div>
-          
+
           <div className="text-center lg:text-left">
             <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
               Connexion
@@ -68,10 +70,11 @@ export default function LoginPage() {
               Connectez-vous pour accéder à votre tableau de bord
             </p>
           </div>
-          
+
           <LoginForm />
         </div>
       </div>
     </div>
+
   );
 }

@@ -30,6 +30,15 @@ export interface ContractInteractionResult {
   error?: string;
 }
 
+export interface TokenHolding {
+  tokenId: string;
+  cropType: string;
+  amount: number;
+  estimatedValue: number;
+  harvestDate: string;
+  status: 'active' | 'harvested' | 'expired';
+}
+
 class MazaoContractsService {
   private impl: any = null;
 
@@ -47,6 +56,7 @@ class MazaoContractsService {
             mintTokens: async () => ({ success: false, error: 'Service not available during build' }),
             getFarmerBalanceForToken: async () => 0,
             getFarmerTotalBalance: async () => 0,
+            getFarmerTokenHoldings: async () => [],
             getTokenDetails: async () => null,
             requestLoan: async () => ({ success: false, error: 'Service not available during build' }),
             getLoanDetails: async () => null,
@@ -63,6 +73,7 @@ class MazaoContractsService {
           mintTokens: async () => ({ success: false, error: 'Service not available' }),
           getFarmerBalanceForToken: async () => 0,
           getFarmerTotalBalance: async () => 0,
+          getFarmerTokenHoldings: async () => [],
           getTokenDetails: async () => null,
           requestLoan: async () => ({ success: false, error: 'Service not available' }),
           getLoanDetails: async () => null,
@@ -106,6 +117,11 @@ class MazaoContractsService {
   async getFarmerTotalBalance(farmerAddress: string): Promise<number> {
     const impl = await this.getImpl();
     return impl.getFarmerTotalBalance(farmerAddress);
+  }
+
+  async getFarmerTokenHoldings(farmerAddress: string): Promise<TokenHolding[]> {
+    const impl = await this.getImpl();
+    return impl.getFarmerTokenHoldings(farmerAddress);
   }
 
   async getTokenDetails(tokenId: string): Promise<MazaoTokenInfo | null> {

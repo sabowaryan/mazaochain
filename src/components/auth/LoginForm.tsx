@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { clientAuth } from "@/lib/supabase/client-auth";
+import { getRedirectInfo, clearRedirectInfo } from "@/lib/auth/redirect-storage";
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface FormData {

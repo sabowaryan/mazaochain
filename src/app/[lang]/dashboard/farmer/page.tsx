@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTranslations } from "@/components/TranslationProvider";
 import { useMazaoContracts } from "@/hooks/useMazaoContracts";
 import { useWallet } from "@/hooks/useWallet";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -58,12 +58,18 @@ export default function FarmerDashboard() {
   });
 
   const [isLoading, setIsLoading] = useState(true);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
+    // Éviter les appels multiples si les données sont déjà chargées ou en cours de chargement
+    if (dataLoaded || loadingRef.current) return;
+
     const loadFarmerData = async () => {
       if (!user?.id || !profile) return;
 
       try {
+        loadingRef.current = true;
         setIsLoading(true);
 
         // Vérifier le cache de session pour éviter les requêtes multiples
@@ -72,8 +78,8 @@ export default function FarmerDashboard() {
         const cacheTime = sessionStorage.getItem(`${cacheKey}_time`);
         const now = Date.now();
 
-        // Utiliser le cache s'il a moins de 30 secondes
-        if (cachedData && cacheTime && (now - parseInt(cacheTime)) < 30000) {
+        // Utiliser le cache s'il a moins de 2 minutes (120 secondes)
+        if (cachedData && cacheTime && (now - parseInt(cacheTime)) < 120000) {
           const { evaluations, loans } = JSON.parse(cachedData);
 
           // Calculer les statistiques depuis le cache
@@ -99,6 +105,7 @@ export default function FarmerDashboard() {
             mazaoTokens: 0, // Sera chargé depuis la blockchain
           });
 
+          setDataLoaded(true);
           setIsLoading(false);
           return;
         }
@@ -169,18 +176,21 @@ export default function FarmerDashboard() {
           pendingEvaluations: pendingEvaluationsCount,
           mazaoTokens: mazaoBalance,
         });
+
+        setDataLoaded(true);
       } catch (error) {
         console.error(
           "Erreur lors du chargement des données agriculteur:",
           error
         );
       } finally {
+        loadingRef.current = false;
         setIsLoading(false);
       }
     };
 
     loadFarmerData();
-  }, [user?.id, profile, getFarmerTotalBalance]);
+  }, [user?.id, profile]); // Suppression de getFarmerTotalBalance des dépendances
 
   if (isLoading || contractsLoading) {
     return (

@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useTranslations } from '@/components/TranslationProvider'
 import { Button } from '@/components/ui/Button'
 import { WalletStatus } from '@/components/wallet/WalletStatus'
+import { EnhancedWalletStatus } from '@/components/wallet/EnhancedWalletStatus'
+import { AppKitWalletButton } from '@/components/wallet/AppKitWalletButton'
 import { NotificationBell } from '@/components/notifications/NotificationBell'
 import { NavbarLogo } from '@/components/ui/Logo'
 import { AuthStatus } from '@/components/auth/AuthStatus'
@@ -142,17 +144,15 @@ export function Navigation() {
             {initialized && isAuthenticated ? (
               <div className="flex items-center space-x-3">
                 {/* Notifications */}
-                <button className="relative p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all duration-200">
-                  <BellIcon className="w-5 h-5" />
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                </button>
+                <NotificationBell />
 
                 {/* Wallet Connection */}
                 <div className="hidden xl:block">
-                  <div className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-200">
-                    <WalletIcon className="w-4 h-4 text-emerald-600" />
-                    <WalletStatus />
-                  </div>
+                  <EnhancedWalletStatus 
+                    variant="dropdown" 
+                    showBalance={true} 
+                    showNetwork={true} 
+                  />
                 </div>
 
                 {/* User Menu */}
@@ -248,12 +248,8 @@ export function Navigation() {
                         </button>
 
                         {/* Mobile Wallet */}
-                        <div className="xl:hidden px-4 py-2 bg-gradient-to-r from-emerald-50 to-teal-50 mx-2 rounded-lg border border-emerald-200 mt-2">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <WalletIcon className="w-4 h-4 text-emerald-600" />
-                            <span className="text-sm font-medium text-emerald-700">Wallet</span>
-                          </div>
-                          <WalletStatus />
+                        <div className="xl:hidden px-4 py-2 mt-2">
+                          <EnhancedWalletStatus variant="detailed" showBalance={true} showNetwork={true} />
                         </div>
 
                         <div className="border-t border-gray-100 my-2"></div>
@@ -282,6 +278,7 @@ export function Navigation() {
               /* Guest State */
               <div className="flex items-center space-x-3">
                 <LanguageSwitcher />
+                <AppKitWalletButton variant="connect" size="sm" />
                 <Link href={ROUTES.AUTH.LOGIN}>
                   <Button variant="ghost" size="sm" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50">
                     {t('login')}

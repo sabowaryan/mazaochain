@@ -46,7 +46,8 @@ export interface UseMazaoContractsReturn {
   // State
   loading: boolean;
   error: string | null;
-  
+  isReady: boolean; // Indicates if the service is loaded and ready to use
+
   // Token operations
   createCropToken: (
     farmerAddress: string,
@@ -55,24 +56,24 @@ export interface UseMazaoContractsReturn {
     harvestDate: number,
     tokenSymbol: string
   ) => Promise<ContractInteractionResult>;
-  
+
   mintTokens: (
     tokenId: string,
     amount: number,
     recipientAddress: string
   ) => Promise<ContractInteractionResult>;
-  
+
   getFarmerBalanceForToken: (
     farmerAddress: string,
     tokenId: string
   ) => Promise<number>;
-  
+
   getFarmerTotalBalance: (farmerAddress: string) => Promise<number>;
-  
+
   getFarmerTokenHoldings: (farmerAddress: string) => Promise<TokenHolding[]>;
-  
+
   getTokenDetails: (tokenId: string) => Promise<MazaoTokenInfo | null>;
-  
+
   // Loan operations
   requestLoan: (
     collateralTokenId: string,
@@ -80,13 +81,13 @@ export interface UseMazaoContractsReturn {
     duration: number,
     interestRate: number
   ) => Promise<ContractInteractionResult>;
-  
+
   getLoanDetails: (loanId: string) => Promise<LoanInfo | null>;
-  
+
   // Utility functions
   getNextTokenId: () => Promise<number>;
   getNextLoanId: () => Promise<number>;
-  
+
   // Complete workflows
   tokenizeEvaluation: (
     evaluationId: string,
@@ -107,29 +108,38 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mazaoContractsService, setMazaoContractsService] = useState<any>(null);
+  const [isServiceLoading, setIsServiceLoading] = useState(true);
 
-  // Chargement dynamique du service uniquement côté client
+  // Chargement dynamique du service uniquement côté client (une seule fois)
   useEffect(() => {
     if (typeof window !== 'undefined' && !mazaoContractsService) {
+      setIsServiceLoading(true);
       import('@/lib/services/mazao-contracts').then(module => {
         setMazaoContractsService(module.mazaoContractsService);
+        setIsServiceLoading(false);
       }).catch(err => {
         console.error('Failed to load mazao contracts service:', err);
         setError('Failed to load contracts service');
+        setIsServiceLoading(false);
       });
     }
-  }, [mazaoContractsService]);
+  }, []); // Empty deps - only load once
 
   const handleAsyncOperation = useCallback(async <T>(
     operation: () => Promise<T>
   ): Promise<T> => {
+    // Wait for service to load if it's still loading
+    if (isServiceLoading) {
+      throw new Error('Contracts service is still loading. Please wait...');
+    }
+
     if (!mazaoContractsService) {
       throw new Error('Contracts service not loaded yet');
     }
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await operation();
       return result;
@@ -140,7 +150,7 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     } finally {
       setLoading(false);
     }
-  }, [mazaoContractsService]);
+  }, [mazaoContractsService, isServiceLoading]);
 
   const createCropToken = useCallback(async (
     farmerAddress: string,
@@ -262,6 +272,7 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
   return {
     loading,
     error,
+    isReady: !isServiceLoading && !!mazaoContractsService,
     createCropToken,
     mintTokens,
     getFarmerBalanceForToken,

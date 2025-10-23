@@ -1,4 +1,5 @@
 import 'server-only'
+import { cache } from 'react'
 
 const dictionaries = {
   en: () => import('../../../messages/en.json').then((module) => module.default),
@@ -6,10 +7,9 @@ const dictionaries = {
   ln: () => import('../../../messages/ln.json').then((module) => module.default),
 } as const;
 
-export const getDictionary = async (locale: 'en' | 'fr' | 'ln') => {
-  console.log('getDictionary called with locale:', locale, 'type:', typeof locale);
-  
-  // Ensure locale is a string and one of our supported locales
+// Cache dictionary loading per request using React cache
+// This prevents multiple loads of the same dictionary during a single request
+const loadDictionary = cache(async (locale: 'en' | 'fr' | 'ln') => {
   const normalizedLocale = String(locale).toLowerCase() as 'en' | 'fr' | 'ln';
   
   if (!['en', 'fr', 'ln'].includes(normalizedLocale)) {
@@ -25,10 +25,14 @@ export const getDictionary = async (locale: 'en' | 'fr' | 'ln') => {
   
   try {
     const result = await dictionaryLoader();
-    console.log(`Successfully loaded dictionary for ${normalizedLocale}`);
     return result;
   } catch (error) {
     console.error(`Failed to load dictionary for ${normalizedLocale}:`, error);
     return dictionaries.en();
   }
+});
+
+export const getDictionary = async (locale: 'en' | 'fr' | 'ln') => {
+  // Use cached version - only logs once per request now
+  return loadDictionary(locale);
 }

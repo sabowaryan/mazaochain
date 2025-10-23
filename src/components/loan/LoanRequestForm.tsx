@@ -8,6 +8,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/Button'
 import type { LoanEligibility, LoanRequest } from '@/types/loan'
 import type { FarmerPortfolio } from '@/types/tokenization'
+import {
+  CurrencyDollarIcon,
+  BanknotesIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ClockIcon,
+  SparklesIcon,
+  DocumentTextIcon,
+  CalendarDaysIcon
+} from '@heroicons/react/24/outline'
+import {
+  CurrencyDollarIcon as CurrencyDollarIconSolid,
+  CheckCircleIcon as CheckCircleIconSolid,
+  ExclamationTriangleIcon as ExclamationTriangleIconSolid
+} from '@heroicons/react/24/solid'
 
 interface LoanRequestFormProps {
   onSuccess?: (loanId: string) => void
@@ -130,13 +145,11 @@ export function LoanRequestForm({ onSuccess, onCancel }: LoanRequestFormProps) {
 
   if (!portfolio) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-            <p className="mt-2 text-gray-600">Chargement du portefeuille...</p>
-          </div>
-        </CardContent>
+      <Card className="p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement du portefeuille...</p>
+        </div>
       </Card>
     )
   }
@@ -144,166 +157,225 @@ export function LoanRequestForm({ onSuccess, onCancel }: LoanRequestFormProps) {
   return (
     <div className="space-y-6">
       {/* Portfolio Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Votre Collatéral Disponible</CardTitle>
-          <CardDescription>
-            Tokens disponibles pour garantir votre prêt
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Valeur totale</p>
-              <p className="text-2xl font-bold text-green-600">
-                {portfolio.totalValue.toFixed(2)} USDC
-              </p>
+      <Card className="p-6 lg:p-8 hover:shadow-xl transition-all duration-300">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="p-2 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg">
+            <SparklesIcon className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Votre Collatéral Disponible</h3>
+            <p className="text-sm text-gray-600">Tokens disponibles pour garantir votre prêt</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="p-4 bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl border border-primary-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <CurrencyDollarIcon className="w-5 h-5 text-primary-600" />
+              <p className="text-sm font-medium text-primary-700">Valeur totale</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Tokens actifs</p>
-              <p className="text-2xl font-bold">
-                {portfolio.tokens.filter(t => t.isActive).length}
-              </p>
+            <p className="text-2xl font-bold text-primary-900">
+              {portfolio.totalValue.toFixed(2)} USDC
+            </p>
+          </div>
+          <div className="p-4 bg-gradient-to-r from-secondary-50 to-secondary-100 rounded-xl border border-secondary-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <BanknotesIcon className="w-5 h-5 text-secondary-600" />
+              <p className="text-sm font-medium text-secondary-700">Tokens actifs</p>
+            </div>
+            <p className="text-2xl font-bold text-secondary-900">
+              {portfolio.tokens.filter(t => t.isActive).length}
+            </p>
+          </div>
+        </div>
+        
+        {portfolio.tokens.length === 0 && (
+          <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+            <div className="flex items-center space-x-3">
+              <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <div>
+                <h4 className="text-sm font-medium text-amber-800">Tokens requis</h4>
+                <p className="text-sm text-amber-700 mt-1">
+                  Vous devez avoir des tokens de récolte pour demander un prêt. 
+                  Veuillez d'abord faire évaluer vos récoltes.
+                </p>
+              </div>
             </div>
           </div>
-          
-          {portfolio.tokens.length === 0 && (
-            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <p className="text-yellow-800">
-                Vous devez avoir des tokens de récolte pour demander un prêt. 
-                Veuillez d'abord faire évaluer vos récoltes.
-              </p>
-            </div>
-          )}
-        </CardContent>
+        )}
       </Card>
 
       {/* Loan Request Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Demande de Prêt</CardTitle>
-          <CardDescription>
-            Remplissez les détails de votre demande de prêt
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Requested Amount */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Montant demandé (USDC)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.requestedAmount}
-                onChange={(e) => handleInputChange('requestedAmount', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="0.00"
-              />
-              {errors.requestedAmount && (
-                <p className="mt-1 text-sm text-red-600">{errors.requestedAmount}</p>
-              )}
-            </div>
+      <Card className="p-6 lg:p-8 hover:shadow-xl transition-all duration-300">
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="p-2 bg-gradient-to-br from-secondary-500 to-secondary-600 rounded-lg">
+            <DocumentTextIcon className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900">Demande de Prêt</h3>
+            <p className="text-sm text-gray-600">Remplissez les détails de votre demande de prêt</p>
+          </div>
+        </div>
 
-            {/* Eligibility Check */}
-            {eligibility && formData.requestedAmount && (
-              <div className={`p-4 rounded-md ${
-                eligibility.isEligible 
-                  ? 'bg-green-50 border border-green-200' 
-                  : 'bg-red-50 border border-red-200'
-              }`}>
-                <div className="flex items-center">
-                  <div className={`flex-shrink-0 ${
-                    eligibility.isEligible ? 'text-green-500' : 'text-red-500'
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Requested Amount */}
+          <div>
+            <div className="flex items-center space-x-2 mb-2">
+              <CurrencyDollarIcon className="w-4 h-4 text-gray-500" />
+              <label className="text-sm font-medium text-gray-700">
+                Montant demandé (USDC) *
+              </label>
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.requestedAmount}
+              onChange={(e) => handleInputChange('requestedAmount', e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
+              placeholder="0.00"
+            />
+            {errors.requestedAmount && (
+              <p className="mt-2 text-sm text-red-600 flex items-center space-x-1">
+                <ExclamationTriangleIcon className="w-4 h-4" />
+                <span>{errors.requestedAmount}</span>
+              </p>
+            )}
+          </div>
+
+          {/* Eligibility Check */}
+          {eligibility && formData.requestedAmount && (
+            <div className={`p-6 rounded-xl border-2 ${
+              eligibility.isEligible 
+                ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200' 
+                : 'bg-gradient-to-r from-red-50 to-pink-50 border-red-200'
+            }`}>
+              <div className="flex items-start space-x-4">
+                <div className={`p-2 rounded-lg ${
+                  eligibility.isEligible ? 'bg-green-500' : 'bg-red-500'
+                }`}>
+                  {eligibility.isEligible ? (
+                    <CheckCircleIconSolid className="h-5 w-5 text-white" />
+                  ) : (
+                    <ExclamationTriangleIconSolid className="h-5 w-5 text-white" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <h3 className={`text-lg font-semibold mb-2 ${
+                    eligibility.isEligible ? 'text-green-800' : 'text-red-800'
                   }`}>
-                    {eligibility.isEligible ? (
-                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    ) : (
-                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="ml-3">
-                    <h3 className={`text-sm font-medium ${
-                      eligibility.isEligible ? 'text-green-800' : 'text-red-800'
-                    }`}>
-                      {eligibility.isEligible ? 'Éligible' : 'Non éligible'}
-                    </h3>
-                    <div className={`mt-1 text-sm ${
-                      eligibility.isEligible ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      <p>Montant maximum: {eligibility.maxLoanAmount.toFixed(2)} USDC</p>
-                      <p>Collatéral requis: {eligibility.requiredCollateral.toFixed(2)} USDC (200%)</p>
-                      {eligibility.reasons && (
-                        <ul className="mt-1 list-disc list-inside">
+                    {eligibility.isEligible ? '✅ Éligible pour ce prêt' : '❌ Non éligible'}
+                  </h3>
+                  <div className={`space-y-2 text-sm ${
+                    eligibility.isEligible ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-3 bg-white/50 rounded-lg">
+                        <p className="font-medium">Montant maximum</p>
+                        <p className="text-lg font-bold">{eligibility.maxLoanAmount.toFixed(2)} USDC</p>
+                      </div>
+                      <div className="p-3 bg-white/50 rounded-lg">
+                        <p className="font-medium">Collatéral requis (200%)</p>
+                        <p className="text-lg font-bold">{eligibility.requiredCollateral.toFixed(2)} USDC</p>
+                      </div>
+                    </div>
+                    {eligibility.reasons && eligibility.reasons.length > 0 && (
+                      <div className="mt-4">
+                        <p className="font-medium mb-2">Détails:</p>
+                        <ul className="space-y-1">
                           {eligibility.reasons.map((reason, index) => (
-                            <li key={index}>{reason}</li>
+                            <li key={index} className="flex items-center space-x-2">
+                              <span className="w-1.5 h-1.5 bg-current rounded-full"></span>
+                              <span>{reason}</span>
+                            </li>
                           ))}
                         </ul>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Purpose */}
+          <div>
+            <div className="flex items-center space-x-2 mb-2">
+              <DocumentTextIcon className="w-4 h-4 text-gray-500" />
+              <label className="text-sm font-medium text-gray-700">
+                Objectif du prêt *
+              </label>
+            </div>
+            <textarea
+              value={formData.purpose}
+              onChange={(e) => handleInputChange('purpose', e.target.value)}
+              rows={4}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 resize-none"
+              placeholder="Décrivez l'utilisation prévue des fonds (ex: achat de semences, équipement agricole, frais de récolte...)"
+            />
+            {errors.purpose && (
+              <p className="mt-2 text-sm text-red-600 flex items-center space-x-1">
+                <ExclamationTriangleIcon className="w-4 h-4" />
+                <span>{errors.purpose}</span>
+              </p>
             )}
+          </div>
 
-            {/* Purpose */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Objectif du prêt
+          {/* Repayment Period */}
+          <div>
+            <div className="flex items-center space-x-2 mb-2">
+              <CalendarDaysIcon className="w-4 h-4 text-gray-500" />
+              <label className="text-sm font-medium text-gray-700">
+                Période de remboursement *
               </label>
-              <textarea
-                value={formData.purpose}
-                onChange={(e) => handleInputChange('purpose', e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Décrivez l'utilisation prévue des fonds..."
-              />
-              {errors.purpose && (
-                <p className="mt-1 text-sm text-red-600">{errors.purpose}</p>
-              )}
             </div>
+            <select
+              value={formData.repaymentPeriodMonths}
+              onChange={(e) => handleInputChange('repaymentPeriodMonths', e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
+            >
+              <option value="3">📅 3 mois</option>
+              <option value="6">📅 6 mois (recommandé)</option>
+              <option value="9">📅 9 mois</option>
+              <option value="12">📅 12 mois</option>
+            </select>
+            {errors.repaymentPeriodMonths && (
+              <p className="mt-2 text-sm text-red-600 flex items-center space-x-1">
+                <ExclamationTriangleIcon className="w-4 h-4" />
+                <span>{errors.repaymentPeriodMonths}</span>
+              </p>
+            )}
+          </div>
 
-            {/* Repayment Period */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Période de remboursement (mois)
-              </label>
-              <select
-                value={formData.repaymentPeriodMonths}
-                onChange={(e) => handleInputChange('repaymentPeriodMonths', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="3">3 mois</option>
-                <option value="6">6 mois</option>
-                <option value="9">9 mois</option>
-                <option value="12">12 mois</option>
-              </select>
-              {errors.repaymentPeriodMonths && (
-                <p className="mt-1 text-sm text-red-600">{errors.repaymentPeriodMonths}</p>
-              )}
-            </div>
-
-            {/* Submit Error */}
-            {errors.submit && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-red-800">{errors.submit}</p>
+          {/* Submit Error */}
+          {errors.submit && (
+            <div className="p-4 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl">
+              <div className="flex items-center space-x-3">
+                <ExclamationTriangleIcon className="w-5 h-5 text-red-600 flex-shrink-0" />
+                <p className="text-red-800 font-medium">{errors.submit}</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Action Buttons */}
-            <div className="flex space-x-3 pt-4">
+          {/* Action Buttons */}
+          <div className="pt-6 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 type="submit"
                 disabled={loading || !eligibility?.isEligible || portfolio.tokens.length === 0}
-                className="flex-1"
+                className="flex-1 group bg-gradient-to-r from-secondary-500 to-secondary-600 hover:from-secondary-600 hover:to-secondary-700"
               >
-                {loading ? 'Soumission...' : 'Soumettre la demande'}
+                {loading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Soumission...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <CheckCircleIconSolid className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                    <span>Soumettre la demande</span>
+                  </div>
+                )}
               </Button>
               {onCancel && (
                 <Button
@@ -311,13 +383,14 @@ export function LoanRequestForm({ onSuccess, onCancel }: LoanRequestFormProps) {
                   variant="outline"
                   onClick={onCancel}
                   disabled={loading}
+                  className="sm:w-auto"
                 >
                   Annuler
                 </Button>
               )}
             </div>
-          </form>
-        </CardContent>
+          </div>
+        </form>
       </Card>
     </div>
   )

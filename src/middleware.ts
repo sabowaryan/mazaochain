@@ -183,6 +183,26 @@ async function handleAuthentication(request: NextRequest, response: NextResponse
 }
 
 /**
+ * Get role-specific dashboard path
+ */
+function getRoleDashboardPath(role: UserRole, locale: string): string {
+  const basePath = `/${locale}/dashboard`;
+  
+  switch (role) {
+    case 'agriculteur':
+      return `${basePath}/farmer`;
+    case 'cooperative':
+      return `${basePath}/cooperative`;
+    case 'preteur':
+      return `${basePath}/lender`;
+    case 'admin':
+      return `/${locale}/admin`;
+    default:
+      return basePath;
+  }
+}
+
+/**
  * Main middleware function
  * Handles authentication, authorization, and internationalization
  */
@@ -232,10 +252,24 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
+    // Handle generic /dashboard route - redirect to role-specific dashboard
+    if (cleanPathname === '/dashboard' && authResult.role) {
+      const roleDashboard = getRoleDashboardPath(authResult.role, locale);
+      console.log(`🎯 Redirecting from generic dashboard to role-specific: ${roleDashboard}`);
+      return NextResponse.redirect(new URL(roleDashboard, request.url));
+    }
+
     // Check role-based access
     const requiredRole = getRequiredRole(cleanPathname);
     if (requiredRole && !hasPermission(authResult.role, requiredRole)) {
       console.log(`❌ Insufficient permissions for ${cleanPathname}. Required: ${requiredRole}, User: ${authResult.role}`);
+      
+      // If user is trying to access wrong dashboard, redirect to their correct one
+      if (cleanPathname.startsWith('/dashboard/') && authResult.role) {
+        const correctDashboard = getRoleDashboardPath(authResult.role, locale);
+        console.log(`🔄 Redirecting to correct dashboard: ${correctDashboard}`);
+        return NextResponse.redirect(new URL(correctDashboard, request.url));
+      }
       
       const unauthorizedUrl = createRedirectUrl(
         `${request.nextUrl.origin}/${locale}/unauthorized`,

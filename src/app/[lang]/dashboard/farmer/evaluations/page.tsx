@@ -1,17 +1,33 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslations } from '@/components/TranslationProvider';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { CropEvaluationForm } from '@/components/crop-evaluation/CropEvaluationForm';
 import { EvaluationHistory } from '@/components/crop-evaluation/EvaluationHistory';
+import { ModernPageHeader } from '@/components/ui/ModernPageHeader';
+import { StatCard } from '@/components/ui/StatCard';
+import {
+  ClipboardDocumentListIcon,
+  PlusIcon,
+  ChartBarIcon,
+  CurrencyDollarIcon,
+  ClockIcon,
+  SparklesIcon,
+  EyeIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
+import {
+  ClipboardDocumentListIcon as ClipboardDocumentListIconSolid,
+  CheckCircleIcon as CheckCircleIconSolid,
+  ClockIcon as ClockIconSolid,
+  CurrencyDollarIcon as CurrencyDollarIconSolid
+} from '@heroicons/react/24/solid';
 
 export default function FarmerEvaluationsPage() {
   const { user } = useAuth();
-  const t = useTranslations('farmer');
   const [showForm, setShowForm] = useState(false);
 
   if (!user) {
@@ -23,87 +39,152 @@ export default function FarmerEvaluationsPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Évaluations de cultures
-        </h1>
-        <p className="text-gray-600">
-          Gérez vos évaluations de cultures et suivez leur statut
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Nouvelle évaluation */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Nouvelle évaluation</h3>
-            <Button
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-screen-7xl mx-auto">
+        {/* En-tête moderne */}
+        <ModernPageHeader
+          title="Évaluations de cultures"
+          subtitle="Gérez vos évaluations de cultures et suivez leur statut"
+          icon={<ClipboardDocumentListIconSolid />}
+          subtitleIcon={<ChartBarIcon />}
+          gradient="emerald"
+          actions={
+            <button
               onClick={() => setShowForm(!showForm)}
-              variant={showForm ? "outline" : "default"}
+              className="group flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl hover:from-primary-600 hover:to-primary-700 transition-all duration-300 shadow-lg hover:shadow-xl"
             >
-              {showForm ? 'Annuler' : 'Nouvelle évaluation'}
-            </Button>
-          </div>
-          
-          {showForm ? (
-            <CropEvaluationForm 
-              onSuccess={() => {
-                setShowForm(false);
-                // Recharger l'historique
-                window.location.reload();
-              }}
-              onCancel={() => setShowForm(false)}
-            />
-          ) : (
-            <div className="text-center py-8">
-              <div className="mb-4">
-                <svg className="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </div>
-              <p className="text-gray-500 mb-4">
-                Soumettez une nouvelle évaluation de vos cultures
-              </p>
-              <Button onClick={() => setShowForm(true)}>
-                Commencer une évaluation
-              </Button>
-            </div>
-          )}
-        </Card>
+              {showForm ? (
+                <>
+                  <XMarkIcon className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  <span className="font-medium">Annuler</span>
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  <span className="font-medium">Nouvelle évaluation</span>
+                </>
+              )}
+            </button>
+          }
+        />
 
-        {/* Historique */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Historique des évaluations</h3>
-          <EvaluationHistory 
-            farmerId={user.id}
-            onViewDetails={(evaluation) => {
-              // Ouvrir les détails de l'évaluation
-              console.log('Voir détails:', evaluation);
-            }}
+        {/* Statistiques rapides en haut */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 mb-8 lg:mb-12">
+          <StatCard
+            title="Approuvées"
+            value={2}
+            subtitle="Évaluations validées"
+            icon={<CheckCircleIconSolid className="w-6 h-6 text-white" />}
+            accentIcon={<SparklesIcon className="w-5 h-5" />}
+            gradient="emerald"
           />
-        </Card>
-      </div>
 
-      {/* Statistiques rapides */}
-      <div className="mt-8">
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Résumé des évaluations</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-success-50 rounded-lg">
-              <div className="text-2xl font-bold text-success-600">2</div>
-              <div className="text-sm text-success-700">Approuvées</div>
-            </div>
-            <div className="text-center p-4 bg-warning-50 rounded-lg">
-              <div className="text-2xl font-bold text-warning-600">1</div>
-              <div className="text-sm text-warning-700">En attente</div>
-            </div>
-            <div className="text-center p-4 bg-primary-50 rounded-lg">
-              <div className="text-2xl font-bold text-primary-600">$17,500</div>
-              <div className="text-sm text-primary-700">Valeur totale</div>
-            </div>
+          <StatCard
+            title="En attente"
+            value={1}
+            subtitle="En cours de validation"
+            icon={<ClockIconSolid className="w-6 h-6 text-white" />}
+            accentIcon={<ClockIcon className="w-5 h-5" />}
+            gradient="amber"
+          />
+
+          <StatCard
+            title="Valeur totale"
+            value="$17,500"
+            subtitle="Cultures évaluées"
+            icon={<CurrencyDollarIconSolid className="w-6 h-6 text-white" />}
+            accentIcon={<CurrencyDollarIcon className="w-5 h-5" />}
+            gradient="emerald"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
+          {/* Nouvelle évaluation */}
+          <div className="xl:col-span-2">
+            <Card className="p-6 lg:p-8 hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-gradient-to-br from-emerald-500 to-green-600 rounded-lg">
+                    <PlusIcon className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {showForm ? 'Formulaire d\'évaluation' : 'Nouvelle évaluation'}
+                  </h3>
+                </div>
+                <Button
+                  onClick={() => setShowForm(!showForm)}
+                  variant={showForm ? "outline" : "default"}
+                  className="group"
+                >
+                  {showForm ? (
+                    <>
+                      <XMarkIcon className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                      Annuler
+                    </>
+                  ) : (
+                    <>
+                      <PlusIcon className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                      Nouvelle évaluation
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {showForm ? (
+                <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border border-gray-200">
+                  <CropEvaluationForm 
+                    onSuccess={() => {
+                      setShowForm(false);
+                      // Recharger l'historique
+                      window.location.reload();
+                    }}
+                    onCancel={() => setShowForm(false)}
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="mb-6">
+                    <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <ClipboardDocumentListIcon className="w-8 h-8 text-emerald-600" />
+                    </div>
+                  </div>
+                  <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                    Prêt à évaluer vos cultures ?
+                  </h4>
+                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                    Soumettez une nouvelle évaluation de vos cultures pour obtenir une estimation de leur valeur et débloquer des opportunités de financement.
+                  </p>
+                  <Button 
+                    onClick={() => setShowForm(true)}
+                    className="group bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700"
+                  >
+                    <PlusIcon className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-200" />
+                    Commencer une évaluation
+                  </Button>
+                </div>
+              )}
+            </Card>
           </div>
-        </Card>
+
+          {/* Historique */}
+          <div className="xl:col-span-1">
+            <Card className="p-6 hover:shadow-xl transition-all duration-300 h-full">
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-2 bg-gradient-to-br from-secondary-500 to-secondary-600 rounded-lg">
+                  <EyeIcon className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">Historique des évaluations</h3>
+              </div>
+              <EvaluationHistory 
+                farmerId={user.id}
+                onViewDetails={(evaluation) => {
+                  // Ouvrir les détails de l'évaluation
+                  console.log('Voir détails:', evaluation);
+                }}
+              />
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

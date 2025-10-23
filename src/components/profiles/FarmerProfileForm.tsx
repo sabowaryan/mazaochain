@@ -1,12 +1,25 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useAuth } from '@/hooks/useAuth'
 import { createClient } from '@/lib/supabase/client'
+import {
+  UserIcon,
+  MapPinIcon,
+  HomeIcon,
+  SparklesIcon,
+  CalendarDaysIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  ChartBarIcon
+} from '@heroicons/react/24/outline'
+import {
+  CheckCircleIcon as CheckCircleIconSolid
+} from '@heroicons/react/24/solid'
 
 interface FarmerProfileData {
   nom: string
@@ -29,6 +42,8 @@ interface FormErrors {
 
 export function FarmerProfileForm() {
   const router = useRouter()
+  const params = useParams()
+  const lang = params?.lang as string || 'fr'
   const { user, profile } = useAuth()
   const [formData, setFormData] = useState<FarmerProfileData>({
     nom: '',
@@ -154,7 +169,7 @@ export function FarmerProfileForm() {
       }
 
       // Redirect to dashboard
-      router.push('/dashboard/farmer')
+      router.push(`/${lang}/dashboard/farmer`)
     } catch (error) {
       setErrors({ general: 'Une erreur inattendue s\'est produite' })
     } finally {
@@ -188,111 +203,182 @@ export function FarmerProfileForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle>Profil Agriculteur</CardTitle>
-          <CardDescription>
-            {existingProfile ? 'Modifier votre profil' : 'Complétez votre profil pour commencer'}
-            {!profile?.is_validated && (
-              <div className="mt-2 p-2 bg-secondary-50 border border-secondary-200 rounded text-sm text-secondary-800">
+    <div className="space-y-6">
+      {/* En-tête du formulaire */}
+      <div className="flex items-center space-x-3 mb-6">
+        <div className="p-2 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg">
+          <UserIcon className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">
+            {existingProfile ? 'Modifier votre profil' : 'Complétez votre profil'}
+          </h3>
+          <p className="text-sm text-gray-600">
+            Renseignez vos informations agricoles
+          </p>
+        </div>
+      </div>
+
+      {/* Alerte de validation */}
+      {!profile?.is_validated && (
+        <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+          <div className="flex items-center space-x-3">
+            <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <h4 className="text-sm font-medium text-amber-800">Validation requise</h4>
+              <p className="text-sm text-amber-700 mt-1">
                 Votre profil doit être validé par une coopérative avant de pouvoir accéder aux fonctionnalités de prêt.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Formulaire principal */}
+      <Card className="p-6 lg:p-8 hover:shadow-xl transition-all duration-300">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {errors.general && (
+            <div className="p-4 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl">
+              <div className="flex items-center space-x-3">
+                <ExclamationTriangleIcon className="w-5 h-5 text-red-600 flex-shrink-0" />
+                <p className="text-sm text-red-800">{errors.general}</p>
               </div>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {errors.general && (
-              <div className="p-3 text-sm text-secondary-700 bg-secondary-50 border border-secondary-200 rounded-md">
-                {errors.general}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Nom complet */}
+            <div className="md:col-span-2">
+              <div className="flex items-center space-x-2 mb-2">
+                <UserIcon className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-medium text-gray-700">Nom complet *</label>
               </div>
-            )}
+              <Input
+                type="text"
+                value={formData.nom}
+                onChange={handleInputChange('nom')}
+                error={errors.nom}
+                placeholder="Votre nom complet"
+                className="w-full"
+                required
+              />
+            </div>
 
-            <Input
-              label="Nom complet"
-              type="text"
-              value={formData.nom}
-              onChange={handleInputChange('nom')}
-              error={errors.nom}
-              placeholder="Votre nom complet"
-              required
-            />
+            {/* Superficie */}
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <HomeIcon className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-medium text-gray-700">Superficie (hectares) *</label>
+              </div>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                value={formData.superficie}
+                onChange={handleInputChange('superficie')}
+                error={errors.superficie}
+                placeholder="Ex: 2.5"
+                required
+              />
+            </div>
 
-            <Input
-              label="Superficie (hectares)"
-              type="number"
-              step="0.1"
-              min="0"
-              value={formData.superficie}
-              onChange={handleInputChange('superficie')}
-              error={errors.superficie}
-              placeholder="Ex: 2.5"
-              required
-            />
+            {/* Localisation */}
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <MapPinIcon className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-medium text-gray-700">Localisation *</label>
+              </div>
+              <Input
+                type="text"
+                value={formData.localisation}
+                onChange={handleInputChange('localisation')}
+                error={errors.localisation}
+                placeholder="Village, Territoire, Province"
+                required
+              />
+            </div>
 
-            <Input
-              label="Localisation"
-              type="text"
-              value={formData.localisation}
-              onChange={handleInputChange('localisation')}
-              error={errors.localisation}
-              placeholder="Village, Territoire, Province"
-              required
-            />
-
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Type de culture *
-              </label>
+            {/* Type de culture */}
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <SparklesIcon className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-medium text-gray-700">Type de culture *</label>
+              </div>
               <select
                 value={formData.cropType}
                 onChange={(e) => setFormData(prev => ({ ...prev, cropType: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
                 required
               >
                 <option value="">Sélectionnez un type de culture</option>
-                <option value="manioc">Manioc</option>
-                <option value="cafe">Café</option>
+                <option value="manioc">🌿 Manioc</option>
+                <option value="cafe">☕ Café</option>
               </select>
               {errors.cropType && (
-                <p className="text-sm text-red-600">{errors.cropType}</p>
+                <p className="text-sm text-red-600 mt-1 flex items-center space-x-1">
+                  <ExclamationTriangleIcon className="w-4 h-4" />
+                  <span>{errors.cropType}</span>
+                </p>
               )}
             </div>
 
-            <Input
-              label="Rendement historique (kg/hectare)"
-              type="number"
-              step="0.1"
-              min="0"
-              value={formData.rendementHistorique}
-              onChange={handleInputChange('rendementHistorique')}
-              error={errors.rendementHistorique}
-              placeholder="Ex: 1500"
-              required
-            />
+            {/* Rendement historique */}
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <ChartBarIcon className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-medium text-gray-700">Rendement historique (kg/hectare) *</label>
+              </div>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                value={formData.rendementHistorique}
+                onChange={handleInputChange('rendementHistorique')}
+                error={errors.rendementHistorique}
+                placeholder="Ex: 1500"
+                required
+              />
+            </div>
 
-            <Input
-              label="Expérience en agriculture (années)"
-              type="number"
-              min="0"
-              value={formData.experienceAnnees}
-              onChange={handleInputChange('experienceAnnees')}
-              error={errors.experienceAnnees}
-              placeholder="Ex: 5"
-              required
-            />
+            {/* Expérience */}
+            <div>
+              <div className="flex items-center space-x-2 mb-2">
+                <CalendarDaysIcon className="w-4 h-4 text-gray-500" />
+                <label className="text-sm font-medium text-gray-700">Expérience en agriculture (années) *</label>
+              </div>
+              <Input
+                type="number"
+                min="0"
+                value={formData.experienceAnnees}
+                onChange={handleInputChange('experienceAnnees')}
+                error={errors.experienceAnnees}
+                placeholder="Ex: 5"
+                required
+              />
+            </div>
+          </div>
 
+          {/* Bouton de soumission */}
+          <div className="pt-6 border-t border-gray-200">
             <Button
               type="submit"
-              className="w-full"
+              className="w-full group bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700"
               loading={loading}
               disabled={loading}
             >
-              {existingProfile ? 'Mettre à jour le profil' : 'Créer le profil'}
+              {loading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Sauvegarde...</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <CheckCircleIconSolid className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" />
+                  <span>{existingProfile ? 'Mettre à jour le profil' : 'Créer le profil'}</span>
+                </div>
+              )}
             </Button>
-          </form>
-        </CardContent>
+          </div>
+        </form>
       </Card>
     </div>
   )

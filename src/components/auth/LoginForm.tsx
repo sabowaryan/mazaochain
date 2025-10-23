@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,8 +13,8 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { clientAuth } from "@/lib/supabase/client-auth";
-import { getRedirectInfo, clearRedirectInfo } from "@/lib/auth/redirect-storage";
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { usePostLoginRedirect } from "@/hooks/usePostLoginRedirect";
+import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 interface FormData {
   email: string;
@@ -29,12 +29,14 @@ interface FormErrors {
 
 export function LoginForm() {
   const router = useRouter();
+  const { redirectAfterLogin } = usePostLoginRedirect();
   const [formData, setFormData] = useState<FormData>({
     email: "",
     password: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -64,23 +66,32 @@ export function LoginForm() {
     setErrors({});
 
     try {
-      const { data, error } = await clientAuth.signIn(
+      // Use the enhanced signIn method that also fetches the profile
+      const { data, error, profile } = await clientAuth.signInWithProfile(
         formData.email,
         formData.password
       );
 
       if (error) {
         setErrors({ general: "Email ou mot de passe incorrect" });
+        setLoading(false);
         return;
       }
 
-      if (data.user) {
-        // Redirect to dashboard - the middleware will handle role-based routing
-        router.push("/dashboard");
+      if (data.user && profile) {
+        // Show redirecting state
+        setIsRedirecting(true);
+        // Use the hook for clean role-based redirection
+        redirectAfterLogin(profile.role);
+        // Note: We don't set loading to false here to maintain the loading state
+        // during the redirect process for better UX
+      } else {
+        setErrors({ general: "Impossible de récupérer les informations du profil" });
+        setLoading(false);
       }
     } catch (error) {
+      console.error('Login error:', error);
       setErrors({ general: "Une erreur inattendue s'est produite" });
-    } finally {
       setLoading(false);
     }
   };
@@ -160,10 +171,15 @@ export function LoginForm() {
             <Button
               type="submit"
               className="w-full h-12 text-base font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-200"
-              loading={loading}
-              disabled={loading}
+              loading={loading || isRedirecting}
+              disabled={loading || isRedirecting}
             >
-              {loading ? "Connexion en cours..." : "Se connecter"}
+              {isRedirecting 
+                ? "Redirection en cours..." 
+                : loading 
+                  ? "Connexion en cours..." 
+                  : "Se connecter"
+              }
             </Button>
 
             <div className="relative">

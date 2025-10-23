@@ -48,7 +48,7 @@ export function useWallet(): UseWalletReturn {
 
   const { user } = useAuth();
 
-  // Load wallet service dynamically
+  // Load wallet service dynamically (only once)
   useEffect(() => {
     if (typeof window !== 'undefined' && !walletService) {
       import("@/lib/wallet/wallet-service-factory").then(async (module) => {
@@ -59,7 +59,7 @@ export function useWallet(): UseWalletReturn {
         setError('Failed to load wallet service');
       });
     }
-  }, [walletService]);
+  }, []); // Empty deps - only run once
 
   // Load balances function
   const loadBalances = useCallback(async (accountId?: string) => {
@@ -96,14 +96,19 @@ export function useWallet(): UseWalletReturn {
     }
   }, [walletService]);
 
-  // Initialize wallet service and restore existing session
+  // Initialize wallet service and restore existing session (only once per service instance)
   useEffect(() => {
+    if (!walletService) return;
+
+    let mounted = true;
+    
     const initializeWallet = async () => {
-      if (!walletService) return;
-      
       setIsRestoring(true);
       try {
+        // Initialize will return immediately if already initialized (singleton pattern)
         await walletService.initialize();
+
+        if (!mounted) return;
 
         // Note: Session event listeners are set up in the service itself
         // The service handles accountsChanged, chainChanged, session_update, and session_delete events
@@ -120,6 +125,8 @@ export function useWallet(): UseWalletReturn {
           await loadBalances(existingConnection.accountId);
         }
       } catch (err) {
+        if (!mounted) return;
+        
         console.error("Failed to initialize wallet:", err);
         
         if (err instanceof WalletError) {
@@ -130,16 +137,22 @@ export function useWallet(): UseWalletReturn {
           setErrorCode(WalletErrorCode.INITIALIZATION_FAILED);
         }
       } finally {
-        setIsRestoring(false);
+        if (mounted) {
+          setIsRestoring(false);
+        }
       }
     };
 
     initializeWallet();
+
+    return () => {
+      mounted = false;
+    };
   }, [walletService, loadBalances]);
 
-  // Poll wallet service state to detect connection changes
+  // Poll wallet service state to detect connection changes (reduced frequency)
   useEffect(() => {
-    if (!walletService) return;
+    if (!walletService || isRestoring) return;
     
     const pollInterval = setInterval(() => {
       const currentState = walletService.getConnectionState();
@@ -158,10 +171,10 @@ export function useWallet(): UseWalletReturn {
           setBalances(null);
         }
       }
-    }, 1000); // Poll every second
+    }, 2000); // Poll every 2 seconds (reduced from 1s)
 
     return () => clearInterval(pollInterval);
-  }, [walletService, isConnected, loadBalances]);
+  }, [walletService, isConnected, isRestoring, loadBalances]);
 
   const updateUserWalletAddress = useCallback(
     async (walletAddress: string | null) => {

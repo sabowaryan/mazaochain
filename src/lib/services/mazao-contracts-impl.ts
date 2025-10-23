@@ -44,13 +44,11 @@ export interface TokenHolding {
 
 export class MazaoContractsServiceImpl {
   private client: any;
-  private operatorAccountId: any;
-  private operatorPrivateKey: any;
   private tokenFactoryId!: string;
   private loanManagerId!: string;
 
   constructor() {
-    // Lazy initialization
+    // Lazy initialization - client will be created in read-only mode
   }
 
   private async initializeClient() {
@@ -61,30 +59,21 @@ export class MazaoContractsServiceImpl {
           throw new Error('Hedera SDK not available during server-side rendering');
         }
 
+        // SECURITY: Private keys should NEVER be used in client-side code
+        // This service should only be used for READ operations from the client
+        // WRITE operations (transactions) should go through the wallet or backend API
+        
         // Load polyfills first
         await import('@/lib/hedera-polyfills');
         
         // Dynamic import to avoid build-time issues
-        const { Client, AccountId, PrivateKey } = await import("@hashgraph/sdk");
+        const { Client } = await import("@hashgraph/sdk");
         
-        // Initialize Hedera client
+        // Initialize Hedera client WITHOUT operator (read-only mode)
         this.client =
           env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
             ? Client.forMainnet()
             : Client.forTestnet();
-
-        // Set operator account
-        this.operatorAccountId = AccountId.fromString(
-          env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID
-        );
-        this.operatorPrivateKey = PrivateKey.fromStringECDSA(
-          env.HEDERA_PRIVATE_KEY
-        );
-
-        this.client.setOperator(
-          this.operatorAccountId,
-          this.operatorPrivateKey
-        );
 
         // Set contract IDs from deployed contracts
         this.tokenFactoryId =
@@ -92,9 +81,8 @@ export class MazaoContractsServiceImpl {
         this.loanManagerId =
           env.NEXT_PUBLIC_LOAN_MANAGER_CONTRACT_ID || "0.0.6913794";
 
-        console.log("MazaoContracts initialized:", {
+        console.log("MazaoContracts initialized (read-only mode):", {
           network: env.NEXT_PUBLIC_HEDERA_NETWORK,
-          account: this.operatorAccountId.toString(),
           tokenFactory: this.tokenFactoryId,
           loanManager: this.loanManagerId,
         });

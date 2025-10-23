@@ -1,4 +1,5 @@
 import { createClient } from './client'
+import { getUserProfile } from '../auth/role-redirect'
 
 // Client-side only auth functions
 export const clientAuth = {
@@ -27,6 +28,31 @@ export const clientAuth = {
     })
     
     return { data, error }
+  },
+
+  async signInWithProfile(email: string, password: string) {
+    const supabase = createClient()
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+    
+    if (error || !data.user) {
+      return { data, error, profile: null }
+    }
+
+    // Get user profile with role
+    try {
+      const profile = await getUserProfile(supabase, data.user.id)
+      return { data, error: null, profile }
+    } catch (profileError) {
+      return { 
+        data, 
+        error: { message: 'Profile not found' }, 
+        profile: null 
+      }
+    }
   },
 
   async signOut() {

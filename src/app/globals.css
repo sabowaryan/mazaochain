@@ -1170,4 +1170,124 @@ Offline Indicator positioning fix */
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}/* Animati
+ons personnalisées pour les pages farmer */
+@keyframes farmer-card-hover {
+  0% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  100% {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+}
+
+@keyframes farmer-icon-bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes farmer-gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Classes utilitaires pour les pages farmer */
+.farmer-stat-card {
+  animation: farmer-card-hover 0.3s ease-in-out;
+}
+
+.farmer-stat-card:hover .farmer-icon {
+  animation: farmer-icon-bounce 0.6s ease-in-out;
+}
+
+.farmer-gradient-bg {
+  background: linear-gradient(-45deg, #10b981, #059669, #047857, #065f46);
+  background-size: 400% 400%;
+  animation: farmer-gradient-shift 15s ease infinite;
+}
+
+.farmer-card-glass {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Responsive design amélioré */
+@media (max-width: 640px) {
+  .farmer-stat-card {
+    padding: 1rem;
+  }
+  
+  .farmer-stat-card h3 {
+    font-size: 1.5rem;
+  }
+}
+
+/* Animations pour les boutons d'action */
+.farmer-action-button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.farmer-action-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Styles pour les cartes d'information */
+.farmer-info-card {
+  transition: all 0.2s ease-in-out;
+  border-left: 4px solid transparent;
+}
+
+.farmer-info-card:hover {
+  border-left-color: #10b981;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
+/* Animation de chargement personnalisée */
+.farmer-loading-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+/* Styles pour les badges de statut */
+.farmer-status-badge {
+  position: relative;
+  overflow: hidden;
+}
+
+.farmer-status-badge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s;
+}
+
+.farmer-status-badge:hover::before {
+  left: 100%;
 }

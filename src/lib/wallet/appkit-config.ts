@@ -16,13 +16,15 @@ export interface AppKitConfig {
 }
 
 /**
- * Initialize Reown AppKit with Hedera adapters and custom branding
+ * Initialize Reown AppKit with Hedera adapters and HashPack-focused configuration
  * 
  * This function configures AppKit with:
  * - Native and EVM Hedera adapters
+ * - HashPack as the primary and preferred wallet
  * - MazaoChain branding and theme
  * - Disabled analytics, email, and social login features
  * - Support for both mainnet and testnet networks
+ * - Custom HashPack wallet configuration for optimal mobile/desktop experience
  * 
  * @param config - Configuration object containing adapters and universalProvider
  * @returns Initialized AppKit instance
@@ -73,12 +75,35 @@ export async function initializeAppKit(config: AppKitConfig) {
     // Application metadata
     metadata,
 
-    // Supported Hedera networks (both native and EVM)
-    networks: [
-      HederaChainDefinition.EVM.Mainnet,
-      HederaChainDefinition.EVM.Testnet,
-      HederaChainDefinition.Native.Mainnet,
-      HederaChainDefinition.Native.Testnet,
+    // Supported Hedera networks - configure based on environment
+    networks: env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet' 
+      ? [
+          HederaChainDefinition.EVM.Mainnet,
+          HederaChainDefinition.Native.Mainnet,
+        ]
+      : [
+          HederaChainDefinition.EVM.Testnet,
+          HederaChainDefinition.Native.Testnet,
+        ],
+
+    // HashPack wallet configuration - force HashPack as the primary wallet
+    includeWalletIds: [
+      "hashpack", // HashPack wallet ID
+      "c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96", // HashPack official ID
+    ],
+
+    // Custom wallet configuration for HashPack
+    customWallets: [
+      {
+        id: "hashpack_custom",
+        name: "HashPack",
+        homepage: "https://hashpack.app/",
+        mobile_link: "hashpack://app",
+        desktop_link: "https://hashpack.app/",
+        webapp_link: "https://hashpack.app/",
+        app_store: "https://apps.apple.com/app/hashpack/id1580324734",
+        play_store: "https://play.google.com/store/apps/details?id=com.hashpack.wallet",
+      }
     ],
 
     // Feature flags - disable unnecessary features
@@ -94,6 +119,7 @@ export async function initializeAppKit(config: AppKitConfig) {
     // MazaoChain branding - custom theme variables
     themeVariables: {
       "--w3m-accent": "#10b981",              // MazaoChain green (emerald-500)
+      "--w3m-border-radius-master": "8px",    // Rounded corners
     },
   });
 }

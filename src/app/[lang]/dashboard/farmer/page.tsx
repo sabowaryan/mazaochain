@@ -4,8 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTranslations } from "@/components/TranslationProvider";
 import { useMazaoContracts } from "@/hooks/useMazaoContracts";
 import { useWallet } from "@/hooks/useWallet";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { apiCache } from "@/lib/utils/api-cache";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
@@ -46,7 +47,7 @@ export default function FarmerDashboard() {
   const params = useParams();
   const router = useRouter();
   const lang = params.lang as string;
-  const { getFarmerTotalBalance, loading: contractsLoading } =
+  const { getFarmerTotalBalance, loading: contractsLoading, isReady: contractsReady } =
     useMazaoContracts();
   const { isConnected } = useWallet();
 
@@ -137,7 +138,7 @@ export default function FarmerDashboard() {
 
         // Charger le solde de tokens MAZAO depuis le contrat avec timeout
         let mazaoBalance = 0;
-        if (profile.wallet_address) {
+        if (profile.wallet_address && contractsReady) {
           try {
             const balancePromise = getFarmerTotalBalance(
               profile.wallet_address
@@ -152,6 +153,8 @@ export default function FarmerDashboard() {
           } catch (error) {
             console.warn("Erreur lors du chargement du solde MAZAO:", error);
           }
+        } else if (profile.wallet_address && !contractsReady) {
+          console.log("⏳ Contracts service not ready yet, skipping MAZAO balance load");
         }
 
         // Calculer les statistiques
@@ -190,7 +193,7 @@ export default function FarmerDashboard() {
     };
 
     loadFarmerData();
-  }, [user?.id, profile]); // Suppression de getFarmerTotalBalance des dépendances
+  }, [user?.id, profile, contractsReady]); // Recharger quand le service devient prêt
 
   if (isLoading || contractsLoading) {
     return (

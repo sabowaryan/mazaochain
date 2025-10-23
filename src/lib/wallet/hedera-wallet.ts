@@ -16,6 +16,8 @@ import type { SessionTypes } from "@walletconnect/types";
 import type { AppKit } from "@reown/appkit";
 import { env } from "@/lib/config/env";
 import { suppressWalletConnectErrors } from "./wallet-error-handler";
+import { debugAddress, isValidForMirrorNode, extractHederaAccountId } from "./address-utils";
+import { cleanInvalidSessions } from "./session-cleaner";
 import {
   WalletConnection,
   WalletSession,
@@ -51,7 +53,7 @@ class HederaWalletService {
 
         // Use SDK wrapper to avoid build-time issues
         const { createClient } = await import("@/lib/hedera/sdk-wrapper");
-        
+
         // Initialize Hedera client
         this.client = await createClient(
           env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet" ? "mainnet" : "testnet"
@@ -62,10 +64,31 @@ class HederaWalletService {
     }
   }
 
+  private initializationPromise: Promise<void> | null = null;
+
   async initialize(): Promise<void> {
+    // If already initialized, return immediately
     if (this.isInitialized) {
       return;
     }
+
+    // If initialization is in progress, wait for it
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    // Start initialization
+    this.initializationPromise = this._doInitialize();
+
+    try {
+      await this.initializationPromise;
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
+  private async _doInitialize(): Promise<void> {
+    console.log("🚀 Initializing wallet service...");
 
     try {
       // Initialize Hedera client first
@@ -109,6 +132,13 @@ class HederaWalletService {
           projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
           metadata,
         })) as unknown as UniversalProvider;
+
+        // Increase max listeners to prevent EventEmitter warnings
+        // This is safe because we're using a singleton pattern
+        const providerWithEmitter = this.hederaProvider as any;
+        if (providerWithEmitter && typeof providerWithEmitter.setMaxListeners === 'function') {
+          providerWithEmitter.setMaxListeners(20);
+        }
       } catch (error) {
         const err = error as { message?: string; code?: string; name?: string };
         const errorMessage = (err?.message || "").toLowerCase();
@@ -177,10 +207,9 @@ class HederaWalletService {
       try {
         this.nativeAdapter = new HederaAdapter({
           projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-          networks: [
-            HederaChainDefinition.Native.Mainnet,
-            HederaChainDefinition.Native.Testnet,
-          ],
+          networks: env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet'
+            ? [HederaChainDefinition.Native.Mainnet]
+            : [HederaChainDefinition.Native.Testnet],
           namespace: hederaNamespace, // 'hedera' as CaipNamespace
         });
       } catch (error) {
@@ -196,10 +225,9 @@ class HederaWalletService {
       try {
         this.evmAdapter = new HederaAdapter({
           projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-          networks: [
-            HederaChainDefinition.EVM.Mainnet,  // Chain ID 295
-            HederaChainDefinition.EVM.Testnet,  // Chain ID 296
-          ],
+          networks: env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet'
+            ? [HederaChainDefinition.EVM.Mainnet]   // Chain ID 295
+            : [HederaChainDefinition.EVM.Testnet],  // Chain ID 296
           namespace: 'eip155',
         });
       } catch (error) {
@@ -301,10 +329,20 @@ class HederaWalletService {
       // Set up session event listeners
       this.setupSessionListeners();
 
+      // Automatically clean invalid sessions on startup
+      console.log("🧹 Checking for invalid sessions on startup...");
+      const cleanupResult = cleanInvalidSessions();
+      if (cleanupResult.cleaned) {
+        console.log("✅ Cleaned invalid session on startup:", cleanupResult.reason);
+      } else {
+        console.log("ℹ️ No invalid sessions found:", cleanupResult.reason);
+      }
+
       // Attempt to restore existing session
       await this.restoreExistingSession();
 
       this.isInitialized = true;
+      console.log("✅ Wallet service initialized successfully");
     } catch (error) {
       // Requirement 14.5: Wrap unknown errors in WalletError with original error
       const walletError =
@@ -315,7 +353,7 @@ class HederaWalletService {
             "Failed to initialize Hedera Wallet service with HederaProvider",
             error
           );
-      console.error("Failed to initialize Hedera Wallet service:", walletError);
+      console.error("❌ Failed to initialize Hedera Wallet service:", walletError);
       throw walletError;
     }
   }
@@ -325,6 +363,7 @@ class HederaWalletService {
    * Listens for account changes, network changes, and session updates
    * Requirements: 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5
    */
+  private lastStateChangeTime = 0;
   private setupSessionListeners(): void {
     if (!this.appKitInstance) return;
 
@@ -334,6 +373,13 @@ class HederaWalletService {
       if (typeof this.appKitInstance.subscribeState === "function") {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.appKitInstance.subscribeState((state: any) => {
+          // Debounce state changes to prevent rapid-fire events (max 1 per 100ms)
+          const now = Date.now();
+          if (now - this.lastStateChangeTime < 100) {
+            return;
+          }
+          this.lastStateChangeTime = now;
+
           this.handleAppKitStateChange(state as Record<string, unknown>);
         });
         console.log("AppKit event listeners configured successfully");
@@ -384,7 +430,16 @@ class HederaWalletService {
    * Called when AppKit state changes (account, network, connection status)
    * Requirement 6.4: Update React context on connection state changes
    */
+  private lastInvalidAddressLog = 0;
+  private invalidAddressCount = 0;
+  private isCleaningSession = false;
+
   private handleAppKitStateChange(state: Record<string, unknown>): void {
+    // Prevent processing during cleanup to avoid infinite loops
+    if (this.isCleaningSession) {
+      return;
+    }
+
     try {
       const stateAny = state as {
         address?: string;
@@ -393,17 +448,69 @@ class HederaWalletService {
         isConnected?: boolean;
       };
 
-      const address = stateAny.address || stateAny.selectedNetworkId;
+      // CRITICAL FIX: Never use selectedNetworkId as address - it's a chain ID!
+      const address = stateAny.address; // Only use actual address
       const chainId = stateAny.chainId || stateAny.selectedNetworkId;
       const isConnected = stateAny.isConnected || !!address;
 
-      console.log("AppKit state changed:", { address, chainId, isConnected });
+      // Debug log to track event firing
+      console.log("📡 handleAppKitStateChange called:", {
+        address: address?.substring(0, 20) + '...',
+        chainId,
+        isConnected,
+        hasConnectionState: !!this.connectionState
+      });
 
-      if (isConnected && address) {
-        // Update connection state with new information
-        const detectedNamespace = chainId?.includes("eip155")
-          ? "eip155"
-          : "hedera";
+      // CRITICAL FIX: Block invalid addresses IMMEDIATELY before any logging or processing
+      if (address && (
+        address === 'eip155:295' ||
+        address === 'eip155:296' ||
+        address === 'hedera:testnet' ||
+        address === 'hedera:mainnet' ||
+        address === chainId ||
+        (address.startsWith('eip155:') && address.length < 20) ||
+        (address.startsWith('hedera:') && !address.match(/hedera:\w+:\d+\.\d+\.\d+$/))
+      )) {
+        // Throttle logging to prevent console spam (log once every 5 seconds)
+        const now = Date.now();
+        if (now - this.lastInvalidAddressLog > 5000) {
+          console.warn("🚫 BLOCKED invalid address from AppKit:", address);
+          this.lastInvalidAddressLog = now;
+          this.invalidAddressCount++;
+
+          // If we've seen this error multiple times, force cleanup once
+          if (this.invalidAddressCount === 3 && !this.isCleaningSession) {
+            console.warn("⚠️ Multiple invalid addresses detected, forcing cleanup");
+            this.clearInvalidSession();
+          }
+        }
+        return; // Exit immediately without any further processing
+      }
+
+      // Only log valid state changes to reduce console noise
+      if (address && address !== chainId) {
+        console.log("AppKit state changed:", { address, chainId, isConnected });
+      }
+
+      // CRITICAL: Validate that we have a real address, not a chain ID
+      if (isConnected && address && address !== chainId) {
+
+        // Additional validation for address format
+        const detectedNamespace = chainId?.includes("eip155") ? "eip155" : "hedera";
+
+        // For Hedera namespace, ensure proper account ID format
+        if (detectedNamespace === "hedera" && !address.match(/^\d+\.\d+\.\d+$/)) {
+          console.warn("🚫 Invalid Hedera account ID format from AppKit:", address);
+          this.clearInvalidSession();
+          return;
+        }
+
+        // For EVM namespace, ensure proper address format
+        if (detectedNamespace === "eip155" && !address.match(/^0x[a-fA-F0-9]{40}$/)) {
+          console.warn("🚫 Invalid EVM address format from AppKit:", address);
+          this.clearInvalidSession();
+          return;
+        }
 
         const newConnectionState: WalletConnection = {
           accountId: address,
@@ -419,9 +526,10 @@ class HederaWalletService {
           this.connectionState.accountId !== newConnectionState.accountId ||
           this.connectionState.chainId !== newConnectionState.chainId
         ) {
+          console.log("✅ Valid address - updating connection state:", newConnectionState);
           this.connectionState = newConnectionState;
           this.saveSession();
-          console.log("Connection state updated from AppKit:", this.connectionState);
+          debugAddress(this.connectionState.accountId, "Valid AppKit State");
         }
       } else if (!isConnected && this.connectionState) {
         // Handle disconnection (Requirement 6.3)
@@ -626,6 +734,85 @@ class HederaWalletService {
   }
 
   /**
+   * Clear invalid sessions and reset connection state
+   */
+  private clearInvalidSession(): void {
+    // Prevent re-entry during cleanup
+    if (this.isCleaningSession) {
+      return;
+    }
+
+    this.isCleaningSession = true;
+    console.log("🧹 Clearing invalid session and resetting connection state");
+
+    // Clear state first to prevent further processing
+    this.connectionState = null;
+    this.clearSavedSession();
+
+    // Clear WalletConnect storage directly (without triggering disconnect events)
+    this.clearWalletConnectStorage();
+
+    // Reset counters
+    this.invalidAddressCount = 0;
+    this.lastInvalidAddressLog = 0;
+
+    // Only disconnect from AppKit if absolutely necessary
+    // This is commented out to prevent triggering new state change events
+    // The storage cleanup above should be sufficient
+    /*
+    if (this.appKitInstance) {
+      try {
+        this.appKitInstance.disconnect().catch(() => {});
+        this.appKitInstance.close().catch(() => {});
+      } catch (error) {
+        console.warn("Error during AppKit cleanup:", error);
+      }
+    }
+    */
+
+    // Reset flag after a short delay to allow cleanup to complete
+    setTimeout(() => {
+      this.isCleaningSession = false;
+    }, 2000);
+  }
+
+  /**
+   * Clear WalletConnect storage to prevent session restoration
+   */
+  private clearWalletConnectStorage(): void {
+    try {
+      const wcKeys = [
+        'wc@2:client:0.3//session',
+        'wc@2:core:0.3//keychain',
+        'wc@2:core:0.3//messages',
+        'wc@2:core:0.3//subscription',
+        'wc@2:core:0.3//history',
+        'wc@2:core:0.3//expirer',
+        'wc@2:universal_provider:/optionalNamespaces',
+        'wc@2:universal_provider:/namespaces',
+        'wc@2:universal_provider:/sessionProperties'
+      ];
+
+      wcKeys.forEach(key => {
+        if (localStorage.getItem(key)) {
+          localStorage.removeItem(key);
+          console.log(`Cleared WalletConnect key: ${key}`);
+        }
+      });
+
+      // Clear any AppKit specific storage
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('appkit') || key.startsWith('reown')) {
+          localStorage.removeItem(key);
+          console.log(`Cleared AppKit key: ${key}`);
+        }
+      });
+    } catch (error) {
+      console.warn("Error clearing WalletConnect storage:", error);
+    }
+  }
+
+  /**
    * Restore existing session on startup
    * AppKit handles session persistence automatically via WalletConnect
    */
@@ -642,7 +829,8 @@ class HederaWalletService {
         isConnected?: boolean;
       };
 
-      const address = stateAny.address || stateAny.selectedNetworkId;
+      // CRITICAL FIX: Never use selectedNetworkId as address - it's a chain ID!
+      const address = stateAny.address; // Only use actual address
       const isConnected = stateAny.isConnected || !!address;
 
       if (isConnected && address) {
@@ -684,8 +872,57 @@ class HederaWalletService {
           ? "eip155"
           : "hedera";
 
+        console.log("AppKit fallback state:", { address, chainId, detectedNamespace });
+        debugAddress(address, "AppKit Fallback Address");
+
+        // Validate that we have a proper address, not just a chain ID
+        if (!address ||
+          address === chainId ||
+          address.startsWith('eip155:') ||
+          address.startsWith('hedera:') ||
+          address === 'eip155:295' ||
+          address === 'eip155:296' ||
+          address === 'hedera:testnet' ||
+          address === 'hedera:mainnet') {
+          console.warn("🚫 Invalid or incomplete address from AppKit state. Force clearing session:", address);
+          debugAddress(address, "Invalid Restore Address");
+
+          // Force clear and prevent restoration
+          this.clearInvalidSession();
+
+          // Also force AppKit to reset its state
+          if (this.appKitInstance) {
+            try {
+              // Reset AppKit to clean state
+              this.appKitInstance.disconnect();
+            } catch (error) {
+              console.warn("Error resetting AppKit state:", error);
+            }
+          }
+
+          return null;
+        }
+
+        // For EVM namespace, we need to convert the address to Hedera format
+        // The address from AppKit state might be in EVM format (0x...) or chain format (eip155:295)
+        let accountId = address;
+
+        if (detectedNamespace === "eip155") {
+          // If we have an EVM address, we need to get the corresponding Hedera account
+          // For now, we'll skip restoration for EVM addresses since we can't reliably convert them
+          // The user will need to reconnect their wallet
+          console.warn("Cannot restore EVM session without proper Hedera account mapping. User needs to reconnect.");
+          return null;
+        }
+
+        // Additional validation for Hedera addresses
+        if (detectedNamespace === "hedera" && !accountId.match(/^\d+\.\d+\.\d+$/)) {
+          console.warn("Invalid Hedera account ID format. Skipping session restoration:", accountId);
+          return null;
+        }
+
         this.connectionState = {
-          accountId: address,
+          accountId,
           network: chainId?.includes("mainnet") ? "mainnet" : "testnet",
           isConnected: true,
           namespace: detectedNamespace,
@@ -693,6 +930,7 @@ class HederaWalletService {
         };
 
         console.log("Restored session from AppKit:", this.connectionState);
+        debugAddress(this.connectionState.accountId, "Restored Session");
         return this.connectionState;
       }
 
@@ -848,16 +1086,23 @@ class HederaWalletService {
       // AppKit's built-in session persistence will handle reconnection on page reload
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(
-            new WalletError(
-              WalletErrorCode.CONNECTION_TIMEOUT,
-              "Connection timeout. Please try again."
-            )
-          );
-        }, 60000); // 60 second timeout
+          // Check one last time before rejecting
+          if (this.connectionState?.isConnected) {
+            console.log("✅ Connection succeeded just before timeout");
+            resolve(this.connectionState);
+          } else {
+            console.warn("⏱️ Connection timeout - no valid address received");
+            reject(
+              new WalletError(
+                WalletErrorCode.CONNECTION_TIMEOUT,
+                "Connection timeout. Please try again."
+              )
+            );
+          }
+        }, 30000); // 30 second timeout (reduced from 60s)
 
         let checkCount = 0;
-        const maxChecks = 120; // 60 seconds with 500ms intervals
+        const maxChecks = 60; // 30 seconds with 500ms intervals
 
         const checkConnection = () => {
           checkCount++;
@@ -865,7 +1110,7 @@ class HederaWalletService {
           // Check if connection state was updated by event listeners
           if (this.connectionState?.isConnected) {
             clearTimeout(timeout);
-            console.log("AppKit connected successfully:", this.connectionState);
+            console.log("✅ AppKit connected successfully via event listener:", this.connectionState);
             resolve(this.connectionState);
             return;
           }
@@ -877,54 +1122,114 @@ class HederaWalletService {
               address?: string;
               selectedNetworkId?: string;
               chainId?: string;
+              isConnected?: boolean;
             };
 
-            const address = stateAny.address || stateAny.selectedNetworkId;
+            // CRITICAL FIX: Never use selectedNetworkId as address - it's a chain ID!
+            const address = stateAny.address; // Only use actual address
+            const isConnected = stateAny.isConnected;
 
-            if (address) {
-              clearTimeout(timeout);
+            // Log state every 10 checks for debugging
+            if (checkCount % 10 === 0) {
+              console.log(`🔍 Connection check ${checkCount}:`, {
+                address,
+                isConnected,
+                hasConnectionState: !!this.connectionState
+              });
+            }
 
-              // Extract network and chainId from AppKit state
-              const chainId = stateAny.chainId || stateAny.selectedNetworkId;
-              const detectedNamespace = chainId?.includes("eip155")
-                ? "eip155"
-                : "hedera";
+            if (address && isConnected) {
+              // Validate that we have a proper address, not just a chain ID
+              if (address === stateAny.chainId ||
+                address === 'eip155:295' ||
+                address === 'eip155:296' ||
+                address === 'hedera:testnet' ||
+                address === 'hedera:mainnet' ||
+                (address.startsWith('eip155:') && address.length < 20) ||
+                (address.startsWith('hedera:') && !address.match(/hedera:\w+:\d+\.\d+\.\d+$/))) {
+                // Invalid address - continue polling
+                if (checkCount % 10 === 0) {
+                  console.warn("⚠️ Invalid address from AppKit:", address);
+                }
+                // Don't return yet - continue polling
+              } else {
+                // Valid address found!
 
-              // Update connection state with accountId, network, and namespace
-              this.connectionState = {
-                accountId: address,
-                network: chainId?.includes("mainnet") ? "mainnet" : "testnet",
-                isConnected: true,
-                namespace: detectedNamespace,
-                chainId: chainId || `${namespace}:testnet`,
-              };
+                clearTimeout(timeout);
 
-              // Save session to localStorage for persistence
-              this.saveSession();
+                // Extract network and chainId from AppKit state
+                const chainId = stateAny.chainId || stateAny.selectedNetworkId;
+                const detectedNamespace = chainId?.includes("eip155")
+                  ? "eip155"
+                  : "hedera";
 
-              console.log(
-                "AppKit connected successfully:",
-                this.connectionState
-              );
-              resolve(this.connectionState);
-              return;
+                // For EVM namespace, try to extract Hedera account ID
+                let finalAccountId = address;
+                debugAddress(address, "AppKit Connection");
+
+                if (detectedNamespace === "eip155") {
+                  const hederaAccountId = extractHederaAccountId(address);
+                  if (hederaAccountId) {
+                    finalAccountId = hederaAccountId;
+                    console.log("✅ Extracted Hedera account ID from EVM address:", hederaAccountId);
+                  } else {
+                    // If we can't extract a Hedera account ID, we'll use the EVM address
+                    // but this will limit functionality (e.g., balance queries won't work)
+                    console.warn("⚠️ Using EVM address as account ID. Some features may be limited:", address);
+                  }
+                }
+
+                // Additional validation for Hedera addresses
+                if (detectedNamespace === "hedera" && !finalAccountId.match(/^\d+\.\d+\.\d+$/)) {
+                  console.warn("⚠️ Invalid Hedera account ID format:", finalAccountId);
+                  // Continue polling - wait for proper address
+                  return;
+                }
+
+                // Update connection state with accountId, network, and namespace
+                this.connectionState = {
+                  accountId: finalAccountId,
+                  network: chainId?.includes("mainnet") ? "mainnet" : "testnet",
+                  isConnected: true,
+                  namespace: detectedNamespace,
+                  chainId: chainId || `${namespace}:testnet`,
+                };
+
+                // Save session to localStorage for persistence
+                this.saveSession();
+
+                console.log(
+                  "✅ AppKit connected successfully via polling:",
+                  this.connectionState
+                );
+                resolve(this.connectionState);
+                return;
+              }
             }
           } catch (error) {
             // Log errors periodically to avoid console spam
             if (checkCount % 10 === 0) {
-              console.log(`AppKit connection check ${checkCount}:`, error);
+              console.warn(`⚠️ AppKit connection check ${checkCount} error:`, error);
             }
           }
 
           // Check if max attempts reached
           if (checkCount >= maxChecks) {
             clearTimeout(timeout);
-            reject(
-              new WalletError(
-                WalletErrorCode.CONNECTION_TIMEOUT,
-                "Connection timeout - no response from wallet"
-              )
-            );
+            console.warn("⏱️ Max connection checks reached");
+
+            // One final check
+            if (this.connectionState?.isConnected) {
+              console.log("✅ Connection succeeded on final check");
+              resolve(this.connectionState);
+            } else {
+              reject(
+                new WalletError(
+                  WalletErrorCode.CONNECTION_TIMEOUT,
+                  "Connection timeout - no response from wallet"
+                )
+              );
+            }
           } else {
             // Continue polling
             setTimeout(checkConnection, 500);
@@ -932,6 +1237,7 @@ class HederaWalletService {
         };
 
         // Start polling
+        console.log("🔄 Starting connection polling...");
         checkConnection();
       });
     } catch (error: unknown) {
@@ -1492,18 +1798,28 @@ class HederaWalletService {
         // Format: hedera:testnet:0.0.12345 or hedera:mainnet:0.0.12345
         network = networkOrChainId as 'mainnet' | 'testnet';
         chainId = `hedera:${network}`;
+
+        return {
+          accountId,
+          network,
+          namespace,
+          chainId,
+        };
       } else {
         // Format: eip155:295:0x... (mainnet) or eip155:296:0x... (testnet)
         network = networkOrChainId === '295' ? 'mainnet' : 'testnet';
         chainId = `eip155:${networkOrChainId}`;
-      }
 
-      return {
-        accountId,
-        network,
-        namespace,
-        chainId,
-      };
+        // For EVM addresses, we can't directly use them with Hedera Mirror Node
+        // We need to either convert them or handle them differently
+        // For now, we'll return the EVM address but mark it appropriately
+        return {
+          accountId, // This will be 0x... format
+          network,
+          namespace,
+          chainId,
+        };
+      }
     }
 
     // Fallback for invalid format
@@ -1532,6 +1848,8 @@ class HederaWalletService {
       return accountId;
     }
   }
+
+
 
   /**
    * Request message signature from the wallet via adapter
@@ -1779,6 +2097,27 @@ class HederaWalletService {
       throw new Error("No account ID available for balance query");
     }
 
+    debugAddress(targetAccountId, "Balance Query");
+
+    // Check if the address is valid for Mirror Node API
+    if (!isValidForMirrorNode(targetAccountId)) {
+      console.warn("Address not valid for Mirror Node API:", targetAccountId);
+
+      // Try to extract Hedera account ID if possible
+      const hederaAccountId = extractHederaAccountId(targetAccountId);
+      if (hederaAccountId && isValidForMirrorNode(hederaAccountId)) {
+        console.log("Using extracted Hedera account ID for balance query:", hederaAccountId);
+        return this.getAccountBalance(hederaAccountId);
+      }
+
+      // For EVM addresses, we would need to use a different approach
+      // For now, return zero balance to avoid API errors
+      return {
+        hbar: "0",
+        tokens: [],
+      };
+    }
+
     try {
       // Use Hedera Mirror Node API to get balance
       const mirrorNodeUrl =
@@ -1870,6 +2209,36 @@ class HederaWalletService {
   }
 
   /**
+   * Force reset AppKit and WalletConnect to clean state
+   */
+  async forceResetAppKit(): Promise<void> {
+    console.log("🔄 Force resetting AppKit and WalletConnect...");
+
+    try {
+      // Clear all storage first
+      this.clearWalletConnectStorage();
+      this.clearSavedSession();
+
+      // Disconnect and reset AppKit
+      if (this.appKitInstance) {
+        try {
+          await this.appKitInstance.disconnect();
+          await this.appKitInstance.close();
+        } catch (error) {
+          console.warn("Error during AppKit reset:", error);
+        }
+      }
+
+      // Reset connection state
+      this.connectionState = null;
+
+      console.log("✅ AppKit force reset completed");
+    } catch (error) {
+      console.error("Error during force reset:", error);
+    }
+  }
+
+  /**
    * Clean up resources and event listeners
    * Called when service is destroyed or needs to be reinitialized
    */
@@ -1884,6 +2253,9 @@ class HederaWalletService {
       if (this.isConnected()) {
         await this.disconnectWallet();
       }
+
+      // Force reset AppKit
+      await this.forceResetAppKit();
 
       // Clear all instances
       this.hederaProvider = null;
@@ -1912,15 +2284,15 @@ export const hederaWalletService = (() => {
   // During build or server-side without proper env, return a mock service
   if (typeof window === 'undefined' && !env.HEDERA_PRIVATE_KEY) {
     return {
-      initialize: async () => {},
-      connectWallet: async () => ({ 
-        accountId: '', 
-        network: 'testnet' as const, 
-        isConnected: false, 
-        namespace: 'hedera' as const, 
-        chainId: 'hedera:testnet' 
+      initialize: async () => { },
+      connectWallet: async () => ({
+        accountId: '',
+        network: 'testnet' as const,
+        isConnected: false,
+        namespace: 'hedera' as const,
+        chainId: 'hedera:testnet'
       }),
-      disconnectWallet: async () => {},
+      disconnectWallet: async () => { },
       signTransaction: async (tx: any) => tx,
       signMessage: async () => ({ signatureMap: '' }),
       getConnectionState: () => null,
@@ -1936,11 +2308,11 @@ export const hederaWalletService = (() => {
       getSessions: () => [],
       getActiveSession: () => null,
       signAndExecuteTransaction: async (tx: any) => null,
-      cleanup: async () => {},
+      cleanup: async () => { },
       isInitialized: false
     } as unknown as HederaWalletService;
   }
-  
+
   return globalThis.hederaWalletServiceInstance ||
     (globalThis.hederaWalletServiceInstance = new HederaWalletService());
 })();

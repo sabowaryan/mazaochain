@@ -115,14 +115,17 @@ export function useWallet(): UseWalletReturn {
         // This hook will poll the service state when needed
 
         // Attempt to restore existing session
-        const existingConnection = walletService.getConnectionState();
-        if (existingConnection && existingConnection.isConnected) {
-          setConnection(existingConnection);
+        // CRITICAL FIX: Ensure the connection state is updated after initialization
+        const existingConnection = await walletService.restoreExistingSession(); // Force restoration check
+        // Fallback to simple state check if restoration didn't return a connection
+        const finalConnection = existingConnection || walletService.getConnectionState();
+        if (finalConnection && finalConnection.isConnected) {
+          setConnection(finalConnection);
           setIsConnected(true);
-          setNamespace(existingConnection.namespace);
+          setNamespace(finalConnection.namespace);
 
           // Load balances if connected
-          await loadBalances(existingConnection.accountId);
+          await loadBalances(finalConnection.accountId);
         }
       } catch (err) {
         if (!mounted) return;

@@ -339,6 +339,10 @@ class HederaWalletService {
       }
 
       // Attempt to restore existing session
+      // The restoration logic is now handled by the service and the hook.
+      // We don't need to await here, as the hook will call restoreExistingSession
+      // and the listener will update the state.
+      // But for completeness, let's keep the call, as it triggers AppKit's internal restoration.
       await this.restoreExistingSession();
 
       this.isInitialized = true;

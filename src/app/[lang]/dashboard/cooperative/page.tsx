@@ -9,6 +9,8 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RequireAuth } from '@/components/auth/AuthGuard';
 import { ClientOnly } from '@/components/ClientOnly';
 import dynamic from 'next/dynamic';
+import { useWallet } from '@/hooks/useWallet';
+import { EnhancedWalletStatus } from '@/components/wallet/EnhancedWalletStatus';
 
 // Chargement dynamique des composants qui utilisent Hedera SDK
 const PendingEvaluationsReview = dynamic(
@@ -73,6 +75,7 @@ interface LoanRequest {
 function CooperativeDashboardContent() {
   const { user, profile, loading: authLoading } = useAuth();
   const t = useTranslations('cooperative');
+  const { isConnected, disconnectWallet } = useWallet();
   
   const [stats, setStats] = useState<CooperativeStats>({
     totalMembers: 0,
@@ -168,10 +171,28 @@ function CooperativeDashboardContent() {
         </p>
       </div>
 
-      {/* Wallet Connection */}
+      {/* Wallet Connection / Status */}
       <ClientOnly fallback={<div className="animate-pulse bg-gray-200 h-20 rounded mb-8"></div>}>
         <div className="mb-8">
-          <WalletConnection showBalances={false} />
+          {!isConnected ? (
+            <WalletConnection showBalances={false} />
+          ) : (
+            <Card className="p-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-semibold text-emerald-800">Wallet connecté</span>
+                  <EnhancedWalletStatus variant="compact" />
+                </div>
+                <Button
+                  variant="outline"
+                  className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400"
+                  onClick={disconnectWallet}
+                >
+                  Déconnecter le wallet
+                </Button>
+              </div>
+            </Card>
+          )}
         </div>
       </ClientOnly>
 

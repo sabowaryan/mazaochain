@@ -95,6 +95,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Always let the browser handle navigations (avoids redirect-mode issues with middleware)
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request, { redirect: 'follow', cache: 'no-store' })
+        .catch(() => caches.match('/'))
+    );
+    return;
+  }
+
   // Handle API requests
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
@@ -126,7 +135,7 @@ self.addEventListener('fetch', (event) => {
           return cachedResponse;
         }
 
-        return fetch(request)
+        return fetch(request, { redirect: 'follow' })
           .then((response) => {
             // Don't cache non-successful responses
             if (!response.ok) {

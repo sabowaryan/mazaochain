@@ -342,12 +342,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setAuthState(prev => ({ ...prev, loading: true }));
-    
+
     const { error } = await supabase.auth.signOut();
-    
+
     if (error) {
       console.error('Error signing out:', error);
       setAuthState(prev => ({ ...prev, loading: false }));
+      return;
+    }
+
+    // Force a full reload so that middleware refreshes/clears cookies properly
+    try {
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/fr';
+      const locale = currentPath.split('/')[1] || 'fr';
+      window.location.href = `/${locale}/auth/login`;
+    } catch {
+      // Fallback
+      window.location.href = `/fr/auth/login`;
     }
   }, [supabase]);
 

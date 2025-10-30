@@ -318,6 +318,25 @@ export function suppressWalletConnectErrors() {
           }
         }
         
+        // Ignorer les objets vides/arguments vides
+        try {
+          const allEmpty = args.every(arg => {
+            if (arg === null || arg === undefined) return true;
+            if (typeof arg === 'object') {
+              try {
+                return Object.keys(arg).length === 0;
+              } catch {
+                return false;
+              }
+            }
+            const s = String(arg).trim();
+            return s === '' || s === '{}';
+          });
+          if (allEmpty) {
+            return;
+          }
+        } catch {}
+
         // Convertir les args en string de manière sûre
         const message = args.map(arg => {
           if (typeof arg === 'string') return arg;
@@ -347,7 +366,8 @@ export function suppressWalletConnectErrors() {
             message.includes('proposal:') ||
             message.includes('Proposal expired') ||
             message.includes('Failed to connect to wallet') ||
-            message === '{}' // Ignorer les objets vides stringifiés
+            message === '{}' ||
+            message === '[]' // Ignorer les collections vides
           )
         ) {
           return;

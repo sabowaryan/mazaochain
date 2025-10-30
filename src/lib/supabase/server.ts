@@ -2,11 +2,9 @@ import { createServerClient } from '@supabase/ssr'
 import { Database } from './database.types'
 
 export const createClient = async () => {
-  // During build time or when cookies are not available, use a minimal client
-  if (typeof window !== 'undefined' || process.env.NODE_ENV === 'production') {
-    // For build time or client-side, create a basic client without cookies
-    const { createClient: createBrowserClient } = await import('./client')
-    return createBrowserClient()
+  // Never use browser client in server context
+  if (typeof window !== 'undefined') {
+    throw new Error('createClient from server.ts should only be used in server context')
   }
 
   try {
@@ -36,8 +34,7 @@ export const createClient = async () => {
       }
     )
   } catch (error) {
-    // Fallback to browser client if next/headers is not available
-    const { createClient: createBrowserClient } = await import('./client')
-    return createBrowserClient()
+    console.error('Error creating Supabase server client:', error)
+    throw error
   }
 }

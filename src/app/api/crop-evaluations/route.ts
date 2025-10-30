@@ -14,6 +14,21 @@ export async function GET(request: NextRequest) {
   
   try {
     const supabase = await createClient();
+    
+    // Vérifier l'authentification
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return createErrorResponse(
+        new MazaoChainError(
+          ErrorCode.UNAUTHORIZED,
+          'Authentication required',
+          { userMessage: 'Vous devez vous connecter pour accéder à cette fonctionnalité' }
+        ),
+        401,
+        requestId
+      );
+    }
+    
     const { searchParams } = new URL(request.url);
     
     const farmerId = searchParams.get('farmer_id');
@@ -49,14 +64,14 @@ export async function GET(request: NextRequest) {
         .from('farmer_profiles')
         .select('user_id')
         .eq('cooperative_id', cooperativeId);
-      
-      if (farmerIds && farmerIds.length > 0) {
-        const ids = farmerIds.map(f => f.user_id);
-        query = query.in('farmer_id', ids);
-      } else {
-        // Aucun fermier dans cette coopérative
-        query = query.eq('farmer_id', 'no-match');
+
+      if (!farmerIds || farmerIds.length === 0) {
+        // Aucun fermier dans cette coopérative → retourner une liste vide
+        return createSuccessResponse([], 'No evaluations for this cooperative');
       }
+
+      const ids = farmerIds.map(f => f.user_id);
+      query = query.in('farmer_id', ids);
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
@@ -76,6 +91,21 @@ export async function POST(request: NextRequest) {
   
   try {
     const supabase = await createClient();
+    
+    // Vérifier l'authentification
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return createErrorResponse(
+        new MazaoChainError(
+          ErrorCode.UNAUTHORIZED,
+          'Authentication required',
+          { userMessage: 'Vous devez vous connecter pour accéder à cette fonctionnalité' }
+        ),
+        401,
+        requestId
+      );
+    }
+    
     const body = await request.json();
 
     // Validate required fields

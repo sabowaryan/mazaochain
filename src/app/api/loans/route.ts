@@ -13,7 +13,22 @@ export async function GET(request: NextRequest) {
   const requestId = generateRequestId();
   
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
+    
+    // Vérifier l'authentification
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return createErrorResponse(
+        new MazaoChainError(
+          ErrorCode.UNAUTHORIZED,
+          'Authentication required',
+          { userMessage: 'Vous devez vous connecter pour accéder à cette fonctionnalité' }
+        ),
+        401,
+        requestId
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
     const borrowerId = searchParams.get("borrower_id");
@@ -22,7 +37,7 @@ export async function GET(request: NextRequest) {
     const cooperativeId = searchParams.get("cooperative_id");
     const excludeLender = searchParams.get("exclude_lender");
 
-    let query = (await supabase).from("loans").select(`
+    let query = supabase.from("loans").select(`
         *,
         borrower:profiles!borrower_id (
           id,
@@ -59,18 +74,18 @@ export async function GET(request: NextRequest) {
 
     if (cooperativeId) {
       // Filtrer par coopérative via une sous-requête
-      const { data: farmerIds } = await (await supabase)
+      const { data: farmerIds } = await supabase
         .from('farmer_profiles')
         .select('user_id')
         .eq('cooperative_id', cooperativeId);
-      
-      if (farmerIds && farmerIds.length > 0) {
-        const ids = farmerIds.map(f => f.user_id);
-        query = query.in('borrower_id', ids);
-      } else {
-        // Aucun fermier dans cette coopérative
-        query = query.eq('borrower_id', 'no-match');
+
+      if (!farmerIds || farmerIds.length === 0) {
+        // Aucun fermier dans cette coopérative → retourner une liste vide
+        return createSuccessResponse([], 'No loans for this cooperative');
       }
+
+      const ids = farmerIds.map(f => f.user_id);
+      query = query.in('borrower_id', ids);
     }
 
     const { data, error } = await query.order("created_at", {
@@ -91,7 +106,21 @@ export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
   
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
+    
+    // Vérifier l'authentification
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return createErrorResponse(
+        new MazaoChainError(
+          ErrorCode.UNAUTHORIZED,
+          'Authentication required',
+          { userMessage: 'Vous devez vous connecter pour accéder à cette fonctionnalité' }
+        ),
+        401,
+        requestId
+      );
+    }
     const body = await request.json();
 
     // Validate required fields
@@ -106,7 +135,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(validationError, 400, requestId);
     }
 
-    const { data, error } = await (await supabase)
+    const { data, error } = await supabase
       .from("loans")
       .insert([body])
       .select()

@@ -151,7 +151,7 @@ export default function FarmerEvaluationsPage() {
                   <h4 className="text-lg font-semibold text-gray-900 mb-2">
                     Prêt à évaluer vos cultures ?
                   </h4>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  <p className="text-gray-600 mb-6 max-w-screen-md mx-auto">
                     Soumettez une nouvelle évaluation de vos cultures pour obtenir une estimation de leur valeur et débloquer des opportunités de financement.
                   </p>
                   <Button 

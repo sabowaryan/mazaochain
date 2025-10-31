@@ -1,5 +1,3 @@
-
-```mermaid
 graph TD
     A[Utilisateur/Client Web] -->|Requête HTTP| B(Application Next.js/React)
     B -->|Interaction UI/UX| C[Composants Front-end]
@@ -58,22 +56,3 @@ graph TD
     end
     
     L1 & L2 & L3 & L4
-```
-
-### Explication du Schéma d'Architecture
-
-1.  **Interface Utilisateur (A, B, C) :** L'utilisateur interagit avec l'application web Next.js/React (B). Les actions déclenchent des appels via les composants front-end (C).
-2.  **Logique Applicative (D) :** Le cœur du backend (services Next.js API Routes ou fonctions Supabase) gère la logique métier.
-    *   **Services Clés :** `HederaTokenService` (D1), `USDCTransferService` (D2), et `LoanService` (D3) orchestrent les interactions avec Hedera.
-3.  **Base de Données et Backend (E, F) :** Supabase est utilisé pour l'authentification, le stockage des données relationnelles (profils, prêts, enregistrements de tokenisation), et l'exécution de fonctions backend.
-4.  **Réseau Hedera (G, H, I) :**
-    *   Toutes les transactions passent par un **Nœud Hedera** (G).
-    *   **Hedera Token Service (HTS - H) :** Gère les opérations de tokenisation (création de `MazaoToken` - L) et les transferts de tokens (M), y compris l'USDC pour les prêts et les `MazaoToken` pour le collatéral.
-    *   **Hedera Smart Contract Service (HSCS - I) :** Permet l'interaction avec les contrats Solidity déployés.
-    *   **Smart Contracts (J, K) :** Le contrat `LoanManager` (J) gère le cycle de vie des prêts, et `MazaoTokenFactory` (K) est responsable de la création des tokens de culture (collatéral).
-5.  **Flux DeFi :**
-    *   **Tokenisation :** Les agriculteurs utilisent le `MazaoTokenFactory` pour créer des `MazaoToken` (L) représentant leur récolte, qui servent de **collatéral**.
-    *   **Prêt :** Le `LoanManager` gère l'engagement de prêt. Le service `USDCTransferService` (D2) utilise des `TransferTransaction` (M) pour le **décaissement** du prêt en USDC et l'**escrow** du collatéral.
-    *   **Remboursement :** Les remboursements en USDC sont également gérés par `TransferTransaction` vers le compte de l'opérateur.
-    
-Ce schéma illustre la séparation claire des responsabilités : Supabase pour les données et l'authentification, et Hedera pour la logique immuable (Smart Contracts) et la gestion des actifs numériques (HTS).

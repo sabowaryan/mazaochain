@@ -1,7 +1,7 @@
 # MazaoChain : Plateforme de Prêt Décentralisée pour Agriculteurs
 ## Piste : Finance Décentralisée (DeFi)
 
-**Auteur :** Manus AI
+
 
 MazaoChain est une plateforme de finance décentralisée (DeFi) conçue pour connecter les agriculteurs ayant besoin de financement avec des prêteurs. Le projet utilise le réseau Hedera Hashgraph pour la tokenisation des récoltes comme collatéral et la gestion des prêts via des Smart Contracts, garantissant des transactions rapides, sécurisées et à faible coût.
 

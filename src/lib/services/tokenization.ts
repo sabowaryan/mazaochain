@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-import { hederaTokenService } from './hedera-token'
+// import { hederaTokenService } from './hedera-token' // Converti en importation dynamique conditionnelle
 // import { CropEvaluationService } from './crop-evaluation' // Removed to avoid circular dependency
 import type { 
   TokenizationRequest, 
@@ -148,7 +148,11 @@ export class TokenizationService {
         if (evaluation.farmer_id !== farmerId) continue
 
         // Get token info from Hedera
-        const tokenInfo = await hederaTokenService.getTokenInfo(record.token_id)
+        let tokenInfo = null;
+        if (typeof window !== 'undefined') {
+          const { hederaTokenService } = await import('./hedera-token');
+          tokenInfo = await hederaTokenService.getTokenInfo(record.token_id)
+        }
         
         if (tokenInfo) {
           const portfolioToken: PortfolioToken = {

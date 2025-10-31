@@ -72,13 +72,14 @@ export function PendingEvaluationsReview({
       }
 
       // Tokeniser l'évaluation approuvée via le hook (qui appelle l'API Route)
+      // Note: harvest_date sera calculé côté serveur (90-120 jours selon le type de culture)
       const tokenizationResult = await tokenizeEvaluation(
         evaluationId,
         evaluation.crop_type,
         evaluation.farmer_id,
         evaluation.farmer.wallet_address,
         evaluation.valeur_estimee,
-        new Date(evaluation.harvest_date).getTime()
+        Date.now() // Timestamp actuel, la date de récolte sera calculée côté serveur
       );
 
       if (!tokenizationResult.success) {

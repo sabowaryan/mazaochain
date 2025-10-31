@@ -115,7 +115,12 @@ export async function POST(request: NextRequest) {
 
       // 5. Créer le token sur la blockchain
       const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase()}-${Date.now()}`;
-      const harvestDateTimestamp = Math.floor(new Date(evaluation.harvest_date).getTime() / 1000);
+      
+      // Calculer la date de récolte (90 jours à partir de maintenant pour le café, 120 jours pour le manioc)
+      const daysUntilHarvest = evaluation.crop_type === 'cafe' ? 90 : 120;
+      const harvestDate = new Date();
+      harvestDate.setDate(harvestDate.getDate() + daysUntilHarvest);
+      const harvestDateTimestamp = Math.floor(harvestDate.getTime() / 1000);
 
       console.log('Préparation de la transaction createCropToken:', {
         farmer: farmerProfile.wallet_address,

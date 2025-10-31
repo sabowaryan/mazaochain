@@ -119,7 +119,7 @@ Pour exécuter le projet, vous devez avoir installé les dépendances logicielle
 Installez les dépendances du projet :
 
 ```bash
-pnpm install
+npm install
 ```
 
 ### Étape 2 : Configuration de l'Environnement
@@ -169,7 +169,7 @@ supabase migration up
 Démarrez l'application Next.js en mode développement :
 
 ```bash
-pnpm dev
+npm run  dev
 ```
 
 L'application sera accessible à l'adresse `http://localhost:3000`.

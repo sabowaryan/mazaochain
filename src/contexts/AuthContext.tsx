@@ -52,12 +52,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     try {
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+      );
+
       // First, get the basic profile
-      const { data: profileData, error: profileError } = await supabase
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
+
+      const { data: profileData, error: profileError } = await Promise.race([
+        profilePromise,
+        timeoutPromise
+      ]) as Awaited<typeof profilePromise>;
 
       if (profileError) {
         // Gestion spécifique des erreurs connues

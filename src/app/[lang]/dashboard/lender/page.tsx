@@ -11,8 +11,9 @@ import { RequireAuth } from '@/components/auth/AuthGuard';
 import { LenderInvestmentDashboard } from '@/components/lender/LenderInvestmentDashboard';
 import { LenderPortfolio } from '@/components/lender/LenderPortfolio';
 import { RiskAssessmentDisplay } from '@/components/lender/RiskAssessmentDisplay';
-import { WalletConnection } from '@/components/wallet/WalletConnection';
+import dynamic from 'next/dynamic';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
+import { EnhancedWalletStatus } from '@/components/wallet/EnhancedWalletStatus';
 import type { RiskAssessment } from '@/types/lender';
 
 interface LenderStats {
@@ -45,6 +46,15 @@ interface Loan {
   principal: number;
   interest_rate: number;
 }
+
+// Charger WalletConnection côté client uniquement (évite l'état faux non connecté au premier rendu)
+const WalletConnection = dynamic(
+  () => import('@/components/wallet/WalletConnection').then(mod => ({ default: mod.WalletConnection })),
+  {
+    ssr: false,
+    loading: () => <div className="animate-pulse bg-gray-200 h-20 rounded" />
+  }
+);
 
 function LenderDashboardContent() {
   const { user, profile } = useAuth();
@@ -192,12 +202,21 @@ function LenderDashboardContent() {
         </p>
       </div>
 
-      {/* Wallet Connection */}
-      {!isConnected && (
-        <div className="mb-8">
+      {/* Wallet Connection / Status */}
+      <div className="mb-8">
+        {!isConnected ? (
           <WalletConnection showBalances={false} />
-        </div>
-      )}
+        ) : (
+          <Card className="p-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-lg font-semibold text-emerald-800">Wallet connecté</span>
+                <EnhancedWalletStatus variant="compact" />
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* Wallet Balance */}
       {isConnected && (

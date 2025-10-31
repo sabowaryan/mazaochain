@@ -219,9 +219,13 @@ export function createDatabaseErrorResponse(
   error: unknown,
   requestId?: string
 ): NextResponse<APIErrorResponse> {
+  // Log the actual error for debugging
+  console.error('Database error details:', error);
+  
+  const errorMessage = error instanceof Error ? error.message : 'Database operation failed';
   const mazaoError = new MazaoChainError(
     ErrorCode.DATABASE_ERROR,
-    'Database operation failed',
+    errorMessage,
     {
       severity: ErrorSeverity.CRITICAL,
       userMessage: 'Erreur de base de données. Veuillez réessayer',

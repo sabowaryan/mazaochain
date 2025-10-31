@@ -29,6 +29,7 @@ export function LoanApprovalList() {
       setPendingLoans(pending)
     } catch (error) {
       console.error('Error loading pending loans:', error)
+      // Optionally show error to user
     } finally {
       setLoading(false)
     }

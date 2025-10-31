@@ -329,13 +329,16 @@ class HederaWalletService {
       // Set up session event listeners
       this.setupSessionListeners();
 
-      // Automatically clean invalid sessions on startup
-      console.log("🧹 Checking for invalid sessions on startup...");
-      const cleanupResult = cleanInvalidSessions();
-      if (cleanupResult.cleaned) {
-        console.log("✅ Cleaned invalid session on startup:", cleanupResult.reason);
-      } else {
-        console.log("ℹ️ No invalid sessions found:", cleanupResult.reason);
+      // Automatically clean invalid sessions on startup (disabled in dev to avoid conflicts)
+      const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+      if (!isDevelopment) {
+        console.log("🧹 Checking for invalid sessions on startup...");
+        const cleanupResult = cleanInvalidSessions();
+        if (cleanupResult.cleaned) {
+          console.log("✅ Cleaned invalid session on startup:", cleanupResult.reason);
+        } else {
+          console.log("ℹ️ No invalid sessions found:", cleanupResult.reason);
+        }
       }
 
       // Attempt to restore existing session
@@ -456,6 +459,12 @@ class HederaWalletService {
       const address = stateAny.address; // Only use actual address
       const chainId = stateAny.chainId || stateAny.selectedNetworkId;
       const isConnected = stateAny.isConnected || !!address;
+
+      // Ignore transient undefined/false during Fast Refresh or modal transitions
+      // Do not downgrade an already connected state on temporary undefined states
+      if ((!address || !isConnected) && this.connectionState?.isConnected) {
+        return;
+      }
 
       // Debug log to track event firing
       console.log("📡 handleAppKitStateChange called:", {
@@ -824,6 +833,40 @@ class HederaWalletService {
     if (!this.appKitInstance || !this.hederaProvider) return null;
 
     try {
+      // PRIORITY: Try to get accounts directly from HederaProvider session first
+      // This is the most reliable source after QR code approval
+      try {
+        const providerWithSession = this.hederaProvider as UniversalProvider & {
+          session?: SessionTypes.Struct;
+        };
+
+        if (providerWithSession.session) {
+          const accounts = Object.values(providerWithSession.session.namespaces).flatMap(
+            (namespace) => namespace.accounts
+          );
+
+          if (accounts.length > 0) {
+            // Parse the first account address
+            const accountStr = accounts[0];
+            const parsed = this.parseAccountAddress(accountStr);
+
+            this.connectionState = {
+              accountId: parsed.accountId,
+              network: parsed.network,
+              isConnected: true,
+              namespace: parsed.namespace,
+              chainId: parsed.chainId,
+            };
+
+            this.saveSession();
+            console.log("✅ Restored session from HederaProvider (priority):", this.connectionState);
+            return this.connectionState;
+          }
+        }
+      } catch (error) {
+        console.warn("Could not get accounts from HederaProvider session:", error);
+      }
+
       // Check if AppKit has an existing session
       const state = this.appKitInstance.getState?.() || {};
       const stateAny = state as {
@@ -838,37 +881,6 @@ class HederaWalletService {
       const isConnected = stateAny.isConnected || !!address;
 
       if (isConnected && address) {
-        // Try to get account addresses from HederaProvider session if available
-        try {
-          const providerWithSession = this.hederaProvider as UniversalProvider & {
-            session?: SessionTypes.Struct;
-          };
-
-          if (providerWithSession.session) {
-            const accounts = Object.values(providerWithSession.session.namespaces).flatMap(
-              (namespace) => namespace.accounts
-            );
-
-            if (accounts.length > 0) {
-              // Parse the first account address
-              const accountStr = accounts[0];
-              const parsed = this.parseAccountAddress(accountStr);
-
-              this.connectionState = {
-                accountId: parsed.accountId,
-                network: parsed.network,
-                isConnected: true,
-                namespace: parsed.namespace,
-                chainId: parsed.chainId,
-              };
-
-              console.log("Restored session from AppKit:", this.connectionState);
-              return this.connectionState;
-            }
-          }
-        } catch (error) {
-          console.warn("Could not get accounts from provider session:", error);
-        }
 
         // Fallback to AppKit state if provider doesn't have accounts
         const chainId = stateAny.chainId || stateAny.selectedNetworkId;
@@ -894,11 +906,15 @@ class HederaWalletService {
           // Force clear and prevent restoration
           this.clearInvalidSession();
 
-          // Also force AppKit to reset its state
+          // Also force AppKit to reset its state (only if connected)
           if (this.appKitInstance) {
             try {
-              // Reset AppKit to clean state
-              this.appKitInstance.disconnect();
+              const currentState = this.appKitInstance.getState?.() as any;
+              const isCurrentlyConnected = currentState?.address && currentState?.isConnected;
+              if (isCurrentlyConnected) {
+                // Reset AppKit to clean state only if actually connected
+                this.appKitInstance.disconnect();
+              }
             } catch (error) {
               console.warn("Error resetting AppKit state:", error);
             }
@@ -1086,6 +1102,28 @@ class HederaWalletService {
         }
       }
 
+      // Try to resolve immediately from provider session namespaces (QR approved on mobile)
+      try {
+        const providerWithSession = this.hederaProvider as UniversalProvider & { session?: SessionTypes.Struct };
+        const sess = providerWithSession?.session;
+        if (sess) {
+          const accounts = Object.values(sess.namespaces).flatMap(ns => ns.accounts);
+          if (accounts.length > 0) {
+            const parsed = this.parseAccountAddress(accounts[0]);
+            this.connectionState = {
+              accountId: parsed.accountId,
+              network: parsed.network,
+              isConnected: true,
+              namespace: parsed.namespace as any,
+              chainId: parsed.chainId,
+            };
+            this.saveSession();
+            console.log("✅ Connected (provider session accounts):", this.connectionState);
+            return this.connectionState;
+          }
+        }
+      } catch {/* continue to event/polling */}
+
       // Wait for connection with polling
       // AppKit's built-in session persistence will handle reconnection on page reload
       return new Promise((resolve, reject) => {
@@ -1103,10 +1141,52 @@ class HederaWalletService {
               )
             );
           }
-        }, 30000); // 30 second timeout (reduced from 60s)
+        }, 240000); // 240 second timeout (4 minutes)
 
         let checkCount = 0;
-        const maxChecks = 60; // 30 seconds with 500ms intervals
+        const maxChecks = 480; // 240 seconds with 500ms intervals (4 minutes)
+
+        // Prefer event-driven resolve: wait for first valid state change
+        const eventDrivenResolve = new Promise<WalletConnection>((eventResolve, eventReject) => {
+          try {
+            const unsubscribe = (this.appKitInstance as any)?.subscribeState?.((raw: any) => {
+              try {
+                const addr = raw?.address;
+                const connected = raw?.isConnected;
+                const chId = raw?.chainId || raw?.selectedNetworkId;
+
+                if (addr && connected) {
+                  // Validate Hedera vs EVM as plus haut
+                  let finalAccountId = addr;
+                  const detectedNamespace = chId?.includes("eip155") ? "eip155" : "hedera";
+                  if (detectedNamespace === "eip155") {
+                    const hederaAccountId = extractHederaAccountId(addr);
+                    if (hederaAccountId) finalAccountId = hederaAccountId;
+                  }
+                  if (detectedNamespace === "hedera" && !finalAccountId.match(/^\d+\.\d+\.\d+$/)) {
+                    return; // wait for proper account id
+                  }
+
+                  this.connectionState = {
+                    accountId: finalAccountId,
+                    network: chId?.includes("mainnet") ? "mainnet" : "testnet",
+                    isConnected: true,
+                    namespace: detectedNamespace as any,
+                    chainId: chId || `${namespace}:testnet`,
+                  };
+                  this.saveSession();
+                  if (typeof unsubscribe === 'function') unsubscribe();
+                  clearTimeout(timeout);
+                  console.log("✅ AppKit connected via event (no polling):", this.connectionState);
+                  eventResolve(this.connectionState);
+                }
+              } catch {}
+            });
+            // Safety timeout handled by outer timeout
+          } catch (e) {
+            // ignore, fallback to polling
+          }
+        });
 
         const checkConnection = () => {
           checkCount++;
@@ -1240,9 +1320,21 @@ class HederaWalletService {
           }
         };
 
-        // Start polling
-        console.log("🔄 Starting connection polling...");
-        checkConnection();
+        // Race event-driven resolve vs polling
+        console.log("🔄 Starting connection (event + polling)...");
+        Promise.race([
+          eventDrivenResolve,
+          new Promise<WalletConnection>((res, rej) => {
+            const poll = () => {
+              checkConnection();
+              if (this.connectionState?.isConnected) res(this.connectionState);
+              else setTimeout(poll, 500);
+            };
+            poll();
+          })
+        ]).then(resolve).catch(() => {
+          // let polling/error handlers above handle rejection
+        });
       });
     } catch (error: unknown) {
       // Requirement 14.5: Wrap unknown errors in WalletError with original error

@@ -30,9 +30,10 @@ export function usePostLoginRedirect() {
       returnUrl
     );
     
-    // Perform the redirect
-    router.push(redirectUrl);
-  }, [router, pathname]);
+    // Use window.location for full page reload to sync cookies with middleware
+    // This ensures the middleware processes the authentication cookies properly
+    window.location.href = redirectUrl;
+  }, [pathname]);
 
   const redirectToRoleDashboard = useCallback((userRole: UserRole, locale?: string) => {
     const currentLocale = locale || getLocaleFromPath(pathname);

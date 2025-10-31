@@ -293,15 +293,22 @@ export class LoanService {
       }
 
       const response = await fetch(apiUrl);
+      const responseData = await response.json();
 
       if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        console.error('API Error Response:', responseData);
+        // L'API retourne { error: { message, code, userMessage, ... } }
+        let errorMessage = `HTTP ${response.status}`;
+        if (responseData.error) {
+          errorMessage = responseData.error.userMessage || responseData.error.message || errorMessage;
+        } else if (responseData.message) {
+          errorMessage = responseData.message;
+        }
+        console.error('Throwing error with message:', errorMessage);
+        throw new Error(errorMessage);
       }
 
-      const result = await response.json();
+      const result = responseData;
       // L'API retourne { data: [...], message: '...', timestamp: '...' }
       const loans = Array.isArray(result) ? result : (result?.data || []);
 

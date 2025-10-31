@@ -14,21 +14,7 @@ import { EvaluationDetails } from "@/components/crop-evaluation/EvaluationDetail
 import { CROP_TYPES } from "@/types/crop-evaluation";
 import type { Tables } from "@/lib/supabase/database.types";
 import { notificationService } from "@/lib/services/notification";
-
-// Hook chargé dynamiquement
-const useMazaoContracts = () => {
-  const [hook, setHook] = useState<any>(null);
-  
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      import('@/hooks/useMazaoContracts').then(module => {
-        setHook(() => module.useMazaoContracts);
-      });
-    }
-  }, []);
-  
-  return hook ? hook() : { tokenizeEvaluation: async () => ({ success: false, error: 'Service not loaded' }), loading: false };
-};
+import { useMazaoContracts } from "@/hooks/useMazaoContracts";
 
 interface PendingEvaluationsReviewProps {
   cooperativeId: string;
@@ -56,14 +42,15 @@ export function PendingEvaluationsReview({
   const loadPendingEvaluations = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await cropEvaluationService.getPendingEvaluations(
         cooperativeId
       );
       setEvaluations(data);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Erreur lors du chargement"
-      );
+      console.error('Error loading pending evaluations:', err);
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors du chargement";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

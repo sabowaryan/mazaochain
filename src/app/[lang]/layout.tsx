@@ -38,7 +38,13 @@ export const viewport = {
   themeColor: "#22c55e",
 };
 
+// Only generate static params in production
 export async function generateStaticParams() {
+  if (process.env.NODE_ENV === 'development') {
+    // In development, only generate the default language for faster builds
+    return [{ lang: 'fr' }];
+  }
+  // In production, generate all languages
   return [{ lang: 'en' }, { lang: 'fr' }, { lang: 'ln' }];
 }
 
@@ -54,36 +60,24 @@ export default async function RootLayout({
   const dict = await getDictionary(validLang);
 
   return (
-    <html lang={validLang}>
-      <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-        <link rel="icon" type="image/svg+xml" href="/logo.svg" />
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#22c55e" />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
-      >
-        <ErrorBoundary>
-          <TranslationProvider messages={dict} locale={validLang}>
-            <AuthProvider>
-              <WalletModalGlobalProvider>
-                <WalletErrorSuppressor />
-                <ServiceWorkerRegistration />
-                <ClientNavigation />
-                <ConditionalMain>{children}</ConditionalMain>
-                <ConditionalMobileNavigation />
-                <div className="offline-indicator-container">
-                  <OfflineIndicator />
-                </div>
-                <PWAInstallPrompt />
-              </WalletModalGlobalProvider>
-            </AuthProvider>
-          </TranslationProvider>
-        </ErrorBoundary>
-      </body>
-    </html>
+    <>
+      <ErrorBoundary>
+        <TranslationProvider messages={dict} locale={validLang}>
+          <AuthProvider>
+            <WalletModalGlobalProvider>
+              <WalletErrorSuppressor />
+              <ServiceWorkerRegistration />
+              <ClientNavigation />
+              <ConditionalMain>{children}</ConditionalMain>
+              <ConditionalMobileNavigation />
+              <div className="offline-indicator-container">
+                <OfflineIndicator />
+              </div>
+              <PWAInstallPrompt />
+            </WalletModalGlobalProvider>
+          </AuthProvider>
+        </TranslationProvider>
+      </ErrorBoundary>
+    </>
   );
 }

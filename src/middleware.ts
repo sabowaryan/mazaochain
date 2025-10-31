@@ -132,21 +132,11 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
  */
 async function handleAuthentication(request: NextRequest, response: NextResponse) {
   try {
-    console.log('🔍 Checking authentication...');
-    console.log('📝 Cookies:', request.cookies.getAll().map(c => c.name).join(', '));
-    
     // Create Supabase client for middleware
     const supabase = createMiddlewareClient(request, response);
 
     // Get the current user (more secure than getSession)
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    console.log('📊 User check:', {
-      hasUser: !!user,
-      hasError: !!userError,
-      errorMessage: userError?.message,
-      userId: user?.id
-    });
 
     if (userError || !user) {
       return { authenticated: false, error: userError?.message || 'No authenticated user' };
@@ -209,15 +199,28 @@ function getRoleDashboardPath(role: UserRole, locale: string): string {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Skip middleware for static files, API routes, and Next.js internals
+  // Skip middleware for static files and Next.js internals
   if (pathname.startsWith('/_next') || 
-      pathname.startsWith('/api') || 
-      pathname.includes('.') ||
-      pathname === '/favicon.ico' ||
-      pathname === '/sw.js' ||
-      pathname === '/manifest.json' ||
-      pathname === '/site.webmanifest') {
+      pathname.startsWith('/favicon') ||
+      pathname.startsWith('/screenshot') ||
+      pathname.startsWith('/logo') ||
+      pathname.startsWith('/icon') ||
+      pathname.includes('.')) {
     return NextResponse.next();
+  }
+
+  // Create Supabase client for API routes to handle cookie updates
+  // Handle API routes separately - just ensure cookies are refreshed
+  if (pathname.startsWith('/api')) {
+    const response = NextResponse.next();
+    const supabase = createMiddlewareClient(request, response);
+    try {
+      // This refreshes the session cookies if needed
+      await supabase.auth.getUser();
+    } catch (error) {
+      console.error('Error refreshing session for API route:', error);
+    }
+    return response;
   }
 
   // Skip authentication for development test routes in dev mode
@@ -236,8 +239,6 @@ export async function middleware(request: NextRequest) {
 
   // Check if route requires protection
   if (isProtectedRoute(cleanPathname)) {
-    console.log(`🔒 Protecting route: ${cleanPathname}`);
-    
     const authResult = await handleAuthentication(request, response);
     
     if (!authResult.authenticated) {

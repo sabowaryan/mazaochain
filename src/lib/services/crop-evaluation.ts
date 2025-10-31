@@ -158,7 +158,7 @@ export class CropEvaluationService {
         .eq('id', evaluation.farmer_id!)
         .single()
 
-      if (profileError || !farmerProfile?.wallet_address) {
+      if (profileError || !farmerProfile?.wallet_address || farmerProfile.wallet_address.trim() === '') {
         throw new Error('Farmer wallet address not found')
       }
 

@@ -142,7 +142,10 @@ export class TokenizationService {
         if (evaluation.farmer_id !== farmerId) continue
 
         // Get token info from Hedera
-        const tokenInfo = await hederaTokenService.getTokenInfo(record.token_id)
+        let tokenInfo = null;
+        if (typeof window !== 'undefined') {
+          tokenInfo = await hederaTokenService.getTokenInfo(record.token_id)
+        }
         
         if (tokenInfo) {
           const portfolioToken: PortfolioToken = {

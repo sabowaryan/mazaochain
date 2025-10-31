@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
@@ -47,11 +48,12 @@
     "db:verify": "npm run audit:database && npm run test:database"
   },
   "dependencies": {
-    "@hashgraph/hedera-wallet-connect": "^2.0.4-canary.3ca04e9.0",
+    "@hashgraph/hedera-wallet-connect": "^2.0.5-canary.b03fe61.0",
     "@hashgraph/sdk": "2.72.0",
     "@heroicons/react": "^2.2.0",
-    "@reown/appkit": "^1.7.16",
-    "@reown/appkit-common": "^1.7.16",
+    "@reown/appkit": "^1.8.12",
+    "@reown/appkit-common": "^1.8.12",
+    "@reown/appkit-controllers": "^1.8.12",
     "@reown/walletkit": "^1.2.8",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "2.57.4",
@@ -86,6 +88,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
     "jsdom": "^27.0.0",
+    "patch-package": "^8.0.1",
     "process": "^0.11.10",
     "solc": "^0.5.0",
     "stream-browserify": "^3.0.0",

@@ -63,10 +63,10 @@ export async function initializeAppKit(config: AppKitConfig) {
   // Create and configure AppKit instance
   return createAppKit({
     // Hedera adapters for native and EVM namespaces
+    // @ts-expect-error - HederaAdapter type compatibility with AppKit 1.8.12
     adapters,
 
-    // UniversalProvider from HederaProvider
-    // @ts-expect-error - Expected type error due to private properties in HederaProvider's UniversalProvider implementation
+    // UniversalProvider from HederaPr properties in HederaProvider's UniversalProvider implementation
     universalProvider,
 
     // WalletConnect configuration

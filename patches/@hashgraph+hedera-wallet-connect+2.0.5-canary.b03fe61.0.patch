@@ -1,0 +1,23 @@
+diff --git a/node_modules/@hashgraph/hedera-wallet-connect/dist/reown/adapter.js b/node_modules/@hashgraph/hedera-wallet-connect/dist/reown/adapter.js
+index b6ab276..f7b1660 100644
+--- a/node_modules/@hashgraph/hedera-wallet-connect/dist/reown/adapter.js
++++ b/node_modules/@hashgraph/hedera-wallet-connect/dist/reown/adapter.js
+@@ -1,6 +1,6 @@
+-import { CoreHelperUtil, WcHelpersUtil } from '@reown/appkit';
++import { CoreHelperUtil } from '@reown/appkit';
+ import { isReownName } from '@reown/appkit-common';
+-import { AdapterBlueprint } from '@reown/appkit/adapters';
++import { AdapterBlueprint, WcHelpersUtil } from '@reown/appkit-controllers';
+ import { LedgerId } from '@hashgraph/sdk';
+ import { BrowserProvider, Contract, formatUnits, JsonRpcSigner, parseUnits } from 'ethers';
+ import { HederaConnector } from './connectors';
+diff --git a/node_modules/@hashgraph/hedera-wallet-connect/dist/reown/utils/chains.js b/node_modules/@hashgraph/hedera-wallet-connect/dist/reown/utils/chains.js
+index 6955aa1..dc43f78 100644
+--- a/node_modules/@hashgraph/hedera-wallet-connect/dist/reown/utils/chains.js
++++ b/node_modules/@hashgraph/hedera-wallet-connect/dist/reown/utils/chains.js
+@@ -1,4 +1,4 @@
+-import { WcHelpersUtil } from '@reown/appkit';
++import { WcHelpersUtil } from '@reown/appkit-controllers';
+ import { defineChain } from '@reown/appkit/networks';
+ import { mergeArrays, normalizeNamespaces } from '@walletconnect/utils';
+ import { HederaJsonRpcMethod } from '../..';

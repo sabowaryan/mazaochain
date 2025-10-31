@@ -36,57 +36,128 @@ MazaoChain exécute principalement les transactions suivantes pour gérer le flu
 
 ## Schéma d'Architecture (Flux de Données)
 
-Le schéma ci-dessous illustre le flux de données entre l'interface utilisateur, le backend (Next.js/Supabase) et le réseau Hedera.
+Le schéma ci-dessous illustre le flux de données complet entre l'interface utilisateur, le backend (Next.js/Supabase) et le réseau Hedera, incluant l'intégration wallet et les requêtes de solde.
 
 ```mermaid
-graph TD
-    A[Utilisateur/Client Web] -->|Requête HTTP| B(Application Next.js/React)
-    B -->|Interaction UI/UX| C[Composants Front-end]
-    
-    C -->|Appel de service| D{Services Backend/Logique Applicative}
-    
-    %% Supabase Flow
-    D -->|Authentification/Données| E[Supabase (PostgreSQL, Auth, Functions)]
-    E -->|Migrations, Stockage| F[Base de données PostgreSQL]
-    
-    %% Hedera Flow
-    D -->|Transaction Hedera (SDK)| G[Nœud Hedera]
-    
-    G -->|Création/Transfert de Token| H(Hedera Token Service - HTS)
-    G -->|Appel de Fonction| I(Hedera Smart Contract Service - HSCS)
-    
-    I -->|Contrat Déployé| J[LoanManager Smart Contract]
-    I -->|Contrat Déployé| K[MazaoTokenFactory Smart Contract]
-    
-    H -->|Création de Token| L[MazaoToken (Fungible Token)]
-    H -->|Transfert de Token (USDC/Mazao)| M[TransferTransaction]
-    
-    %% Data Flow
-    D -->|Enregistrement des IDs| F
-    G -->|Réponse de Transaction/Reçu| D
-    
-    %% Key DeFi Interactions
-    style J fill:#f9f,stroke:#333,stroke-width:2px
-    style K fill:#f9f,stroke:#333,stroke-width:2px
-    style H fill:#ccf,stroke:#333,stroke-width:2px
-    style I fill:#ccf,stroke:#333,stroke-width:2px
-    style G fill:#afa,stroke:#333,stroke-width:2px
-    style E fill:#ffc,stroke:#333,stroke-width:2px
-    
-    D -->|Escrow/Disbursement USDC| G
-    D -->|Tokenization/Collateral| G
-    D -->|Loan Management| G
-    
-    %% Legend
-    subgraph Légende
-        L1[HTS: Hedera Token Service]
-        L2[HSCS: Hedera Smart Contract Service]
-        L3[USDC: Stablecoin (HBAR Token)]
-        L4[MazaoToken: Token de culture (Collateral)]
+graph TB
+    subgraph "Couche Présentation"
+        A[👤 Utilisateur Final<br/>Agriculteur/Prêteur/Coopérative]
+        B[🌐 Interface Web<br/>Next.js 15 + React 19]
+        W[💼 HashPack Wallet<br/>WalletConnect v2]
     end
     
-    L1 & L2 & L3 & L4
+    subgraph "Couche Application"
+        C[⚛️ Composants React<br/>Dashboard/Forms]
+        D[🔧 Services Backend<br/>API Routes + Logique Métier]
+        WS[🔐 Wallet Service<br/>hedera-wallet-connect v2]
+    end
+    
+    subgraph "Couche Données"
+        E[🗄️ Supabase<br/>Auth + PostgreSQL]
+        F[(📊 Base de Données<br/>Utilisateurs/Prêts/Tokens)]
+    end
+    
+    subgraph "Réseau Hedera Testnet/Mainnet"
+        G[🌐 Nœud Hedera<br/>Consensus + Validation]
+        
+        subgraph "Services Hedera"
+            H[🪙 HTS<br/>Token Service]
+            I[📜 HSCS<br/>Smart Contract Service]
+            R[🔍 JSON-RPC<br/>hashio.io API]
+            M[🔎 Mirror Node<br/>REST API]
+        end
+        
+        subgraph "Smart Contracts Déployés"
+            J[📝 LoanManager<br/>0.0.6913910]
+            K[🏭 MazaoTokenFactory<br/>0.0.6913902]
+        end
+        
+        subgraph "Tokens HTS"
+            L[🌾 MazaoToken<br/>Collatéral Récolte]
+            U[💵 USDC<br/>0.0.456858]
+        end
+    end
+    
+    %% User Interactions
+    A -->|1. Connexion Wallet| W
+    A -->|2. Navigation/Actions| B
+    W -->|3. Signature Transactions| WS
+    
+    %% Frontend Flow
+    B -->|4. Rendu UI| C
+    C -->|5. Appels API| D
+    
+    %% Wallet Integration
+    WS -->|6a. Connexion WalletConnect| W
+    WS -->|6b. Requêtes Solde Native| M
+    WS -->|6c. Requêtes Solde EVM| R
+    
+    %% Backend to Database
+    D -->|7. Auth/CRUD| E
+    E -->|8. Persistance| F
+    
+    %% Backend to Hedera
+    D -->|9. Transactions SDK| G
+    
+    %% Hedera Services
+    G -->|10a. Token Operations| H
+    G -->|10b. Contract Calls| I
+    
+    %% Smart Contracts
+    I -->|11a. Gestion Prêts| J
+    I -->|11b. Création Tokens| K
+    
+    %% Token Operations
+    H -->|12a. Mint/Transfer| L
+    H -->|12b. Transfer USDC| U
+    K -->|13. Création| L
+    
+    %% Balance Queries
+    R -->|14a. Solde HBAR EVM| WS
+    M -->|14b. Solde Tokens Native| WS
+    M -->|14c. Métadonnées Tokens| WS
+    
+    %% Response Flow
+    G -->|15. Reçus Transactions| D
+    D -->|16. Enregistrement IDs| F
+    D -->|17. Réponse JSON| C
+    C -->|18. Mise à jour UI| B
+    
+    %% Styling
+    style J fill:#e1bee7,stroke:#8e24aa,stroke-width:3px
+    style K fill:#e1bee7,stroke:#8e24aa,stroke-width:3px
+    style H fill:#bbdefb,stroke:#1976d2,stroke-width:3px
+    style I fill:#bbdefb,stroke:#1976d2,stroke-width:3px
+    style R fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style M fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style G fill:#a5d6a7,stroke:#2e7d32,stroke-width:3px
+    style E fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style W fill:#ffccbc,stroke:#d84315,stroke-width:2px
+    style WS fill:#ffccbc,stroke:#d84315,stroke-width:2px
+    style L fill:#f8bbd0,stroke:#c2185b,stroke-width:2px
+    style U fill:#f8bbd0,stroke:#c2185b,stroke-width:2px
 ```
+
+### Légende du Schéma
+
+| Composant | Description | Technologie |
+|-----------|-------------|-------------|
+| **HTS** | Hedera Token Service - Création et gestion des tokens fongibles | Hedera Native |
+| **HSCS** | Hedera Smart Contract Service - Exécution de contrats Solidity EVM | Hedera Native |
+| **JSON-RPC** | Endpoint compatible Ethereum pour requêtes EVM (soldes, gas, etc.) | hashio.io |
+| **Mirror Node** | API REST pour requêtes historiques et métadonnées | Hedera Public |
+| **WalletConnect v2** | Protocole de connexion wallet décentralisé | @reown/appkit v1.8.12 |
+| **HashPack** | Wallet Hedera natif avec support EVM | Mobile + Extension |
+
+### Flux de Données Clés
+
+1. **Connexion Wallet** : L'utilisateur connecte HashPack via WalletConnect, établissant une session sécurisée
+2. **Requêtes de Solde** : 
+   - Adresses natives (0.0.x) → Mirror Node REST API
+   - Adresses EVM (0x...) → JSON-RPC via ethers.js
+3. **Création de Prêt** : Backend → SDK Hedera → LoanManager Contract → HTS (escrow USDC + MazaoTokens)
+4. **Tokenisation** : MazaoTokenFactory crée un nouveau token HTS représentant la récolte
+5. **Remboursement** : Transfer USDC de l'agriculteur → Prêteur + Libération du collatéral
 
 ---
 
@@ -189,3 +260,67 @@ Les IDs suivants sont utilisés pour l'exécution du projet sur le Testnet Heder
 | **Token ID** | MazaoToken (Exemple) | Créé dynamiquement | Token fongible (HTS) représentant une récolte spécifique, utilisé comme collatéral. |
 
 ***Note :*** *Les IDs de contrat sont des exemples tirés du fichier de configuration et doivent être mis à jour si les contrats sont redéployés.*
+
+
+---
+
+## Sécurité
+
+### Gestion des Clés Privées
+
+**⚠️ IMPORTANT : NE JAMAIS COMMITTER DE CLÉS PRIVÉES DANS LE DÉPÔT GIT**
+
+MazaoChain suit les meilleures pratiques de sécurité pour la gestion des clés sensibles :
+
+1. **Fichiers d'Exemple** : Le fichier `.env.local.example` contient uniquement des exemples de variables sans valeurs réelles.
+
+2. **Gitignore** : Le fichier `.env.local` est explicitement exclu du contrôle de version via `.gitignore`.
+
+3. **Variables d'Environnement** : Toutes les clés sensibles sont stockées dans des variables d'environnement :
+   - `HEDERA_PRIVATE_KEY` : Clé privée du compte opérateur Hedera
+   - `SUPABASE_SERVICE_ROLE_KEY` : Clé de service Supabase
+   - `NEXTAUTH_SECRET` : Secret pour les sessions NextAuth
+   - `SMTP_PASSWORD` / `TWILIO_AUTH_TOKEN` : Clés des services tiers
+
+4. **Séparation des Environnements** :
+   - **Développement** : Utilisez des comptes Testnet avec des fonds limités
+   - **Production** : Utilisez des comptes Mainnet avec des clés stockées dans des gestionnaires de secrets sécurisés (ex: Vercel Environment Variables, AWS Secrets Manager)
+
+5. **Wallet Connect** : L'intégration HashPack/WalletConnect permet aux utilisateurs de signer des transactions sans exposer leurs clés privées à l'application.
+
+### Audit de Sécurité
+
+Les Smart Contracts `LoanManager` et `MazaoTokenFactory` doivent être audités avant tout déploiement en production. Les points critiques incluent :
+- Gestion du collatéral et de l'escrow
+- Logique de liquidation
+- Contrôles d'accès (modifiers `onlyOperator`, etc.)
+- Protection contre les attaques de réentrance
+
+---
+
+## Technologies Utilisées
+
+- **Frontend** : Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend** : Next.js API Routes, Supabase (PostgreSQL, Auth, Functions)
+- **Blockchain** : Hedera Hashgraph (HTS, HSCS, HCS)
+- **Wallet** : HashPack via WalletConnect (@hashgraph/hedera-wallet-connect v2, @reown/appkit v1.8.12)
+- **Smart Contracts** : Solidity (EVM-compatible sur Hedera)
+- **Tokens** : Hedera Token Service (HTS) pour MazaoTokens et USDC
+- **Balance Queries** : ethers.js v6 pour les requêtes de solde EVM via JSON-RPC
+
+---
+
+## Support et Contact
+
+Pour toute question ou problème :
+- **Issues GitHub** : [https://github.com/sabowaryan/mazaochain/issues](https://github.com/sabowaryan/mazaochain/issues)
+- **Documentation Hedera** : [https://docs.hedera.com](https://docs.hedera.com)
+- **Documentation Supabase** : [https://supabase.com/docs](https://supabase.com/docs)
+
+---
+
+## Licence
+
+Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+
+Copyright (c) 2025 MazaoChain

@@ -137,13 +137,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // createCropToken(
-        farmerAddress,
-        estimatedValue,
-        cropType,
-        harvestDate,
-        tokenSymbol
-      )
     });
   }, [handleAsyncOperation]);
 
@@ -155,7 +148,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // mintTokens(tokenId, amount, recipientAddress)
     });
   }, [handleAsyncOperation]);
 
@@ -166,7 +158,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // getFarmerBalanceForToken(farmerAddress, tokenId)
     });
   }, [handleAsyncOperation]);
 
@@ -174,7 +165,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // 0;
     });
   }, [handleAsyncOperation]);
 
@@ -182,7 +172,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // getFarmerTokenHoldings(farmerAddress)
     });
   }, [handleAsyncOperation]);
 
@@ -190,7 +179,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // getTokenDetails(tokenId)
     });
   }, [handleAsyncOperation]);
 
@@ -203,12 +191,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // requestLoan(
-        collateralTokenId,
-        principal,
-        duration,
-        interestRate
-      )
     });
   }, [handleAsyncOperation]);
 
@@ -216,7 +198,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // getLoanDetails(loanId)
     });
   }, [handleAsyncOperation]);
 
@@ -224,7 +205,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // getNextTokenId()
     });
   }, [handleAsyncOperation]);
 
@@ -232,7 +212,6 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     return handleAsyncOperation(async () => {
       // TODO: Implémenter via API Route si nécessaire
       throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
-      // getNextLoanId()
     });
   }, [handleAsyncOperation]);
 

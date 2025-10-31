@@ -14,7 +14,7 @@ import { EvaluationDetails } from "@/components/crop-evaluation/EvaluationDetail
 import { CROP_TYPES } from "@/types/crop-evaluation";
 import type { Tables } from "@/lib/supabase/database.types";
 import { notificationService } from "@/lib/services/notification";
-import { useMazaoContracts } from "@/hooks/useMazaoContracts";
+// import { useMazaoContracts } from "@/hooks/useMazaoContracts"; // Remplacé par API Route
 
 interface PendingEvaluationsReviewProps {
   cooperativeId: string;
@@ -33,7 +33,7 @@ export function PendingEvaluationsReview({
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const cropEvaluationService = new CropEvaluationService();
-  const { tokenizeEvaluation, loading: contractsLoading } = useMazaoContracts();
+  // const { tokenizeEvaluation, loading: contractsLoading } = useMazaoContracts(); // Remplacé par API Route
 
   useEffect(() => {
     loadPendingEvaluations();
@@ -66,55 +66,23 @@ export function PendingEvaluationsReview({
         throw new Error("Évaluation non trouvée");
       }
 
-      // Vérifier que le fermier a une adresse wallet
-      if (!evaluation.farmer?.wallet_address) {
-        throw new Error("Le fermier n'a pas d'adresse wallet configurée");
-      }
+      // Appeler l'API Route pour approuver et tokeniser l'évaluation
+      const response = await fetch('/api/evaluations/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          evaluationId,
+        }),
+      });
 
-      // Tokeniser l'évaluation approuvée via le hook
-      const tokenizationResult = await tokenizeEvaluation(
-        evaluationId,
-        evaluation.crop_type,
-        evaluation.farmer_id,
-        evaluation.farmer.wallet_address,
-        evaluation.valeur_estimee,
-        new Date(evaluation.harvest_date).getTime()
-      );
+      const result = await response.json();
 
-      if (!tokenizationResult.success) {
+      if (!response.ok || !result.success) {
         throw new Error(
-          tokenizationResult.error || "Erreur lors de la tokenisation"
+          result.error || result.details || "Erreur lors de l'approbation"
         );
-      }
-
-      // Mettre à jour le statut dans la base de données
-      await cropEvaluationService.updateEvaluationStatus(
-        evaluationId,
-        "approved"
-      );
-
-      // Envoyer une notification à l'agriculteur
-      try {
-        await notificationService.sendNotification({
-          userId: evaluation.farmer_id,
-          type: "evaluation_approved",
-          title: "Évaluation Approuvée",
-          message: `Votre évaluation de ${
-            CROP_TYPES[evaluation.crop_type as keyof typeof CROP_TYPES]
-          } a été approuvée. ${
-            evaluation.valeur_estimee
-          } tokens MAZAO ont été créés et ajoutés à votre portefeuille.`,
-          data: {
-            evaluationId,
-            tokenAmount: evaluation.valeur_estimee,
-            cropType: evaluation.crop_type,
-            actionUrl: `/dashboard/farmer/portfolio`,
-          },
-          channels: ["in_app", "email"],
-        });
-      } catch (notifError) {
-        console.error("Erreur lors de l'envoi de la notification:", notifError);
-        // Ne pas bloquer le processus si la notification échoue
       }
 
       // Remove from pending list

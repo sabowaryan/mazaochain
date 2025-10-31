@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { 
-  Client, 
-  PrivateKey, 
-  ContractExecuteTransaction, 
-  ContractId,
-  ContractFunctionParameters,
-  ContractCallQuery
-} from "@hashgraph/sdk";
+
+// Import dynamique du SDK Hedera pour éviter les erreurs de build
+// Le SDK sera chargé uniquement lors de l'exécution de la route
 
 // Configuration pour Vercel - permet jusqu'à 60 secondes d'exécution
 export const maxDuration = 60;
@@ -78,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Initialiser le client Hedera (côté serveur uniquement)
-    let client: Client;
+    let client: any;
     let tokenId: string | null = null;
     let transactionId: string | null = null;
 
@@ -96,6 +91,16 @@ export async function POST(request: NextRequest) {
       if (!tokenFactoryId) {
         throw new Error('NEXT_PUBLIC_MAZAO_TOKEN_FACTORY_CONTRACT_ID non configuré');
       }
+
+      // Import dynamique du SDK Hedera pour éviter les erreurs de build
+      const { 
+        Client, 
+        PrivateKey, 
+        ContractExecuteTransaction, 
+        ContractId,
+        ContractFunctionParameters,
+        ContractCallQuery
+      } = await import('@hashgraph/sdk');
 
       // Initialiser le client Hedera
       client = network === 'mainnet' 

@@ -1,0 +1,25 @@
+[Unit]
+Description=MazaoChain Tokenization Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/mazaochain/services/tokenization
+Environment="NODE_ENV=production"
+EnvironmentFile=/opt/mazaochain/services/tokenization/.env
+ExecStart=/usr/bin/node index.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/mazaochain/tokenization.log
+StandardError=append:/var/log/mazaochain/tokenization-error.log
+
+# Sécurité
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/mazaochain
+
+[Install]
+WantedBy=multi-user.target

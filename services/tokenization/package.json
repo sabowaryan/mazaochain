@@ -1,0 +1,28 @@
+{
+  "name": "mazaochain-tokenization-service",
+  "version": "1.0.0",
+  "description": "Service externe de tokenisation blockchain pour MazaoChain utilisant Hedera SDK",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "hedera",
+    "blockchain",
+    "tokenization",
+    "mazaochain"
+  ],
+  "author": "MazaoChain Team",
+  "license": "MIT",
+  "dependencies": {
+    "@hashgraph/sdk": "^2.49.2",
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

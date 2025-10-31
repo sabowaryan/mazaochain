@@ -2206,8 +2206,14 @@ class HederaWalletService {
         return this.getAccountBalance(hederaAccountId);
       }
 
-      // For EVM addresses, we would need to use a different approach
-      // For now, return zero balance to avoid API errors
+      // For EVM addresses (0x...), use JSON-RPC endpoint
+      if (targetAccountId.match(/^0x[a-fA-F0-9]{40}$/)) {
+        console.log("Using JSON-RPC for EVM address balance query:", targetAccountId);
+        return this.getEvmAccountBalance(targetAccountId);
+      }
+
+      // Unknown address format
+      console.error("Unknown address format:", targetAccountId);
       return {
         hbar: "0",
         tokens: [],
@@ -2240,15 +2246,20 @@ class HederaWalletService {
       const tokens: TokenBalance[] = [];
 
       if (accountData.balance.tokens && accountData.balance.tokens.length > 0) {
-        for (const token of accountData.balance.tokens) {
-          tokens.push({
+        // Fetch token metadata in parallel for better performance
+        const tokenPromises = accountData.balance.tokens.map(async (token: any) => {
+          const metadata = await this.getTokenMetadata(token.token_id, mirrorNodeUrl);
+          return {
             tokenId: token.token_id,
             balance: token.balance.toString(),
-            decimals: token.decimals || 6,
-            symbol: this.getTokenSymbol(token.token_id),
-            name: this.getTokenName(token.token_id),
-          });
-        }
+            decimals: metadata.decimals || token.decimals || 6,
+            symbol: metadata.symbol || "UNKNOWN",
+            name: metadata.name || "Unknown Token",
+          };
+        });
+
+        const resolvedTokens = await Promise.all(tokenPromises);
+        tokens.push(...resolvedTokens);
       }
 
       return {
@@ -2266,26 +2277,193 @@ class HederaWalletService {
     }
   }
 
-  private getTokenSymbol(tokenId: string): string {
-    // This would typically come from a token registry or API
-    const tokenSymbols: Record<string, string> = {
-      // Hedera testnet USDC token ID (example)
-      "0.0.456858": "USDC",
-      // Add more known token IDs and their symbols
-    };
+  /**
+   * Get token metadata from Mirror Node API
+   * Fetches symbol, name, and decimals for a given token ID
+   */
+  private async getTokenMetadata(
+    tokenId: string,
+    mirrorNodeUrl: string
+  ): Promise<{ symbol: string; name: string; decimals: number }> {
+    try {
+      const response = await fetch(`${mirrorNodeUrl}/api/v1/tokens/${tokenId}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch token metadata: ${response.statusText}`);
+      }
 
-    return tokenSymbols[tokenId] || "UNKNOWN";
+      const tokenData = await response.json();
+
+      return {
+        symbol: tokenData.symbol || "UNKNOWN",
+        name: tokenData.name || "Unknown Token",
+        decimals: tokenData.decimals || 6,
+      };
+    } catch (error) {
+      console.warn(`Failed to get metadata for token ${tokenId}:`, error);
+      
+      // Fallback to static registry for known tokens
+      const knownTokens: Record<string, { symbol: string; name: string; decimals: number }> = {
+        "0.0.456858": { symbol: "USDC", name: "USD Coin", decimals: 6 },
+        // Add more known tokens as needed
+      };
+
+      return knownTokens[tokenId] || {
+        symbol: "UNKNOWN",
+        name: "Unknown Token",
+        decimals: 6,
+      };
+    }
   }
 
-  private getTokenName(tokenId: string): string {
-    // This would typically come from a token registry or API
-    const tokenNames: Record<string, string> = {
-      // Hedera testnet USDC token ID (example)
-      "0.0.456858": "USD Coin",
-      // Add more known token IDs and their names
-    };
+  /**
+   * Get account balance for EVM addresses using JSON-RPC
+   * Hedera provides JSON-RPC endpoints compatible with Ethereum
+   */
+  private async getEvmAccountBalance(evmAddress: string): Promise<WalletBalances> {
+    try {
+      // Dynamic import to avoid SSR issues
+      const ethersModule = await import("ethers") as any;
+      const { JsonRpcProvider, formatEther, Contract, formatUnits } = ethersModule;
 
-    return tokenNames[tokenId] || "Unknown Token";
+      // Hedera JSON-RPC endpoints
+      const rpcUrl =
+        env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
+          ? "https://mainnet.hashio.io/api"
+          : "https://testnet.hashio.io/api";
+
+      // Create provider
+      const provider = new JsonRpcProvider(rpcUrl);
+
+      // Get HBAR balance (in wei, need to convert to HBAR)
+      const balanceWei = await provider.getBalance(evmAddress);
+      const hbarBalance = formatEther(balanceWei);
+
+      console.log(`EVM address ${evmAddress} balance: ${hbarBalance} HBAR`);
+
+      // Get token balances using Mirror Node API
+      const tokens: TokenBalance[] = [];
+      try {
+        const mirrorNodeUrl =
+          env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
+            ? "https://mainnet-public.mirrornode.hedera.com"
+            : "https://testnet.mirrornode.hedera.com";
+
+        // Try to get the Hedera account ID from the EVM address
+        const accountResponse = await fetch(
+          `${mirrorNodeUrl}/api/v1/accounts?account.publickey=${evmAddress}`
+        );
+
+        if (accountResponse.ok) {
+          const accountData = await accountResponse.json();
+          if (accountData.accounts && accountData.accounts.length > 0) {
+            const hederaAccountId = accountData.accounts[0].account;
+
+            // Get token balances from Mirror Node
+            const balanceResponse = await fetch(
+              `${mirrorNodeUrl}/api/v1/accounts/${hederaAccountId}`
+            );
+
+            if (balanceResponse.ok) {
+              const balanceData = await balanceResponse.json();
+
+              if (balanceData.balance?.tokens && balanceData.balance.tokens.length > 0) {
+                // ERC-20 ABI for balanceOf, decimals, symbol, and name
+                const erc20Abi = [
+                  "function balanceOf(address) view returns (uint256)",
+                  "function decimals() view returns (uint8)",
+                  "function symbol() view returns (string)",
+                  "function name() view returns (string)",
+                ];
+
+                for (const token of balanceData.balance.tokens) {
+                  try {
+                    // Convert Hedera token ID to EVM address
+                    const tokenEvmAddress = await this.getTokenEvmAddress(
+                      token.token_id,
+                      mirrorNodeUrl
+                    );
+
+                    if (tokenEvmAddress) {
+                      const tokenContract = new Contract(tokenEvmAddress, erc20Abi, provider);
+
+                      // Get token details
+                      const [balance, decimals, symbol, name] = await Promise.all([
+                        tokenContract.balanceOf(evmAddress),
+                        tokenContract.decimals().catch(() => 6),
+                        tokenContract.symbol().catch(() => "UNKNOWN"),
+                        tokenContract.name().catch(() => "Unknown Token"),
+                      ]);
+
+                      tokens.push({
+                        tokenId: token.token_id,
+                        balance: balance.toString(),
+                        decimals: Number(decimals),
+                        symbol: symbol,
+                        name: name,
+                      });
+                    } else {
+                      // Fallback to Mirror Node metadata
+                      const metadata = await this.getTokenMetadata(token.token_id, mirrorNodeUrl);
+                      tokens.push({
+                        tokenId: token.token_id,
+                        balance: token.balance.toString(),
+                        decimals: metadata.decimals || token.decimals || 6,
+                        symbol: metadata.symbol,
+                        name: metadata.name,
+                      });
+                    }
+                  } catch (tokenError) {
+                    console.warn(`Failed to get ERC-20 details for token ${token.token_id}:`, tokenError);
+                    // Fallback to Mirror Node metadata
+                    const metadata = await this.getTokenMetadata(token.token_id, mirrorNodeUrl);
+                    tokens.push({
+                      tokenId: token.token_id,
+                      balance: token.balance.toString(),
+                      decimals: metadata.decimals || token.decimals || 6,
+                      symbol: metadata.symbol,
+                      name: metadata.name,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (tokenError) {
+        console.warn("Failed to get token balances for EVM address:", tokenError);
+      }
+
+      return {
+        hbar: hbarBalance,
+        tokens,
+      };
+    } catch (error) {
+      console.error("Failed to get EVM account balance:", error);
+      return {
+        hbar: "0",
+        tokens: [],
+      };
+    }
+  }
+
+  /**
+   * Get EVM address for a Hedera token ID
+   */
+  private async getTokenEvmAddress(
+    tokenId: string,
+    mirrorNodeUrl: string
+  ): Promise<string | null> {
+    try {
+      const response = await fetch(`${mirrorNodeUrl}/api/v1/tokens/${tokenId}`);
+      if (response.ok) {
+        const tokenData = await response.json();
+        return tokenData.evm_address || null;
+      }
+    } catch (error) {
+      console.warn(`Failed to get EVM address for token ${tokenId}:`, error);
+    }
+    return null;
   }
 
   /**

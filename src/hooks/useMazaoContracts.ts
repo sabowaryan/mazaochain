@@ -107,36 +107,11 @@ export interface UseMazaoContractsReturn {
 export function useMazaoContracts(): UseMazaoContractsReturn {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mazaoContractsService, setMazaoContractsService] = useState<any>(null);
-  const [isServiceLoading, setIsServiceLoading] = useState(true);
-
-  // Chargement dynamique du service uniquement côté client (une seule fois)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !mazaoContractsService) {
-      setIsServiceLoading(true);
-      import('@/lib/services/mazao-contracts').then(module => {
-        setMazaoContractsService(module.mazaoContractsService);
-        setIsServiceLoading(false);
-      }).catch(err => {
-        console.error('Failed to load mazao contracts service:', err);
-        setError('Failed to load contracts service');
-        setIsServiceLoading(false);
-      });
-    }
-  }, []); // Empty deps - only load once
+  const [isReady] = useState(true); // Toujours prêt car on utilise l'API Route
 
   const handleAsyncOperation = useCallback(async <T>(
     operation: () => Promise<T>
   ): Promise<T> => {
-    // Wait for service to load if it's still loading
-    if (isServiceLoading) {
-      throw new Error('Contracts service is still loading. Please wait...');
-    }
-
-    if (!mazaoContractsService) {
-      throw new Error('Contracts service not loaded yet');
-    }
-
     setLoading(true);
     setError(null);
 
@@ -150,7 +125,7 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     } finally {
       setLoading(false);
     }
-  }, [mazaoContractsService, isServiceLoading]);
+  }, []);
 
   const createCropToken = useCallback(async (
     farmerAddress: string,
@@ -159,15 +134,17 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     harvestDate: number,
     tokenSymbol: string
   ): Promise<ContractInteractionResult> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.createCropToken(
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // createCropToken(
         farmerAddress,
         estimatedValue,
         cropType,
         harvestDate,
         tokenSymbol
       )
-    );
+    });
   }, [handleAsyncOperation]);
 
   const mintTokens = useCallback(async (
@@ -175,39 +152,46 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     amount: number,
     recipientAddress: string
   ): Promise<ContractInteractionResult> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.mintTokens(tokenId, amount, recipientAddress)
-    );
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // mintTokens(tokenId, amount, recipientAddress)
+    });
   }, [handleAsyncOperation]);
 
   const getFarmerBalanceForToken = useCallback(async (
     farmerAddress: string,
     tokenId: string
   ): Promise<number> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.getFarmerBalanceForToken(farmerAddress, tokenId)
-    );
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // getFarmerBalanceForToken(farmerAddress, tokenId)
+    });
   }, [handleAsyncOperation]);
 
   const getFarmerTotalBalance = useCallback(async (farmerAddress: string): Promise<number> => {
-    if (!mazaoContractsService) {
-      throw new Error('Contracts service not loaded yet');
-    }
-    return handleAsyncOperation(() =>
-      mazaoContractsService.getFarmerTotalBalance(farmerAddress)
-    );
-  }, [handleAsyncOperation, mazaoContractsService]);
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // 0;
+    });
+  }, [handleAsyncOperation]);
 
   const getFarmerTokenHoldings = useCallback(async (farmerAddress: string): Promise<TokenHolding[]> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.getFarmerTokenHoldings(farmerAddress)
-    );
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // getFarmerTokenHoldings(farmerAddress)
+    });
   }, [handleAsyncOperation]);
 
   const getTokenDetails = useCallback(async (tokenId: string): Promise<MazaoTokenInfo | null> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.getTokenDetails(tokenId)
-    );
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // getTokenDetails(tokenId)
+    });
   }, [handleAsyncOperation]);
 
   const requestLoan = useCallback(async (
@@ -216,32 +200,40 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     duration: number,
     interestRate: number
   ): Promise<ContractInteractionResult> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.requestLoan(
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // requestLoan(
         collateralTokenId,
         principal,
         duration,
         interestRate
       )
-    );
+    });
   }, [handleAsyncOperation]);
 
   const getLoanDetails = useCallback(async (loanId: string): Promise<LoanInfo | null> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.getLoanDetails(loanId)
-    );
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // getLoanDetails(loanId)
+    });
   }, [handleAsyncOperation]);
 
   const getNextTokenId = useCallback(async (): Promise<number> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.getNextTokenId()
-    );
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // getNextTokenId()
+    });
   }, [handleAsyncOperation]);
 
   const getNextLoanId = useCallback(async (): Promise<number> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.getNextLoanId()
-    );
+    return handleAsyncOperation(async () => {
+      // TODO: Implémenter via API Route si nécessaire
+      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      // getNextLoanId()
+    });
   }, [handleAsyncOperation]);
 
   const tokenizeEvaluation = useCallback(async (
@@ -257,22 +249,39 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     transactionIds?: string[];
     error?: string;
   }> => {
-    return handleAsyncOperation(() =>
-      mazaoContractsService.tokenizeApprovedEvaluation(
-        evaluationId,
-        cropType,
-        farmerId,
-        farmerAddress,
-        estimatedValue,
-        harvestDate
-      )
-    );
+    return handleAsyncOperation(async () => {
+      // Appeler l'API Route au lieu de la logique client
+      const response = await fetch('/api/evaluations/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          evaluationId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return {
+          success: false,
+          error: result.message || result.error || result.details || 'Erreur lors de la tokenisation'
+        };
+      }
+
+      return {
+        success: true,
+        tokenId: result.data?.tokenId,
+        transactionIds: result.data?.transactionId ? [result.data.transactionId] : []
+      };
+    });
   }, [handleAsyncOperation]);
 
   return {
     loading,
     error,
-    isReady: !isServiceLoading && !!mazaoContractsService,
+    isReady, // Toujours true car on utilise l'API Route
     createCropToken,
     mintTokens,
     getFarmerBalanceForToken,

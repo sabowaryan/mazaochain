@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { Client, PrivateKey, ContractExecuteTransaction, ContractId } from "@hashgraph/sdk";
+import { 
+  Client, 
+  PrivateKey, 
+  ContractExecuteTransaction, 
+  ContractId,
+  ContractFunctionParameters,
+  ContractCallQuery
+} from "@hashgraph/sdk";
 
 // Configuration pour Vercel - permet jusqu'à 60 secondes d'exécution
 export const maxDuration = 60;
@@ -107,44 +114,113 @@ export async function POST(request: NextRequest) {
       });
 
       // 5. Créer le token sur la blockchain
-      // NOTE: Cette implémentation est simplifiée
-      // Dans un environnement de production, vous devriez:
-      // - Utiliser les méthodes appropriées de votre smart contract
-      // - Gérer les erreurs de transaction plus finement
-      // - Implémenter un système de retry
-      
       const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase()}-${Date.now()}`;
-      
-      // Exemple de transaction de création de token
-      // Adaptez selon votre contrat intelligent
+      const harvestDateTimestamp = Math.floor(new Date(evaluation.harvest_date).getTime() / 1000);
+
+      console.log('Préparation de la transaction createCropToken:', {
+        farmer: farmerProfile.wallet_address,
+        estimatedValue: evaluation.valeur_estimee,
+        cropType: evaluation.crop_type,
+        harvestDate: harvestDateTimestamp,
+        tokenSymbol
+      });
+
+      // Préparer les paramètres de la fonction selon l'ABI du contrat
+      // createCropToken(address farmer, uint256 estimatedValue, string cropType, uint256 harvestDate, string tokenSymbol)
+      const functionParams = new ContractFunctionParameters()
+        .addAddress(farmerProfile.wallet_address)  // farmer address
+        .addUint256(evaluation.valeur_estimee)     // estimatedValue
+        .addString(evaluation.crop_type)           // cropType
+        .addUint256(harvestDateTimestamp)          // harvestDate (Unix timestamp)
+        .addString(tokenSymbol);                   // tokenSymbol
+
+      // Créer la transaction
       const transaction = new ContractExecuteTransaction()
         .setContractId(ContractId.fromString(tokenFactoryId))
-        .setGas(1000000)
-        .setFunction(
-          "createCropToken",
-          // Paramètres à adapter selon votre contrat
-          // Ces valeurs sont des exemples
-        );
+        .setGas(1000000)  // 1M gas - ajuster si nécessaire
+        .setFunction("createCropToken", functionParams);
 
       // Exécuter la transaction
-      // const txResponse = await transaction.execute(client);
-      // const receipt = await txResponse.getReceipt(client);
-      
-      // Pour l'instant, simulation de la création du token
-      // À REMPLACER par la vraie logique de votre smart contract
-      tokenId = `0.0.${Math.floor(Math.random() * 1000000)}`;
-      transactionId = `0.0.${accountId}@${Date.now()}.${Math.floor(Math.random() * 1000000)}`;
+      console.log('Exécution de la transaction createCropToken...');
+      const txResponse = await transaction.execute(client);
+      transactionId = txResponse.transactionId.toString();
+
+      // Attendre la confirmation
+      console.log('Attente de la confirmation de la transaction:', transactionId);
+      const receipt = await txResponse.getReceipt(client);
+
+      // Vérifier le statut
+      if (receipt.status.toString() !== 'SUCCESS') {
+        throw new Error(`Transaction échouée avec le statut: ${receipt.status.toString()}`);
+      }
+
+      console.log('Transaction confirmée avec succès:', {
+        transactionId,
+        status: receipt.status.toString()
+      });
+
+      // Récupérer le tokenId créé
+      // Méthode 1: Query le nextTokenId - 1 (le token qui vient d'être créé)
+      try {
+        const query = new ContractCallQuery()
+          .setContractId(ContractId.fromString(tokenFactoryId))
+          .setGas(100000)
+          .setFunction("nextTokenId");
+
+        const queryResult = await query.execute(client);
+        const nextTokenId = queryResult.getUint256(0);
+        
+        // Le token créé est nextTokenId - 1
+        const createdTokenId = nextTokenId.toNumber() - 1;
+        tokenId = createdTokenId.toString();
+
+        console.log('TokenId récupéré:', {
+          nextTokenId: nextTokenId.toString(),
+          createdTokenId: tokenId
+        });
+      } catch (queryError) {
+        console.error('Erreur lors de la récupération du tokenId:', queryError);
+        // Fallback: utiliser un ID temporaire basé sur le timestamp
+        tokenId = `temp-${Date.now()}`;
+        console.warn('Utilisation d\'un tokenId temporaire:', tokenId);
+      }
 
       console.log('Token créé avec succès:', {
         tokenId,
         transactionId,
         evaluationId,
         cropType: evaluation.crop_type,
-        estimatedValue: evaluation.valeur_estimee
+        estimatedValue: evaluation.valeur_estimee,
+        tokenSymbol
       });
 
     } catch (blockchainError) {
       console.error('Erreur lors de la création du token sur Hedera:', blockchainError);
+      
+      // Déterminer le type d'erreur pour un message plus précis
+      let errorMessage = 'Erreur blockchain inconnue';
+      let errorDetails = '';
+      
+      if (blockchainError instanceof Error) {
+        errorDetails = blockchainError.message;
+        
+        // Messages d'erreur spécifiques selon le type d'erreur Hedera
+        if (errorDetails.includes('INSUFFICIENT_ACCOUNT_BALANCE')) {
+          errorMessage = 'Solde insuffisant sur le compte Hedera pour exécuter la transaction';
+        } else if (errorDetails.includes('INVALID_CONTRACT_ID')) {
+          errorMessage = 'ID de contrat invalide - vérifiez la configuration';
+        } else if (errorDetails.includes('CONTRACT_REVERT_EXECUTED')) {
+          errorMessage = 'Le contrat a rejeté la transaction - vérifiez les paramètres';
+        } else if (errorDetails.includes('INVALID_SIGNATURE')) {
+          errorMessage = 'Signature invalide - vérifiez les clés privées';
+        } else if (errorDetails.includes('INSUFFICIENT_GAS')) {
+          errorMessage = 'Gas insuffisant - augmentez la limite de gas';
+        } else if (errorDetails.includes('TIMEOUT')) {
+          errorMessage = 'Timeout de la transaction - réessayez';
+        } else {
+          errorMessage = errorDetails;
+        }
+      }
       
       // Enregistrer l'erreur dans la base de données pour audit
       await supabase
@@ -152,8 +228,10 @@ export async function POST(request: NextRequest) {
         .update({
           status: 'failed',
           metadata: {
-            error: blockchainError instanceof Error ? blockchainError.message : 'Erreur blockchain inconnue',
-            timestamp: new Date().toISOString()
+            error: errorMessage,
+            errorDetails: errorDetails,
+            timestamp: new Date().toISOString(),
+            errorStack: blockchainError instanceof Error ? blockchainError.stack : undefined
           }
         })
         .eq('id', evaluationId);
@@ -161,7 +239,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Erreur lors de la tokenisation sur la blockchain',
-          details: blockchainError instanceof Error ? blockchainError.message : 'Erreur inconnue'
+          message: errorMessage,
+          details: errorDetails
         },
         { status: 500 }
       );

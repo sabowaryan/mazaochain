@@ -14,7 +14,7 @@ import { EvaluationDetails } from "@/components/crop-evaluation/EvaluationDetail
 import { CROP_TYPES } from "@/types/crop-evaluation";
 import type { Tables } from "@/lib/supabase/database.types";
 import { notificationService } from "@/lib/services/notification";
-// import { useMazaoContracts } from "@/hooks/useMazaoContracts"; // Remplacé par API Route
+import { useMazaoContracts } from "@/hooks/useMazaoContracts";
 
 interface PendingEvaluationsReviewProps {
   cooperativeId: string;
@@ -33,7 +33,7 @@ export function PendingEvaluationsReview({
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const cropEvaluationService = new CropEvaluationService();
-  // const { tokenizeEvaluation, loading: contractsLoading } = useMazaoContracts(); // Remplacé par API Route
+  const { tokenizeEvaluation, loading: contractsLoading } = useMazaoContracts();
 
   useEffect(() => {
     loadPendingEvaluations();
@@ -66,22 +66,24 @@ export function PendingEvaluationsReview({
         throw new Error("Évaluation non trouvée");
       }
 
-      // Appeler l'API Route pour approuver et tokeniser l'évaluation
-      const response = await fetch('/api/evaluations/approve', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          evaluationId,
-        }),
-      });
+      // Vérifier que le fermier a une adresse wallet
+      if (!evaluation.farmer?.wallet_address) {
+        throw new Error("Le fermier n'a pas d'adresse wallet configurée");
+      }
 
-      const result = await response.json();
+      // Tokeniser l'évaluation approuvée via le hook (qui appelle l'API Route)
+      const tokenizationResult = await tokenizeEvaluation(
+        evaluationId,
+        evaluation.crop_type,
+        evaluation.farmer_id,
+        evaluation.farmer.wallet_address,
+        evaluation.valeur_estimee,
+        new Date(evaluation.harvest_date).getTime()
+      );
 
-      if (!response.ok || !result.success) {
+      if (!tokenizationResult.success) {
         throw new Error(
-          result.error || result.details || "Erreur lors de l'approbation"
+          tokenizationResult.error || "Erreur lors de la tokenisation"
         );
       }
 
@@ -252,8 +254,11 @@ export function PendingEvaluationsReview({
               onClick={() =>
                 handleRejectEvaluation((selectedEvaluation as any).id)
               }
-              loading={processingId === (selectedEvaluation as any).id}
-              disabled={processingId !== null}
+              loading={
+                processingId === (selectedEvaluation as any).id ||
+                contractsLoading
+              }
+              disabled={processingId !== null || contractsLoading}
             >
               Rejeter
             </Button>

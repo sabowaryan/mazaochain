@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client'
-// import { hederaTokenService } from './hedera-token' // Converti en importation dynamique conditionnelle
+import { hederaTokenService } from './hedera-token'
 // import { CropEvaluationService } from './crop-evaluation' // Removed to avoid circular dependency
 import type { 
   TokenizationRequest, 
@@ -40,21 +40,15 @@ export class TokenizationService {
       await this.updateTokenizationStatus(tokenizationRecord.id, 'minting')
 
       // Execute tokenization on Hedera
-      let tokenizationResult = { success: false, error: 'Tokenization skipped: Not running in client environment.' };
-
-      if (typeof window !== 'undefined') {
-        const { mazaoContractsService } = await import('./mazao-contracts');
-        tokenizationResult = await mazaoContractsService.tokenizeApprovedEvaluation(
-          request.evaluationId,
-          request.cropType,
-          request.farmerId,
-          request.farmerAccountId,
-          request.estimatedValue,
-          request.harvestDate
-        )
-      } else {
-        console.warn('Tokenization skipped on server/build environment for evaluation:', request.evaluationId);
-      }
+      const { mazaoContractsService } = await import('./mazao-contracts');
+      const tokenizationResult = await mazaoContractsService.tokenizeApprovedEvaluation(
+        request.evaluationId,
+        request.cropType,
+        request.farmerId,
+        request.farmerAccountId,
+        request.estimatedValue,
+        request.harvestDate
+      )
 
       if (tokenizationResult.success) {
         // Update record with success
@@ -148,11 +142,7 @@ export class TokenizationService {
         if (evaluation.farmer_id !== farmerId) continue
 
         // Get token info from Hedera
-        let tokenInfo = null;
-        if (typeof window !== 'undefined') {
-          const { hederaTokenService } = await import('./hedera-token');
-          tokenInfo = await hederaTokenService.getTokenInfo(record.token_id)
-        }
+        const tokenInfo = await hederaTokenService.getTokenInfo(record.token_id)
         
         if (tokenInfo) {
           const portfolioToken: PortfolioToken = {

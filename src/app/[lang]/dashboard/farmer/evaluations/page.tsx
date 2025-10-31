@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -9,6 +9,7 @@ import { CropEvaluationForm } from '@/components/crop-evaluation/CropEvaluationF
 import { EvaluationHistory } from '@/components/crop-evaluation/EvaluationHistory';
 import { ModernPageHeader } from '@/components/ui/ModernPageHeader';
 import { StatCard } from '@/components/ui/StatCard';
+import { CropEvaluationService } from '@/lib/services/crop-evaluation';
 import {
   ClipboardDocumentListIcon,
   PlusIcon,
@@ -29,6 +30,43 @@ import {
 export default function FarmerEvaluationsPage() {
   const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
+  const [stats, setStats] = useState({
+    approved: 0,
+    pending: 0,
+    totalValue: 0,
+    loading: true,
+  });
+
+  const cropEvaluationService = new CropEvaluationService();
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchStats = async () => {
+      try {
+        const evaluations = await cropEvaluationService.getFarmerEvaluations(user.id);
+        const evaluationsArray = Array.isArray(evaluations) ? evaluations : [];
+
+        const approved = evaluationsArray.filter(e => e.status === 'approved').length;
+        const pending = evaluationsArray.filter(e => e.status === 'pending').length;
+        const totalValue = evaluationsArray
+          .filter(e => e.status === 'approved')
+          .reduce((sum, e) => sum + (e.valeur_estimee || 0), 0);
+
+        setStats({
+          approved,
+          pending,
+          totalValue,
+          loading: false,
+        });
+      } catch (error) {
+        console.error('Error fetching evaluation stats:', error);
+        setStats(prev => ({ ...prev, loading: false }));
+      }
+    };
+
+    fetchStats();
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!user) {
     return (
@@ -72,7 +110,7 @@ export default function FarmerEvaluationsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 mb-8 lg:mb-12">
           <StatCard
             title="Approuvées"
-            value={2}
+            value={stats.loading ? '...' : stats.approved}
             subtitle="Évaluations validées"
             icon={<CheckCircleIconSolid className="w-6 h-6 text-white" />}
             accentIcon={<SparklesIcon className="w-5 h-5" />}
@@ -81,7 +119,7 @@ export default function FarmerEvaluationsPage() {
 
           <StatCard
             title="En attente"
-            value={1}
+            value={stats.loading ? '...' : stats.pending}
             subtitle="En cours de validation"
             icon={<ClockIconSolid className="w-6 h-6 text-white" />}
             accentIcon={<ClockIcon className="w-5 h-5" />}
@@ -90,7 +128,7 @@ export default function FarmerEvaluationsPage() {
 
           <StatCard
             title="Valeur totale"
-            value="$17,500"
+            value={stats.loading ? '...' : `$${stats.totalValue.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
             subtitle="Cultures évaluées"
             icon={<CurrencyDollarIconSolid className="w-6 h-6 text-white" />}
             accentIcon={<CurrencyDollarIcon className="w-5 h-5" />}
@@ -133,8 +171,23 @@ export default function FarmerEvaluationsPage() {
               {showForm ? (
                 <div className="bg-gradient-to-br from-gray-50 to-white p-6 rounded-xl border border-gray-200">
                   <CropEvaluationForm 
-                    onSuccess={() => {
+                    onSuccess={async () => {
                       setShowForm(false);
+                      // Recharger les statistiques
+                      if (user) {
+                        try {
+                          const evaluations = await cropEvaluationService.getFarmerEvaluations(user.id);
+                          const evaluationsArray = Array.isArray(evaluations) ? evaluations : [];
+                          const approved = evaluationsArray.filter(e => e.status === 'approved').length;
+                          const pending = evaluationsArray.filter(e => e.status === 'pending').length;
+                          const totalValue = evaluationsArray
+                            .filter(e => e.status === 'approved')
+                            .reduce((sum, e) => sum + (e.valeur_estimee || 0), 0);
+                          setStats({ approved, pending, totalValue, loading: false });
+                        } catch (error) {
+                          console.error('Error refreshing stats:', error);
+                        }
+                      }
                       // Recharger l'historique
                       window.location.reload();
                     }}

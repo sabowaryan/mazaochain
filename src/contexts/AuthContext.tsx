@@ -341,26 +341,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    console.log('🔓 Starting sign out process...');
     setAuthState(prev => ({ ...prev, loading: true }));
 
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      console.error('Error signing out:', error);
-      setAuthState(prev => ({ ...prev, loading: false }));
-      return;
-    }
-
-    // Force a full reload so that middleware refreshes/clears cookies properly
     try {
+      // Disconnect wallet first
+      try {
+        const { hederaWalletService } = await import('@/lib/wallet/hedera-wallet');
+        await hederaWalletService.disconnectWallet();
+        console.log('✅ Wallet disconnected successfully');
+      } catch (walletError) {
+        console.warn('⚠️ Error disconnecting wallet:', walletError);
+        // Continue with sign out even if wallet disconnect fails
+      }
+
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('❌ Error signing out from Supabase:', error);
+        setAuthState(prev => ({ ...prev, loading: false }));
+        return;
+      }
+
+      console.log('✅ Successfully signed out from Supabase');
+
+      // Clear local state immediately
+      setAuthState({
+        user: null,
+        profile: null,
+        loading: false,
+        initialized: true,
+      });
+
+      // Clear any remaining session data
+      if (typeof window !== 'undefined') {
+        try {
+          // Clear localStorage items related to wallet and session
+          localStorage.removeItem('hedera_wallet_session');
+          sessionStorage.clear();
+          
+          // Clear any WalletConnect storage
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('wc@2:') || key.startsWith('appkit') || key.startsWith('reown')) {
+              localStorage.removeItem(key);
+            }
+          });
+          
+          console.log('✅ Cleared local storage and wallet sessions');
+        } catch (storageError) {
+          console.warn('⚠️ Error clearing storage:', storageError);
+        }
+      }
+
+      // Redirect to login page
       const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/fr';
       const locale = currentPath.split('/')[1] || 'fr';
-      window.location.href = `/${locale}/auth/login`;
-    } catch {
-      // Fallback
-      window.location.href = `/fr/auth/login`;
+      const loginUrl = `/${locale}/auth/login`;
+      
+      console.log(`🔄 Redirecting to ${loginUrl}`);
+      
+      // Use router.push first, then fallback to window.location if needed
+      router.push(loginUrl);
+      
+      // Force reload after a short delay to ensure middleware processes the sign out
+      setTimeout(() => {
+        window.location.href = loginUrl;
+      }, 100);
+      
+    } catch (error) {
+      console.error('❌ Unexpected error during sign out:', error);
+      setAuthState(prev => ({ ...prev, loading: false }));
     }
-  }, [supabase]);
+  }, [supabase, router]);
 
   // Helper functions
   const isAuthenticated = !!authState.user;

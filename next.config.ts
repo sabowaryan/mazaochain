@@ -22,15 +22,22 @@ const nextConfig = {
   webpack: (config: { externals: string[]; resolve: { fallback: any; }; plugins: any[]; }, { isServer }: { isServer: boolean }) => {
     // Externaliser les modules problématiques (recommandation Reown Appkit)
     config.externals.push("pino-pretty", "lokijs", "encoding");
-    
-    // Externaliser @hashgraph/sdk côté serveur pour éviter les erreurs Buffer.constants
-    if (isServer) {
-      config.externals.push('@hashgraph/sdk');
-    }
 
-    // Ajouter le plugin ProvidePlugin pour buffer (nécessaire pour @hashgraph/sdk côté client uniquement)
-    if (!isServer) {
-      const webpack = require('webpack');
+    // Ajouter le plugin ProvidePlugin pour buffer (nécessaire pour @hashgraph/sdk)
+    const webpack = require('webpack');
+    
+    // Côté serveur: polyfill Buffer pour le SDK Hedera
+    if (isServer) {
+      config.plugins.push(
+        new webpack.DefinePlugin({
+          'Buffer.constants': JSON.stringify({
+            MAX_LENGTH: 2147483647,
+            MAX_STRING_LENGTH: 536870888
+          })
+        })
+      );
+    } else {
+      // Côté client: polyfills complets
       config.plugins.push(
         new webpack.ProvidePlugin({
           Buffer: ['buffer', 'Buffer'],
@@ -38,7 +45,6 @@ const nextConfig = {
         })
       );
 
-      // Ajouter les constantes Buffer nécessaires pour Hedera SDK côté client
       config.plugins.push(
         new webpack.DefinePlugin({
           'Buffer.constants': JSON.stringify({

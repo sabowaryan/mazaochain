@@ -2186,85 +2186,146 @@ class HederaWalletService {
     return this.appKitInstance;
   }
 
+  // paramettre de récuperation de wallet hbar
   async getAccountBalance(accountId?: string): Promise<WalletBalances> {
-    const targetAccountId = accountId || this.connectionState?.accountId;
+  const targetAccountId = accountId || this.connectionState?.accountId;
 
-    if (!targetAccountId) {
-      throw new Error("No account ID available for balance query");
-    }
-
-    debugAddress(targetAccountId, "Balance Query");
-
-    // Check if the address is valid for Mirror Node API
-    if (!isValidForMirrorNode(targetAccountId)) {
-      console.warn("Address not valid for Mirror Node API:", targetAccountId);
-
-      // Try to extract Hedera account ID if possible
-      const hederaAccountId = extractHederaAccountId(targetAccountId);
-      if (hederaAccountId && isValidForMirrorNode(hederaAccountId)) {
-        console.log("Using extracted Hedera account ID for balance query:", hederaAccountId);
-        return this.getAccountBalance(hederaAccountId);
-      }
-
-      // For EVM addresses, we would need to use a different approach
-      // For now, return zero balance to avoid API errors
-      return {
-        hbar: "0",
-        tokens: [],
-      };
-    }
-
-    try {
-      // Use Hedera Mirror Node API to get balance
-      const mirrorNodeUrl =
-        env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
-          ? "https://mainnet-public.mirrornode.hedera.com"
-          : "https://testnet.mirrornode.hedera.com";
-
-      const response = await fetch(
-        `${mirrorNodeUrl}/api/v1/accounts/${targetAccountId}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch account data: ${response.statusText}`);
-      }
-
-      const accountData = await response.json();
-
-      // Convert balance from tinybars to HBAR
-      const hbarBalance = (
-        parseInt(accountData.balance.balance) / 100000000
-      ).toString();
-
-      // Get token balances
-      const tokens: TokenBalance[] = [];
-
-      if (accountData.balance.tokens && accountData.balance.tokens.length > 0) {
-        for (const token of accountData.balance.tokens) {
-          tokens.push({
-            tokenId: token.token_id,
-            balance: token.balance.toString(),
-            decimals: token.decimals || 6,
-            symbol: this.getTokenSymbol(token.token_id),
-            name: this.getTokenName(token.token_id),
-          });
-        }
-      }
-
-      return {
-        hbar: hbarBalance,
-        tokens,
-      };
-    } catch (error) {
-      console.error("Failed to get account balance:", error);
-
-      // Return empty balance on error to avoid breaking the UI
-      return {
-        hbar: "0",
-        tokens: [],
-      };
-    }
+  if (!targetAccountId) {
+    throw new Error("No account ID available for balance query");
   }
+
+  debugAddress(targetAccountId, "Balance Query");
+
+  // Check if the address is valid for Mirror Node API
+  if (!isValidForMirrorNode(targetAccountId)) {
+    console.warn("Address not valid for Mirror Node API:", targetAccountId);
+
+    // Try to extract Hedera account ID if possible
+    const hederaAccountId = extractHederaAccountId(targetAccountId);
+    if (hederaAccountId && isValidForMirrorNode(hederaAccountId)) {
+      console.log("Using extracted Hedera account ID for balance query:", hederaAccountId);
+      return this.getAccountBalance(hederaAccountId);
+    }
+
+    // For EVM addresses, use JSON-RPC
+    if (targetAccountId.startsWith('0x')) {
+      console.log("Using EVM balance query for address:", targetAccountId);
+      return this.getEVMBalance(targetAccountId);
+    }
+
+    // Fallback: return zero balance
+    return {
+      hbar: "0",
+      tokens: [],
+    };
+  }
+
+  try {
+    // Use Hedera Mirror Node API to get balance
+    const mirrorNodeUrl =
+      env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
+        ? "https://mainnet-public.mirrornode.hedera.com"
+        : "https://testnet.mirrornode.hedera.com";
+
+    const response = await fetch(
+      ${mirrorNodeUrl}/api/v1/accounts/${targetAccountId}
+    );
+
+    if (!response.ok) {
+      throw new Error(Failed to fetch account data: ${response.statusText});
+    }
+
+    const accountData = await response.json();
+
+    // Convert balance from tinybars to HBAR
+    const hbarBalance = (
+      parseInt(accountData.balance.balance) / 100000000
+    ).toString();
+
+    // Get token balances
+    const tokens: TokenBalance[] = [];
+
+    if (accountData.balance.tokens && accountData.balance.tokens.length > 0) {
+      for (const token of accountData.balance.tokens) {
+        tokens.push({
+          tokenId: token.token_id,
+          balance: token.balance.toString(),
+          decimals: token.decimals || 6,
+          symbol: this.getTokenSymbol(token.token_id),
+          name: this.getTokenName(token.token_id),
+        });
+      }
+    }
+
+    return {
+      hbar: hbarBalance,
+      tokens,
+    };
+  } catch (error) {
+    console.error("Failed to get account balance:", error);
+
+    // Return empty balance on error to avoid breaking the UI
+    return {
+      hbar: "0",
+      tokens: [],
+    };
+  }
+}
+
+// Nouvelle méthode à ajouter dans votre classe
+private async getEVMBalance(evmAddress: string): Promise<WalletBalances> {
+  try {
+    const rpcUrl = env.NEXT_PUBLIC_HEDERA_NETWORK === "mainnet"
+      ? "https://mainnet.hashio.io/api"
+      : "https://testnet.hashio.io/api";
+
+    console.log("Querying EVM balance from:", rpcUrl);
+
+    // Query balance using JSON-RPC eth_getBalance
+    const response = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_getBalance',
+        params: [evmAddress, 'latest'],
+        id: 1
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(RPC request failed: ${response.statusText});
+    }
+
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(data.error.message);
+    }
+
+    // Convert from Wei to HBAR
+    // On Hedera EVM, 1 HBAR = 10^18 Wei (same as Ethereum)
+    const balanceWei = BigInt(data.result);
+    const hbarBalance = (Number(balanceWei) / 1e18).toFixed(8);
+
+    console.log("EVM Balance retrieved:", hbarBalance, "HBAR");
+
+    return {
+      hbar: hbarBalance,
+      tokens: [], // Token balances would need additional ERC20 queries
+    };
+  } catch (error) {
+    console.error("Failed to get EVM balance:", error);
+    
+    // Return empty balance on error
+    return {
+      hbar: "0",
+      tokens: [],
+    };
+  }
+}
+
+
 
   private getTokenSymbol(tokenId: string): string {
     // This would typically come from a token registry or API

@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
         profiles!farmer_id (
           id,
           wallet_address,
-          farmer_profiles (
+          farmer_profiles!farmer_profiles_user_id_fkey (
             nom,
             localisation
           )

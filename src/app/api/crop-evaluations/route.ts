@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
         farmer:profiles!farmer_id (
           id,
           role,
+          wallet_address,
           farmer_profiles!farmer_profiles_user_id_fkey (
             nom,
             superficie,

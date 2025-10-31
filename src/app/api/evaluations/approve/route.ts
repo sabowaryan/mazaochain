@@ -96,7 +96,8 @@ export async function POST(request: NextRequest) {
         PrivateKey, 
         ContractExecuteTransaction, 
         ContractId,
-        ContractFunctionParameters
+        ContractFunctionParameters,
+        ContractCallQuery
       } = require('@hashgraph/sdk');
 
       // Initialiser le client Hedera

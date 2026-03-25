@@ -30,6 +30,7 @@ export default clerkMiddleware(async (auth, request) => {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname.includes('.') ||
+    pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api')
   ) {
     return NextResponse.next();

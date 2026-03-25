@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { sql } from '@/lib/db';
-import { generateRequestId, createSuccessResponse, createErrorResponse } from '@/lib/errors/api-errors';
+import { prisma } from '@/lib/db';
 import { mazaoContractsService } from '@/lib/services/mazao-contracts';
 
 export async function POST(request: NextRequest) {
-  const requestId = generateRequestId();
-
   try {
     const body = await request.json();
     const { evaluationId, cropType, farmerId, farmerAddress, estimatedValue, harvestDate } = body;
@@ -16,28 +13,20 @@ export async function POST(request: NextRequest) {
     }
 
     const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const profileRows = await sql`SELECT role FROM profiles WHERE id = ${userId}`;
-    const profile = profileRows[0] as { role: string } | undefined;
-
+    const profile = await prisma.profile.findUnique({ where: { id: userId }, select: { role: true } });
     if (!profile || !['cooperative', 'admin'].includes(profile.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
     const result = await mazaoContractsService.tokenizeApprovedEvaluation(
-      evaluationId,
-      cropType,
-      farmerId,
-      farmerAddress,
-      estimatedValue,
-      harvestDate
+      evaluationId, cropType, farmerId, farmerAddress, estimatedValue, harvestDate
     );
 
-    return createSuccessResponse(result, 'Tokenization initiated successfully');
+    return NextResponse.json({ data: result, message: 'Tokenization initiated successfully' });
   } catch (error) {
-    return createErrorResponse(error, 500, requestId);
+    console.error('Error initiating tokenization:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -8,7 +8,8 @@ A decentralized lending platform for farmers built on Hedera blockchain, with Cl
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4
 - **Auth**: Clerk (`@clerk/nextjs`)
-- **Database**: Neon PostgreSQL (`@neondatabase/serverless`)
+- **ORM**: Prisma v5 (`prisma`, `@prisma/client`)
+- **Database**: Neon PostgreSQL (Prisma datasource)
 - **Blockchain**: Hedera Hashgraph via `@hashgraph/sdk`
 - **Wallet**: HashPack / WalletConnect / Reown AppKit
 - **i18n**: next-intl (fr, en, ln)

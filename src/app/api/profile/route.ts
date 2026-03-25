@@ -1,27 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { sql } from '@/lib/db';
+import { prisma } from '@/lib/db';
+import { UserRole } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
 
-  if (!userId) {
-    return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-  }
+  if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
 
   try {
-    const rows = await sql`
-      SELECT id, role, wallet_address, is_validated, created_at
-      FROM profiles
-      WHERE id = ${userId}
-    `;
-
-    if (!rows.length) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
-    }
-
-    return NextResponse.json(rows[0]);
+    const profile = await prisma.profile.findUnique({ where: { id: userId } });
+    if (!profile) return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    return NextResponse.json(profile);
   } catch (error) {
     console.error('Error fetching profile:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -30,28 +21,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const body = await request.json();
     const { role, wallet_address } = body;
 
-    if (!role || !['agriculteur', 'cooperative', 'preteur', 'admin'].includes(role)) {
+    const validRoles: UserRole[] = ['agriculteur', 'cooperative', 'preteur', 'admin'];
+    if (!role || !validRoles.includes(role as UserRole)) {
       return NextResponse.json({ error: 'Valid role is required' }, { status: 400 });
     }
 
-    const rows = await sql`
-      INSERT INTO profiles (id, role, wallet_address, is_validated)
-      VALUES (${userId}, ${role}, ${wallet_address || null}, false)
-      ON CONFLICT (id) DO UPDATE SET
-        role = EXCLUDED.role,
-        wallet_address = COALESCE(EXCLUDED.wallet_address, profiles.wallet_address)
-      RETURNING id, role, wallet_address, is_validated, created_at
-    `;
+    const profile = await prisma.profile.upsert({
+      where: { id: userId },
+      update: { role: role as UserRole, ...(wallet_address ? { wallet_address } : {}) },
+      create: { id: userId, role: role as UserRole, wallet_address: wallet_address ?? null },
+    });
 
-    return NextResponse.json(rows[0], { status: 201 });
+    return NextResponse.json(profile, { status: 201 });
   } catch (error) {
     console.error('Error creating profile:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -60,28 +47,21 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const body = await request.json();
     const { wallet_address, is_validated } = body;
 
-    const rows = await sql`
-      UPDATE profiles
-      SET
-        wallet_address = COALESCE(${wallet_address ?? null}, wallet_address),
-        is_validated = COALESCE(${is_validated ?? null}, is_validated)
-      WHERE id = ${userId}
-      RETURNING id, role, wallet_address, is_validated, created_at
-    `;
+    const profile = await prisma.profile.update({
+      where: { id: userId },
+      data: {
+        ...(wallet_address !== undefined ? { wallet_address } : {}),
+        ...(is_validated !== undefined ? { is_validated } : {}),
+      },
+    });
 
-    if (!rows.length) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
-    }
-
-    return NextResponse.json(rows[0]);
+    return NextResponse.json(profile);
   } catch (error) {
     console.error('Error updating profile:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -14,33 +14,33 @@ export async function GET(request: NextRequest) {
     const stats: Record<string, number> = {};
 
     if (role === 'agriculteur') {
-      const [evals, activeLoans, totalLoans] = await Promise.all([
-        sql`SELECT COUNT(*) AS count FROM crop_evaluations WHERE farmer_id = ${userId}`,
-        sql`SELECT COUNT(*) AS count FROM loans WHERE borrower_id = ${userId} AND status = 'active'`,
-        sql`SELECT COUNT(*) AS count FROM loans WHERE borrower_id = ${userId}`,
+      const [evaluations, activeLoans, totalLoans] = await Promise.all([
+        prisma.cropEvaluation.count({ where: { farmer_id: userId } }),
+        prisma.loan.count({ where: { borrower_id: userId, status: 'active' } }),
+        prisma.loan.count({ where: { borrower_id: userId } }),
       ]);
-      stats.evaluations = Number((evals[0] as any).count);
-      stats.activeLoans = Number((activeLoans[0] as any).count);
-      stats.totalLoans = Number((totalLoans[0] as any).count);
+      stats.evaluations = evaluations;
+      stats.activeLoans = activeLoans;
+      stats.totalLoans = totalLoans;
       stats.mazaoTokens = 0;
     }
 
     if (role === 'cooperative') {
-      const [farmers, pendingEvals] = await Promise.all([
-        sql`SELECT COUNT(*) AS count FROM farmer_profiles WHERE cooperative_id = ${userId}`,
-        sql`SELECT COUNT(*) AS count FROM crop_evaluations WHERE status = 'pending'`,
+      const [farmers, pendingEvaluations] = await Promise.all([
+        prisma.farmerProfile.count({ where: { cooperative_id: userId } }),
+        prisma.cropEvaluation.count({ where: { status: 'pending' } }),
       ]);
-      stats.farmers = Number((farmers[0] as any).count);
-      stats.pendingEvaluations = Number((pendingEvals[0] as any).count);
+      stats.farmers = farmers;
+      stats.pendingEvaluations = pendingEvaluations;
     }
 
     if (role === 'preteur') {
       const [loansGranted, activeLoans] = await Promise.all([
-        sql`SELECT COUNT(*) AS count FROM loans WHERE lender_id = ${userId}`,
-        sql`SELECT COUNT(*) AS count FROM loans WHERE lender_id = ${userId} AND status = 'active'`,
+        prisma.loan.count({ where: { lender_id: userId } }),
+        prisma.loan.count({ where: { lender_id: userId, status: 'active' } }),
       ]);
-      stats.loansGranted = Number((loansGranted[0] as any).count);
-      stats.activeLoans = Number((activeLoans[0] as any).count);
+      stats.loansGranted = loansGranted;
+      stats.activeLoans = activeLoans;
     }
 
     return NextResponse.json(stats);

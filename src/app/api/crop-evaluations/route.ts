@@ -1,63 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { sql } from '@/lib/db';
-import { generateRequestId, createSuccessResponse, createErrorResponse } from '@/lib/errors/api-errors';
+import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
-  const requestId = generateRequestId();
-
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    if (!userId) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
     const { searchParams } = new URL(request.url);
     const farmerId = searchParams.get('farmer_id');
     const status = searchParams.get('status');
     const cooperativeId = searchParams.get('cooperative_id');
 
-    let farmerIds: string[] = [];
+    let farmerIds: string[] | undefined;
     if (cooperativeId) {
-      const rows = await sql`
-        SELECT user_id FROM farmer_profiles WHERE cooperative_id = ${cooperativeId}
-      `;
-      if (!rows.length) return createSuccessResponse([], 'No evaluations for this cooperative');
-      farmerIds = rows.map((r: any) => r.user_id);
+      const farmers = await prisma.farmerProfile.findMany({
+        where: { cooperative_id: cooperativeId },
+        select: { user_id: true },
+      });
+      if (!farmers.length) return NextResponse.json({ data: [], message: 'No evaluations for this cooperative' });
+      farmerIds = farmers.map(f => f.user_id);
     }
 
-    const rows = await sql`
-      SELECT
-        ce.*,
-        fp.nom AS farmer_nom,
-        fp.superficie AS farmer_superficie,
-        fp.localisation AS farmer_localisation
-      FROM crop_evaluations ce
-      LEFT JOIN farmer_profiles fp ON fp.user_id = ce.farmer_id
-      WHERE
-        (${farmerId}::text IS NULL OR ce.farmer_id = ${farmerId})
-        AND (${status}::text IS NULL OR ce.status = ${status})
-        AND (
-          ${cooperativeId}::text IS NULL
-          OR ce.farmer_id = ANY(${farmerIds.length ? farmerIds : ['__none__']}::text[])
-        )
-      ORDER BY ce.created_at DESC
-    `;
+    const evaluations = await prisma.cropEvaluation.findMany({
+      where: {
+        ...(farmerId ? { farmer_id: farmerId } : {}),
+        ...(status ? { status } : {}),
+        ...(farmerIds ? { farmer_id: { in: farmerIds } } : {}),
+      },
+      include: { farmer: { include: { farmer_profile: true } } },
+      orderBy: { created_at: 'desc' },
+    });
 
-    return createSuccessResponse(rows, 'Evaluations retrieved successfully');
+    return NextResponse.json({ data: evaluations, message: 'Evaluations retrieved successfully' });
   } catch (error) {
-    return createErrorResponse(error, 500, requestId);
+    console.error('Error fetching evaluations:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
-  const requestId = generateRequestId();
-
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    if (!userId) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 
     const body = await request.json();
     const { farmer_id, crop_type, superficie, rendement_historique, prix_reference, valeur_estimee } = body;
@@ -66,14 +51,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const rows = await sql`
-      INSERT INTO crop_evaluations (farmer_id, crop_type, superficie, rendement_historique, prix_reference, valeur_estimee)
-      VALUES (${farmer_id}, ${crop_type}, ${superficie}, ${rendement_historique}, ${prix_reference}, ${valeur_estimee})
-      RETURNING *
-    `;
+    const evaluation = await prisma.cropEvaluation.create({
+      data: { farmer_id, crop_type, superficie, rendement_historique, prix_reference, valeur_estimee },
+    });
 
-    return createSuccessResponse(rows[0], 'Evaluation created successfully', 201);
+    return NextResponse.json({ data: evaluation, message: 'Evaluation created successfully' }, { status: 201 });
   } catch (error) {
-    return createErrorResponse(error, 500, requestId);
+    console.error('Error creating evaluation:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { prisma } from '@/lib/db';
 
 let requestCount = 0;
 let errorCount = 0;
@@ -9,15 +9,12 @@ export async function GET() {
   try {
     requestCount++;
 
-    const [usersResult, loansResult, evaluationsResult] = await Promise.all([
-      sql`SELECT COUNT(*) AS count FROM profiles`,
-      sql`SELECT COUNT(*) AS count FROM loans`,
-      sql`SELECT COUNT(*) AS count FROM crop_evaluations`,
+    const [userCount, loanCount, evaluationCount] = await Promise.all([
+      prisma.profile.count(),
+      prisma.loan.count(),
+      prisma.cropEvaluation.count(),
     ]);
 
-    const userCount = (usersResult[0] as any).count;
-    const loanCount = (loansResult[0] as any).count;
-    const evaluationCount = (evaluationsResult[0] as any).count;
     const uptime = Math.floor((Date.now() - startTime) / 1000);
 
     const metrics = `

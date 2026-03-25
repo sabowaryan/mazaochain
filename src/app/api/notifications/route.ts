@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { sql } from '@/lib/db';
+import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -9,13 +9,12 @@ export async function GET(request: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 });
 
   try {
-    const rows = await sql`
-      SELECT * FROM notifications
-      WHERE user_id = ${userId}
-      ORDER BY created_at DESC
-      LIMIT 50
-    `;
-    return NextResponse.json(rows);
+    const notifications = await prisma.notification.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: 'desc' },
+      take: 50,
+    });
+    return NextResponse.json(notifications);
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -28,12 +27,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const { user_id, title, message, type, data } = await request.json();
-    const rows = await sql`
-      INSERT INTO notifications (user_id, title, message, type, data)
-      VALUES (${user_id || userId}, ${title}, ${message}, ${type}, ${data ? JSON.stringify(data) : null})
-      RETURNING *
-    `;
-    return NextResponse.json(rows[0], { status: 201 });
+    const notification = await prisma.notification.create({
+      data: { user_id: user_id ?? userId, title, message, type, data: data ?? undefined },
+    });
+    return NextResponse.json(notification, { status: 201 });
   } catch (error) {
     console.error('Error creating notification:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -48,10 +45,10 @@ export async function PATCH(request: NextRequest) {
   const targetUserId = searchParams.get('userId');
 
   try {
-    await sql`
-      UPDATE notifications SET is_read = true
-      WHERE user_id = ${targetUserId || userId}
-    `;
+    await prisma.notification.updateMany({
+      where: { user_id: targetUserId ?? userId },
+      data: { is_read: true },
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error marking notifications as read:', error);

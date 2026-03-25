@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { sql } from '@/lib/db';
+import { prisma } from '@/lib/db';
 
 export async function PATCH(
   request: NextRequest,
@@ -12,14 +12,13 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const rows = await sql`
-      UPDATE notifications SET is_read = ${body.is_read ?? true}
-      WHERE id = ${id}::uuid
-      RETURNING *
-    `;
-    if (!rows.length) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return NextResponse.json(rows[0]);
-  } catch (error) {
+    const notification = await prisma.notification.update({
+      where: { id },
+      data: { is_read: body.is_read ?? true },
+    });
+    return NextResponse.json(notification);
+  } catch (error: any) {
+    if (error.code === 'P2025') return NextResponse.json({ error: 'Not found' }, { status: 404 });
     console.error('Error updating notification:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -34,9 +33,10 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    await sql`DELETE FROM notifications WHERE id = ${id}::uuid`;
+    await prisma.notification.delete({ where: { id } });
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2025') return NextResponse.json({ error: 'Not found' }, { status: 404 });
     console.error('Error deleting notification:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

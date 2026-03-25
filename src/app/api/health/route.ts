@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@/lib/db';
+import { prisma } from '@/lib/db';
 
 export async function GET() {
   try {
-    await sql`SELECT 1 AS ok`;
+    await prisma.$queryRaw`SELECT 1`;
 
     const missingEnvVars = ['NEXT_PUBLIC_HEDERA_NETWORK', 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'].filter(
       v => !process.env[v]

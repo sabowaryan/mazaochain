@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+enum UserRole {
+  agriculteur
+  cooperative
+  preteur
+  admin
+
+  @@map("user_role")
+}
+
+model Profile {
+  id             String   @id
+  role           UserRole
+  wallet_address String?
+  is_validated   Boolean  @default(false)
+  created_at     DateTime @default(now())
+
+  farmer_profile      FarmerProfile?
+  cooperative_profile CooperativeProfile?
+  lender_profile      LenderProfile?
+  crops_evaluated     CropEvaluation[]
+  loans_borrowed      Loan[]           @relation("LoanBorrower")
+  loans_lent          Loan[]           @relation("LoanLender")
+  transactions        Transaction[]
+  notifications       Notification[]
+  farmer_members      FarmerProfile[]  @relation("FarmerCooperative")
+
+  @@map("profiles")
+}
+
+model FarmerProfile {
+  id                   String   @id @default(uuid())
+  user_id              String   @unique
+  nom                  String
+  superficie           Decimal
+  localisation         String
+  crop_type            String?
+  rendement_historique Decimal?
+  experience_annees    Int?
+  cooperative_id       String?
+  created_at           DateTime @default(now())
+
+  profile     Profile  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  cooperative Profile? @relation("FarmerCooperative", fields: [cooperative_id], references: [id])
+
+  @@map("farmer_profiles")
+}
+
+model CooperativeProfile {
+  id            String   @id @default(uuid())
+  user_id       String   @unique
+  nom           String
+  region        String
+  members_count Int      @default(0)
+  created_at    DateTime @default(now())
+
+  profile Profile @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("cooperative_profiles")
+}
+
+model LenderProfile {
+  id               String   @id @default(uuid())
+  user_id          String   @unique
+  institution_name String
+  available_funds  Decimal  @default(0)
+  created_at       DateTime @default(now())
+
+  profile Profile @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("lender_profiles")
+}
+
+model CropEvaluation {
+  id                   String   @id @default(uuid())
+  farmer_id            String
+  crop_type            String
+  superficie           Decimal
+  rendement_historique Decimal
+  prix_reference       Decimal
+  valeur_estimee       Decimal
+  status               String   @default("pending")
+  created_at           DateTime @default(now())
+
+  farmer               Profile              @relation(fields: [farmer_id], references: [id], onDelete: Cascade)
+  tokenization_records TokenizationRecord[]
+
+  @@map("crop_evaluations")
+}
+
+model Loan {
+  id                String   @id @default(uuid())
+  borrower_id       String
+  lender_id         String?
+  principal         Decimal
+  collateral_amount Decimal
+  interest_rate     Decimal
+  due_date          DateTime
+  status            String   @default("pending")
+  created_at        DateTime @default(now())
+
+  borrower Profile  @relation("LoanBorrower", fields: [borrower_id], references: [id], onDelete: Cascade)
+  lender   Profile? @relation("LoanLender", fields: [lender_id], references: [id])
+
+  @@map("loans")
+}
+
+model Transaction {
+  id                    String   @id @default(uuid())
+  user_id               String
+  transaction_type      String
+  from_address          String?
+  to_address            String?
+  amount                Decimal
+  token_type            String
+  hedera_transaction_id String?
+  status                String   @default("pending")
+  created_at            DateTime @default(now())
+
+  user Profile @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  user_id    String
+  title      String
+  message    String
+  type       String
+  is_read    Boolean  @default(false)
+  data       Json?
+  created_at DateTime @default(now())
+
+  user Profile @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model TokenizationRecord {
+  id            String   @id @default(uuid())
+  evaluation_id String
+  token_id      String?
+  token_symbol  String?
+  status        String   @default("pending")
+  error_message String?
+  created_at    DateTime @default(now())
+
+  evaluation CropEvaluation @relation(fields: [evaluation_id], references: [id], onDelete: Cascade)
+
+  @@map("tokenization_records")
+}

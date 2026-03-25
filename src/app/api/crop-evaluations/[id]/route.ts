@@ -1,31 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { sql } from '@/lib/db';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const body = await request.json();
     const { id } = await params;
 
-    const { data, error } = await supabase
-      .from('crop_evaluations')
-      .update(body)
-      .eq('id', id)
-      .select()
-      .single();
+    const allowed = ['status', 'crop_type', 'superficie', 'rendement_historique', 'prix_reference', 'valeur_estimee'];
+    const updates = Object.entries(body)
+      .filter(([k]) => allowed.includes(k))
+      .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {} as Record<string, unknown>);
 
-    if (error) {
-      console.error('Erreur lors de la mise à jour de l\'évaluation:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!Object.keys(updates).length) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
-    return NextResponse.json(data);
+    const setClauses = Object.keys(updates)
+      .map((k, i) => `${k} = $${i + 2}`)
+      .join(', ');
+    const values = [id, ...Object.values(updates)];
+
+    const rows = await sql(`UPDATE crop_evaluations SET ${setClauses} WHERE id = $1 RETURNING *`, values);
+
+    if (!rows.length) {
+      return NextResponse.json({ error: 'Evaluation not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(rows[0]);
   } catch (error) {
-    console.error('Erreur serveur:', error);
-    return NextResponse.json({ error: 'Erreur interne du serveur' }, { status: 500 });
+    console.error('Error updating evaluation:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -34,32 +41,26 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id } = await params;
 
-    const { data, error } = await supabase
-      .from('crop_evaluations')
-      .select(`
-        *,
-        profiles!farmer_id (
-          farmer_profiles (
-            nom,
-            localisation,
-            crop_type
-          )
-        )
-      `)
-      .eq('id', id)
-      .single();
+    const rows = await sql`
+      SELECT
+        ce.*,
+        fp.nom AS farmer_nom,
+        fp.localisation AS farmer_localisation,
+        fp.crop_type AS farmer_crop_type
+      FROM crop_evaluations ce
+      LEFT JOIN farmer_profiles fp ON fp.user_id = ce.farmer_id
+      WHERE ce.id = ${id}
+    `;
 
-    if (error) {
-      console.error('Erreur lors de la récupération de l\'évaluation:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!rows.length) {
+      return NextResponse.json({ error: 'Evaluation not found' }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(rows[0]);
   } catch (error) {
-    console.error('Erreur serveur:', error);
-    return NextResponse.json({ error: 'Erreur interne du serveur' }, { status: 500 });
+    console.error('Error fetching evaluation:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

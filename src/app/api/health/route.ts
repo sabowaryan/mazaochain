@@ -1,28 +1,12 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/client';
+import { sql } from '@/lib/db';
 
 export async function GET() {
   try {
-    // Check database connectivity
-    const supabase = createClient();
-    const { error: dbError } = await supabase
-      .from('profiles')
-      .select('count')
-      .limit(1);
+    await sql`SELECT 1 AS ok`;
 
-    if (dbError) {
-      throw new Error(`Database check failed: ${dbError.message}`);
-    }
-
-    // Check environment variables
-    const requiredEnvVars = [
-      'NEXT_PUBLIC_SUPABASE_URL',
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-      'NEXT_PUBLIC_HEDERA_NETWORK'
-    ];
-
-    const missingEnvVars = requiredEnvVars.filter(
-      envVar => !process.env[envVar]
+    const missingEnvVars = ['NEXT_PUBLIC_HEDERA_NETWORK', 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'].filter(
+      v => !process.env[v]
     );
 
     if (missingEnvVars.length > 0) {
@@ -34,23 +18,18 @@ export async function GET() {
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || '1.0.0',
       environment: process.env.NODE_ENV,
-      checks: {
-        database: 'ok',
-        environment: 'ok'
-      }
+      checks: { database: 'ok', environment: 'ok' },
     });
-
   } catch (error) {
     console.error('Health check failed:', error);
-    
-    return NextResponse.json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error',
-      checks: {
-        database: 'error',
-        environment: 'error'
-      }
-    }, { status: 503 });
+    return NextResponse.json(
+      {
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+        checks: { database: 'error', environment: 'error' },
+      },
+      { status: 503 }
+    );
   }
 }

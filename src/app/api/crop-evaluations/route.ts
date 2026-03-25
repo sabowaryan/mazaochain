@@ -1,87 +1,50 @@
-import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { 
-  createErrorResponse, 
-  createSuccessResponse, 
-  createDatabaseErrorResponse,
-  generateRequestId 
-} from '@/lib/errors/api-errors';
-import { ErrorCode } from '@/lib/errors/types';
-import { MazaoChainError } from '@/lib/errors/MazaoChainError';
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { sql } from '@/lib/db';
+import { generateRequestId, createSuccessResponse, createErrorResponse } from '@/lib/errors/api-errors';
 
 export async function GET(request: NextRequest) {
   const requestId = generateRequestId();
-  
+
   try {
-    const supabase = await createClient();
-    
-    // Vérifier l'authentification
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return createErrorResponse(
-        new MazaoChainError(
-          ErrorCode.UNAUTHORIZED,
-          'Authentication required',
-          { userMessage: 'Vous devez vous connecter pour accéder à cette fonctionnalité' }
-        ),
-        401,
-        requestId
-      );
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    
+
     const { searchParams } = new URL(request.url);
-    
     const farmerId = searchParams.get('farmer_id');
     const status = searchParams.get('status');
     const cooperativeId = searchParams.get('cooperative_id');
 
-    let query = supabase
-      .from('crop_evaluations')
-      .select(`
-        *,
-        farmer:profiles!farmer_id (
-          id,
-          role,
-          wallet_address,
-          farmer_profiles!farmer_profiles_user_id_fkey (
-            nom,
-            superficie,
-            localisation
-          )
-        )
-      `);
-
-    if (farmerId) {
-      query = query.eq('farmer_id', farmerId);
-    }
-
-    if (status) {
-      query = query.eq('status', status);
-    }
-
+    let farmerIds: string[] = [];
     if (cooperativeId) {
-      // Filtrer par coopérative via une sous-requête
-      const { data: farmerIds } = await supabase
-        .from('farmer_profiles')
-        .select('user_id')
-        .eq('cooperative_id', cooperativeId);
-
-      if (!farmerIds || farmerIds.length === 0) {
-        // Aucun fermier dans cette coopérative → retourner une liste vide
-        return createSuccessResponse([], 'No evaluations for this cooperative');
-      }
-
-      const ids = farmerIds.map(f => f.user_id);
-      query = query.in('farmer_id', ids);
+      const rows = await sql`
+        SELECT user_id FROM farmer_profiles WHERE cooperative_id = ${cooperativeId}
+      `;
+      if (!rows.length) return createSuccessResponse([], 'No evaluations for this cooperative');
+      farmerIds = rows.map((r: any) => r.user_id);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const rows = await sql`
+      SELECT
+        ce.*,
+        fp.nom AS farmer_nom,
+        fp.superficie AS farmer_superficie,
+        fp.localisation AS farmer_localisation
+      FROM crop_evaluations ce
+      LEFT JOIN farmer_profiles fp ON fp.user_id = ce.farmer_id
+      WHERE
+        (${farmerId}::text IS NULL OR ce.farmer_id = ${farmerId})
+        AND (${status}::text IS NULL OR ce.status = ${status})
+        AND (
+          ${cooperativeId}::text IS NULL
+          OR ce.farmer_id = ANY(${farmerIds.length ? farmerIds : ['__none__']}::text[])
+        )
+      ORDER BY ce.created_at DESC
+    `;
 
-    if (error) {
-      return createDatabaseErrorResponse(error, requestId);
-    }
-
-    return createSuccessResponse(data || [], 'Crop evaluations retrieved successfully');
+    return createSuccessResponse(rows, 'Evaluations retrieved successfully');
   } catch (error) {
     return createErrorResponse(error, 500, requestId);
   }
@@ -89,49 +52,27 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
-  
+
   try {
-    const supabase = await createClient();
-    
-    // Vérifier l'authentification
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return createErrorResponse(
-        new MazaoChainError(
-          ErrorCode.UNAUTHORIZED,
-          'Authentication required',
-          { userMessage: 'Vous devez vous connecter pour accéder à cette fonctionnalité' }
-        ),
-        401,
-        requestId
-      );
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
-    
+
     const body = await request.json();
+    const { farmer_id, crop_type, superficie, rendement_historique, prix_reference, valeur_estimee } = body;
 
-    // Validate required fields
-    if (!body.farmer_id || !body.crop_type || !body.superficie || !body.rendement_estime) {
-      const validationError = new MazaoChainError(
-        ErrorCode.VALIDATION_ERROR,
-        'Missing required fields for crop evaluation',
-        {
-          userMessage: 'Veuillez fournir tous les champs obligatoires (type de culture, superficie, rendement)'
-        }
-      );
-      return createErrorResponse(validationError, 400, requestId);
+    if (!farmer_id || !crop_type || !superficie || !rendement_historique || !prix_reference || !valeur_estimee) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from('crop_evaluations')
-      .insert([body])
-      .select()
-      .single();
+    const rows = await sql`
+      INSERT INTO crop_evaluations (farmer_id, crop_type, superficie, rendement_historique, prix_reference, valeur_estimee)
+      VALUES (${farmer_id}, ${crop_type}, ${superficie}, ${rendement_historique}, ${prix_reference}, ${valeur_estimee})
+      RETURNING *
+    `;
 
-    if (error) {
-      return createDatabaseErrorResponse(error, requestId);
-    }
-
-    return createSuccessResponse(data, 'Crop evaluation created successfully', 201);
+    return createSuccessResponse(rows[0], 'Evaluation created successfully', 201);
   } catch (error) {
     return createErrorResponse(error, 500, requestId);
   }

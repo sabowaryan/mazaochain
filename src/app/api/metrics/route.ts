@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/client';
+import { sql } from '@/lib/db';
 
-// Simple metrics collection for Prometheus
 let requestCount = 0;
 let errorCount = 0;
 const startTime = Date.now();
@@ -9,34 +8,30 @@ const startTime = Date.now();
 export async function GET() {
   try {
     requestCount++;
-    
-    const supabase = createClient();
-    
-    // Get basic metrics from database
-    const [
-      { count: userCount },
-      { count: loanCount },
-      { count: evaluationCount }
-    ] = await Promise.all([
-      supabase.from('profiles').select('*', { count: 'exact', head: true }),
-      supabase.from('loans').select('*', { count: 'exact', head: true }),
-      supabase.from('crop_evaluations').select('*', { count: 'exact', head: true })
+
+    const [usersResult, loansResult, evaluationsResult] = await Promise.all([
+      sql`SELECT COUNT(*) AS count FROM profiles`,
+      sql`SELECT COUNT(*) AS count FROM loans`,
+      sql`SELECT COUNT(*) AS count FROM crop_evaluations`,
     ]);
 
+    const userCount = (usersResult[0] as any).count;
+    const loanCount = (loansResult[0] as any).count;
+    const evaluationCount = (evaluationsResult[0] as any).count;
     const uptime = Math.floor((Date.now() - startTime) / 1000);
-    
+
     const metrics = `
 # HELP mazaochain_users_total Total number of registered users
 # TYPE mazaochain_users_total counter
-mazaochain_users_total ${userCount || 0}
+mazaochain_users_total ${userCount}
 
 # HELP mazaochain_loans_total Total number of loans
 # TYPE mazaochain_loans_total counter
-mazaochain_loans_total ${loanCount || 0}
+mazaochain_loans_total ${loanCount}
 
 # HELP mazaochain_evaluations_total Total number of crop evaluations
 # TYPE mazaochain_evaluations_total counter
-mazaochain_evaluations_total ${evaluationCount || 0}
+mazaochain_evaluations_total ${evaluationCount}
 
 # HELP mazaochain_http_requests_total Total number of HTTP requests
 # TYPE mazaochain_http_requests_total counter
@@ -56,17 +51,11 @@ mazaochain_version_info{version="${process.env.npm_package_version || '1.0.0'}",
 `;
 
     return new NextResponse(metrics, {
-      headers: {
-        'Content-Type': 'text/plain; version=0.0.4; charset=utf-8'
-      }
+      headers: { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' },
     });
-
   } catch (error) {
     errorCount++;
     console.error('Metrics collection failed:', error);
-    
-    return NextResponse.json({
-      error: 'Failed to collect metrics'
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to collect metrics' }, { status: 500 });
   }
 }

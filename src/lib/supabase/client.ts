@@ -1,24 +1,7 @@
-import { createBrowserClient } from "@supabase/ssr";
-import { Database } from "./database.types";
-
+// Supabase client removed — project now uses Clerk (auth) + Neon (database)
+// This stub is kept to avoid breaking unused imports in test files
 export const createClient = () => {
-  // Don't use custom cookie handling - let @supabase/ssr handle it automatically
-  // The library will use localStorage/sessionStorage which is then synced with cookies by the middleware
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    }
-  );
+  throw new Error('Supabase has been replaced by Clerk + Neon. Use src/lib/db or @clerk/nextjs instead.');
 };
 
-// Only create instance in browser environment
-export const supabase =
-  typeof window !== "undefined"
-    ? createClient()
-    : (null as unknown as ReturnType<typeof createClient>);
+export const supabase = null as any;

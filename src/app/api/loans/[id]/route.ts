@@ -1,31 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { auth } from '@clerk/nextjs/server';
+import { sql } from '@/lib/db';
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
   try {
-    const supabase = await createClient();
     const body = await request.json();
     const { id } = await params;
 
-    const { data, error } = await supabase
-      .from('loans')
-      .update(body)
-      .eq('id', id)
-      .select()
-      .single();
+    const allowed = ['status', 'lender_id', 'collateral_amount', 'interest_rate', 'due_date'];
+    const updates = Object.entries(body)
+      .filter(([k]) => allowed.includes(k))
+      .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {} as Record<string, unknown>);
 
-    if (error) {
-      console.error('Erreur lors de la mise à jour du prêt:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!Object.keys(updates).length) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
-    return NextResponse.json(data);
+    const setClauses = Object.keys(updates)
+      .map((k, i) => `${k} = $${i + 2}`)
+      .join(', ');
+    const values = [id, ...Object.values(updates)];
+
+    const rows = await sql(
+      `UPDATE loans SET ${setClauses} WHERE id = $1 RETURNING *`,
+      values
+    );
+
+    if (!rows.length) {
+      return NextResponse.json({ error: 'Loan not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(rows[0]);
   } catch (error) {
-    console.error('Erreur serveur:', error);
-    return NextResponse.json({ error: 'Erreur interne du serveur' }, { status: 500 });
+    console.error('Error updating loan:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -34,37 +50,28 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
     const { id } = await params;
 
-    const { data, error } = await supabase
-      .from('loans')
-      .select(`
-        *,
-        profiles!borrower_id (
-          farmer_profiles (
-            nom,
-            localisation,
-            crop_type
-          )
-        ),
-        lender_profiles:profiles!lender_id (
-          lender_profiles (
-            institution_name
-          )
-        )
-      `)
-      .eq('id', id)
-      .single();
+    const rows = await sql`
+      SELECT
+        l.*,
+        fp.nom AS borrower_nom,
+        fp.localisation AS borrower_localisation,
+        fp.crop_type AS borrower_crop_type,
+        lp.institution_name AS lender_institution_name
+      FROM loans l
+      LEFT JOIN farmer_profiles fp ON fp.user_id = l.borrower_id
+      LEFT JOIN lender_profiles lp ON lp.user_id = l.lender_id
+      WHERE l.id = ${id}
+    `;
 
-    if (error) {
-      console.error('Erreur lors de la récupération du prêt:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!rows.length) {
+      return NextResponse.json({ error: 'Loan not found' }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(rows[0]);
   } catch (error) {
-    console.error('Erreur serveur:', error);
-    return NextResponse.json({ error: 'Erreur interne du serveur' }, { status: 500 });
+    console.error('Error fetching loan:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

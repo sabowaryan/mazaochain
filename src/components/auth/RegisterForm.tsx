@@ -1,163 +1,144 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { clientAuth } from '@/lib/supabase/client-auth'
-import {
-  UserIcon,
-  UserGroupIcon,
-  CurrencyDollarIcon,
-  ExclamationTriangleIcon,
-  InformationCircleIcon
-} from '@heroicons/react/24/outline'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useSignUp } from '@clerk/nextjs';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
-type UserRole = 'agriculteur' | 'cooperative' | 'preteur'
+type UserRole = 'agriculteur' | 'cooperative' | 'preteur';
 
 interface FormData {
-  email: string
-  password: string
-  confirmPassword: string
-  role: UserRole
+  email: string;
+  password: string;
+  confirmPassword: string;
+  role: UserRole;
 }
 
 interface FormErrors {
-  email?: string
-  password?: string
-  confirmPassword?: string
-  role?: string
-  general?: string
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+  role?: string;
+  general?: string;
 }
 
-const roleLabels: Record<UserRole, { label: string; description: string }> = {
-  agriculteur: {
-    label: 'Agriculteur',
-    description: 'Je suis un fermier qui veut tokeniser mes récoltes'
-  },
-  cooperative: {
-    label: 'Coopérative',
-    description: 'Je représente une coopérative agricole'
-  },
-  preteur: {
-    label: 'Prêteur',
-    description: 'Je veux investir dans des prêts agricoles'
-  }
-}
+const ROLE_LABELS: Record<UserRole, { label: string; description: string }> = {
+  agriculteur: { label: 'Agriculteur', description: 'Je cultive des terres et cherche un financement' },
+  cooperative: { label: 'Coopérative', description: "Je gère une coopérative agricole et valide les évaluations" },
+  preteur: { label: 'Prêteur', description: 'Je souhaite financer des projets agricoles' },
+};
 
 export function RegisterForm() {
-  const router = useRouter()
+  const router = useRouter();
+  const { isLoaded, signUp, setActive } = useSignUp();
+
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'agriculteur'
-  })
-  const [errors, setErrors] = useState<FormErrors>({})
-  const [loading, setLoading] = useState(false)
+    role: 'agriculteur',
+  });
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const validateForm = (): boolean => {
-    const newErrors: FormErrors = {}
-
-    // Email validation
-    if (!formData.email) {
-      newErrors.email = 'L\'adresse email est requise'
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'L\'adresse email n\'est pas valide'
-    }
-
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = 'Le mot de passe est requis'
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères'
-    }
-
-    // Confirm password validation
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Veuillez confirmer votre mot de passe'
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-    }
-
-    // Role validation
-    if (!formData.role) {
-      newErrors.role = 'Veuillez sélectionner votre rôle'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    const newErrors: FormErrors = {};
+    if (!formData.email) newErrors.email = "L'adresse email est requise";
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "L'adresse email n'est pas valide";
+    if (!formData.password) newErrors.password = 'Le mot de passe est requis';
+    else if (formData.password.length < 8) newErrors.password = 'Le mot de passe doit contenir au moins 8 caractères';
+    if (!formData.confirmPassword) newErrors.confirmPassword = 'Veuillez confirmer votre mot de passe';
+    else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Les mots de passe ne correspondent pas';
+    if (!formData.role) newErrors.role = 'Veuillez sélectionner votre rôle';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
+    if (!validateForm() || !isLoaded) return;
 
-    if (!validateForm()) {
-      return
-    }
-
-    setLoading(true)
-    setErrors({})
+    setLoading(true);
+    setErrors({});
 
     try {
-      const { data, error } = await clientAuth.signUp(
-        formData.email,
-        formData.password,
-        { role: formData.role }
-      )
+      const result = await signUp.create({
+        emailAddress: formData.email,
+        password: formData.password,
+      });
 
-      if (error) {
-        setErrors({ general: error.message })
-        return
-      }
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
 
-      if (data.user) {
-        // Redirect based on role
-        if (formData.role === 'agriculteur') {
-          router.push('/dashboard/farmer/profile')
-        } else if (formData.role === 'cooperative') {
-          router.push('/dashboard/cooperative')
-        } else {
-          router.push('/dashboard/lender')
-        }
+        await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: formData.role }),
+        });
+
+        setSuccess(true);
+        setTimeout(() => {
+          const dashboardPaths: Record<UserRole, string> = {
+            agriculteur: '/fr/dashboard/farmer',
+            cooperative: '/fr/dashboard/cooperative',
+            preteur: '/fr/dashboard/lender',
+          };
+          router.push(dashboardPaths[formData.role]);
+        }, 1500);
+      } else if (result.status === 'missing_requirements') {
+        setErrors({ general: 'Vérification email requise. Consultez votre boîte mail.' });
+      } else {
+        setErrors({ general: 'Inscription incomplète. Veuillez réessayer.' });
       }
-    } catch (error) {
-      setErrors({ general: 'Une erreur inattendue s\'est produite' })
+    } catch (err: any) {
+      const code = err?.errors?.[0]?.code;
+      if (code === 'form_identifier_exists') {
+        setErrors({ email: 'Cette adresse email est déjà utilisée' });
+      } else if (code === 'form_password_pwned') {
+        setErrors({ password: 'Ce mot de passe est trop commun. Veuillez en choisir un plus sécurisé.' });
+      } else {
+        setErrors({ general: "Une erreur inattendue s'est produite. Veuillez réessayer." });
+      }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handleInputChange = (field: keyof FormData) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: e.target.value
-    }))
+  const handleInputChange =
+    (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      setFormData(prev => ({ ...prev, [field]: e.target.value }));
+      if (errors[field as keyof FormErrors]) setErrors(prev => ({ ...prev, [field]: undefined }));
+    };
 
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: undefined
-      }))
-    }
+  if (success) {
+    return (
+      <div className="w-full max-w-screen-md mx-auto">
+        <Card className="bg-white/80 border-0 shadow-xl">
+          <CardContent className="p-10 text-center">
+            <CheckCircleIcon className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Compte créé avec succès !</h2>
+            <p className="text-gray-600">Redirection vers votre tableau de bord...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
-    <div className="w-full max-w-screen-lg mx-auto">
+    <div className="w-full max-w-screen-md mx-auto">
       <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl relative overflow-hidden">
-        {/* Subtle decorative elements inside the card */}
-        <div className="absolute top-0 left-0 w-24 h-24 bg-teal-50/35 rounded-full -translate-y-12 -translate-x-12 auth-form-decoration"></div>
-        <div className="absolute top-1/3 right-0 w-18 h-18 bg-emerald-50/25 rounded-full translate-x-9 auth-form-decoration"></div>
-        <div className="absolute bottom-0 right-0 w-20 h-20 bg-green-50/30 rounded-full translate-y-10 translate-x-10 auth-form-decoration"></div>
-        <div className="absolute bottom-1/4 left-0 w-14 h-14 bg-teal-50/20 rounded-full -translate-x-7 auth-form-decoration"></div>
+        <CardHeader className="p-8 pb-0">
+          <CardTitle className="text-2xl font-bold text-gray-900">Créer un compte</CardTitle>
+          <CardDescription className="text-gray-600">Rejoignez MazaoChain et accédez au financement agricole décentralisé</CardDescription>
+        </CardHeader>
 
-        <CardContent className="p-8 sm:p-10 relative z-10">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <CardContent className="p-8">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {errors.general && (
               <div className="p-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-3">
                 <ExclamationTriangleIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
@@ -165,146 +146,84 @@ export function RegisterForm() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Adresse email</label>
               <Input
-                label="Adresse email"
                 type="email"
+                placeholder="votre@email.com"
                 value={formData.email}
                 onChange={handleInputChange('email')}
-                error={errors.email}
-                placeholder="votre@email.com"
-                className="h-12 text-base"
-                required
+                className={errors.email ? 'border-red-500' : ''}
+                disabled={loading}
               />
-
-              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input
-                  label="Mot de passe"
-                  type="password"
-                  value={formData.password}
-                  onChange={handleInputChange('password')}
-                  error={errors.password}
-                  placeholder="••••••••"
-                  className="h-12 text-base"
-                  required
-                />
-
-                <Input
-                  label="Confirmer le mot de passe"
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange('confirmPassword')}
-                  error={errors.confirmPassword}
-                  placeholder="••••••••"
-                  className="h-12 text-base"
-                  required
-                />
-              </div>
+              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
             </div>
 
-            <div className="space-y-4">
-              <label className="block text-lg font-semibold text-gray-900">
-                Choisissez votre rôle
-              </label>
-              <p className="text-gray-600 text-sm">
-                Sélectionnez le rôle qui correspond le mieux à votre profil
-              </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={formData.password}
+                onChange={handleInputChange('password')}
+                className={errors.password ? 'border-red-500' : ''}
+                disabled={loading}
+              />
+              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {Object.entries(roleLabels).map(([role, { label, description }]) => (
-                  <label
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={formData.confirmPassword}
+                onChange={handleInputChange('confirmPassword')}
+                className={errors.confirmPassword ? 'border-red-500' : ''}
+                disabled={loading}
+              />
+              {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Je suis</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(Object.keys(ROLE_LABELS) as UserRole[]).map(role => (
+                  <button
                     key={role}
-                    className={`relative flex flex-col p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg ${formData.role === role
-                      ? 'border-emerald-500 bg-emerald-50 shadow-md'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                      }`}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, role }))}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      formData.role === role
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                    }`}
                   >
-                    <input
-                      type="radio"
-                      name="role"
-                      value={role}
-                      checked={formData.role === role}
-                      onChange={handleInputChange('role')}
-                      className="sr-only"
-                    />
-
-                    <div className="flex items-center justify-between mb-3">
-                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${role === 'agriculteur' ? 'bg-green-100 text-green-600' :
-                        role === 'cooperative' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'
-                        }`}>
-                        {role === 'agriculteur' ? (
-                          <UserIcon className="w-6 h-6" />
-                        ) : role === 'cooperative' ? (
-                          <UserGroupIcon className="w-6 h-6" />
-                        ) : (
-                          <CurrencyDollarIcon className="w-6 h-6" />
-                        )}
-                      </div>
-
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${formData.role === role
-                        ? 'border-emerald-500 bg-emerald-500'
-                        : 'border-gray-300'
-                        }`}>
-                        {formData.role === role && (
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-left">
-                      <div className="text-lg font-semibold text-gray-900 mb-2">
-                        {label}
-                      </div>
-                      <div className="text-sm text-gray-600 leading-relaxed">
-                        {description}
-                      </div>
-                    </div>
-                  </label>
+                    <div className="font-medium text-sm">{ROLE_LABELS[role].label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{ROLE_LABELS[role].description}</div>
+                  </button>
                 ))}
               </div>
-
-              {errors.role && (
-                <p className="text-sm text-red-600 flex items-center space-x-2">
-                  <InformationCircleIcon className="w-4 h-4 flex-shrink-0" />
-                  <span>{errors.role}</span>
-                </p>
-              )}
+              {errors.role && <p className="mt-1 text-sm text-red-600">{errors.role}</p>}
             </div>
 
-            <div className="space-y-4">
-              <Button
-                type="submit"
-                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-200"
-                loading={loading}
-                disabled={loading}
-              >
-                {loading ? "Création du compte..." : "Créer mon compte"}
-              </Button>
+            <Button
+              type="submit"
+              disabled={loading || !isLoaded}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl"
+            >
+              {loading ? 'Création du compte...' : 'Créer mon compte'}
+            </Button>
 
-              <div className="text-center">
-                <span className="text-gray-600">Déjà un compte ? </span>
-                <Link
-                  href="/auth/login"
-                  className="font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
-                >
-                  Se connecter
-                </Link>
-              </div>
-            </div>
-
-            <div className="text-xs text-gray-500 text-center leading-relaxed">
-              En créant un compte, vous acceptez nos{' '}
-              <Link href="/terms" className="text-emerald-600 hover:text-emerald-700">
-                Conditions d'utilisation
-              </Link>{' '}
-              et notre{' '}
-              <Link href="/privacy" className="text-emerald-600 hover:text-emerald-700">
-                Politique de confidentialité
+            <p className="text-center text-sm text-gray-600">
+              Déjà un compte ?{' '}
+              <Link href="login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+                Se connecter
               </Link>
-            </div>
+            </p>
           </form>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

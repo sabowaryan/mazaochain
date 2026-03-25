@@ -1,102 +1,56 @@
-import { NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-import { 
-  createErrorResponse, 
-  createSuccessResponse, 
-  createDatabaseErrorResponse,
-  generateRequestId 
-} from "@/lib/errors/api-errors";
-import { ErrorCode } from "@/lib/errors/types";
-import { MazaoChainError } from "@/lib/errors/MazaoChainError";
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { sql } from '@/lib/db';
+import { generateRequestId } from '@/lib/errors/api-errors';
+import { createSuccessResponse, createErrorResponse } from '@/lib/errors/api-errors';
 
 export async function GET(request: NextRequest) {
   const requestId = generateRequestId();
-  
+
   try {
-    const supabase = await createClient();
-    
-    // Vérifier l'authentification
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return createErrorResponse(
-        new MazaoChainError(
-          ErrorCode.UNAUTHORIZED,
-          'Authentication required',
-          { userMessage: 'Vous devez vous connecter pour accéder à cette fonctionnalité' }
-        ),
-        401,
-        requestId
-      );
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
+    const borrowerId = searchParams.get('borrower_id');
+    const lenderId = searchParams.get('lender_id');
+    const status = searchParams.get('status');
+    const cooperativeId = searchParams.get('cooperative_id');
+    const excludeLender = searchParams.get('exclude_lender');
 
-    const borrowerId = searchParams.get("borrower_id");
-    const lenderId = searchParams.get("lender_id");
-    const status = searchParams.get("status");
-    const cooperativeId = searchParams.get("cooperative_id");
-    const excludeLender = searchParams.get("exclude_lender");
-
-    let query = supabase.from("loans").select(`
-        *,
-        borrower:profiles!borrower_id (
-          id,
-          role,
-          farmer_profiles!farmer_profiles_user_id_fkey (
-            nom,
-            localisation
-          )
-        ),
-        lender:profiles!lender_id (
-          id,
-          role,
-          lender_profiles!lender_profiles_user_id_fkey (
-            institution_name
-          )
-        )
-      `);
-
-    if (borrowerId) {
-      query = query.eq("borrower_id", borrowerId);
-    }
-
-    if (lenderId) {
-      query = query.eq("lender_id", lenderId);
-    }
-
-    if (status) {
-      query = query.eq("status", status);
-    }
-
-    if (excludeLender) {
-      query = query.neq("lender_id", excludeLender);
-    }
-
+    let farmerIds: string[] = [];
     if (cooperativeId) {
-      // Filtrer par coopérative via une sous-requête
-      const { data: farmerIds } = await supabase
-        .from('farmer_profiles')
-        .select('user_id')
-        .eq('cooperative_id', cooperativeId);
-
-      if (!farmerIds || farmerIds.length === 0) {
-        // Aucun fermier dans cette coopérative → retourner une liste vide
-        return createSuccessResponse([], 'No loans for this cooperative');
-      }
-
-      const ids = farmerIds.map(f => f.user_id);
-      query = query.in('borrower_id', ids);
+      const rows = await sql`
+        SELECT user_id FROM farmer_profiles WHERE cooperative_id = ${cooperativeId}
+      `;
+      if (!rows.length) return createSuccessResponse([], 'No loans for this cooperative');
+      farmerIds = rows.map((r: any) => r.user_id);
     }
 
-    const { data, error } = await query.order("created_at", {
-      ascending: false,
-    });
+    const rows = await sql`
+      SELECT
+        l.*,
+        fp.nom AS borrower_nom,
+        fp.localisation AS borrower_localisation,
+        lp.institution_name AS lender_institution_name
+      FROM loans l
+      LEFT JOIN farmer_profiles fp ON fp.user_id = l.borrower_id
+      LEFT JOIN lender_profiles lp ON lp.user_id = l.lender_id
+      WHERE
+        (${borrowerId}::text IS NULL OR l.borrower_id = ${borrowerId})
+        AND (${lenderId}::text IS NULL OR l.lender_id = ${lenderId})
+        AND (${status}::text IS NULL OR l.status = ${status})
+        AND (${excludeLender}::text IS NULL OR l.lender_id != ${excludeLender})
+        AND (
+          ${cooperativeId}::text IS NULL
+          OR l.borrower_id = ANY(${farmerIds.length ? farmerIds : ['__none__']}::text[])
+        )
+      ORDER BY l.created_at DESC
+    `;
 
-    if (error) {
-      return createDatabaseErrorResponse(error, requestId);
-    }
-
-    return createSuccessResponse(data || [], 'Loans retrieved successfully');
+    return createSuccessResponse(rows, 'Loans retrieved successfully');
   } catch (error) {
     return createErrorResponse(error, 500, requestId);
   }
@@ -104,48 +58,37 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
-  
+
   try {
-    const supabase = await createClient();
-    
-    // Vérifier l'authentification
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return createErrorResponse(
-        new MazaoChainError(
-          ErrorCode.UNAUTHORIZED,
-          'Authentication required',
-          { userMessage: 'Vous devez vous connecter pour accéder à cette fonctionnalité' }
-        ),
-        401,
-        requestId
-      );
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
+
     const body = await request.json();
 
-    // Validate required fields
-    if (!body.borrower_id || !body.amount) {
-      const validationError = new MazaoChainError(
-        ErrorCode.VALIDATION_ERROR,
-        'Missing required fields: borrower_id and amount are required',
-        {
-          userMessage: 'Veuillez fournir tous les champs obligatoires'
-        }
+    if (!body.borrower_id || !body.principal) {
+      return NextResponse.json(
+        { error: 'Missing required fields: borrower_id and principal are required' },
+        { status: 400 }
       );
-      return createErrorResponse(validationError, 400, requestId);
     }
 
-    const { data, error } = await supabase
-      .from("loans")
-      .insert([body])
-      .select()
-      .single();
+    const rows = await sql`
+      INSERT INTO loans (borrower_id, lender_id, principal, collateral_amount, interest_rate, due_date, status)
+      VALUES (
+        ${body.borrower_id},
+        ${body.lender_id || null},
+        ${body.principal},
+        ${body.collateral_amount},
+        ${body.interest_rate},
+        ${body.due_date},
+        ${body.status || 'pending'}
+      )
+      RETURNING *
+    `;
 
-    if (error) {
-      return createDatabaseErrorResponse(error, requestId);
-    }
-
-    return createSuccessResponse(data, 'Loan created successfully', 201);
+    return createSuccessResponse(rows[0], 'Loan created successfully', 201);
   } catch (error) {
     return createErrorResponse(error, 500, requestId);
   }

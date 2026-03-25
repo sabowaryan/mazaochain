@@ -48,9 +48,11 @@
     "db:verify": "npm run audit:database && npm run test:database"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.0.7",
     "@hashgraph/hedera-wallet-connect": "^2.0.5-canary.b03fe61.0",
     "@hashgraph/sdk": "2.72.0",
     "@heroicons/react": "^2.2.0",
+    "@neondatabase/serverless": "^1.0.2",
     "@reown/appkit": "^1.8.12",
     "@reown/appkit-common": "^1.8.12",
     "@reown/appkit-controllers": "^1.8.12",

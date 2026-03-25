@@ -1,87 +1,24 @@
-import { createClient } from './client'
-import { getUserProfile } from '../auth/role-redirect'
+// Supabase client-auth removed — auth is now handled by Clerk.
+// This stub is kept to avoid breaking unused imports.
+// Use @clerk/nextjs useSignIn, useSignUp, useClerk hooks in components instead.
 
-// Client-side only auth functions
 export const clientAuth = {
-  async signUp(email: string, password: string, userData: { role: 'agriculteur' | 'cooperative' | 'preteur' }) {
-    const supabase = createClient()
-    
-    // Le profil sera créé automatiquement par le trigger handle_new_user()
-    // On passe les données dans raw_user_meta_data pour que le trigger puisse les utiliser
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: userData
-      }
-    })
-    
-    return { data, error }
+  async signUp() {
+    throw new Error('clientAuth.signUp is removed. Use Clerk useSignUp hook instead.');
   },
-
-  async signIn(email: string, password: string) {
-    const supabase = createClient()
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    
-    return { data, error }
+  async signIn() {
+    throw new Error('clientAuth.signIn is removed. Use Clerk useSignIn hook instead.');
   },
-
-  async signInWithProfile(email: string, password: string) {
-    const supabase = createClient()
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    
-    if (error || !data.user) {
-      return { data, error, profile: null }
-    }
-
-    // Get user profile with role
-    try {
-      const profile = await getUserProfile(supabase, data.user.id)
-      return { data, error: null, profile }
-    } catch (profileError) {
-      return { 
-        data, 
-        error: { message: 'Profile not found' }, 
-        profile: null 
-      }
-    }
+  async signInWithProfile() {
+    throw new Error('clientAuth.signInWithProfile is removed. Use Clerk useSignIn hook instead.');
   },
-
   async signOut() {
-    const supabase = createClient()
-    const { error } = await supabase.auth.signOut()
-    return { error }
+    throw new Error('clientAuth.signOut is removed. Use Clerk useClerk().signOut() instead.');
   },
-
   async getCurrentUser() {
-    const supabase = createClient()
-    const { data: { user }, error } = await supabase.auth.getUser()
-    return { user, error }
+    throw new Error('clientAuth.getCurrentUser is removed. Use Clerk useUser() hook instead.');
   },
-
-  async updateProfile(updates: Record<string, unknown>) {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) throw new Error('No authenticated user')
-    
-    // TODO: Fix type issue with Supabase generated types
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single()
-    
-    return { data, error }
-  }
-}
+  async updateProfile() {
+    throw new Error('clientAuth.updateProfile is removed. Use the /api/profile endpoint instead.');
+  },
+};

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useAuth } from '@/hooks/useAuth'
-import { createClient } from '@/lib/supabase/client'
 
 interface CooperativeProfileData {
   nom: string
@@ -22,133 +21,80 @@ interface FormErrors {
 export function CooperativeProfileForm() {
   const router = useRouter()
   const { user, profile } = useAuth()
-  const [formData, setFormData] = useState<CooperativeProfileData>({
-    nom: '',
-    region: ''
-  })
+  const [formData, setFormData] = useState<CooperativeProfileData>({ nom: '', region: '' })
   const [errors, setErrors] = useState<FormErrors>({})
   const [loading, setLoading] = useState(false)
   const [existingProfile, setExistingProfile] = useState<any>(null)
 
-  const supabase = createClient()
-
   useEffect(() => {
-    if (user) {
-      fetchExistingProfile()
-    }
+    if (user) fetchExistingProfile()
   }, [user])
 
   const fetchExistingProfile = async () => {
     if (!user) return
-
     try {
-      const { data, error } = await supabase
-        .from('cooperative_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      if (data) {
-        setExistingProfile(data)
-        setFormData({
-          nom: data.nom || '',
-          region: data.region || ''
-        })
+      const res = await fetch(`/api/profile-data?table=cooperative_profiles&userId=${encodeURIComponent(user.id)}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data) {
+          setExistingProfile(data)
+          setFormData({ nom: data.nom || '', region: data.region || '' })
+        }
       }
     } catch (error) {
-      // Profile doesn't exist yet, which is fine
+      // Profile doesn't exist yet
     }
   }
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
-
-    if (!formData.nom.trim()) {
-      newErrors.nom = 'Le nom de la coopérative est requis'
-    }
-
-    if (!formData.region.trim()) {
-      newErrors.region = 'La région est requise'
-    }
-
+    if (!formData.nom.trim()) newErrors.nom = 'Le nom de la coopérative est requis'
+    if (!formData.region.trim()) newErrors.region = 'La région est requise'
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!validateForm() || !user) {
-      return
-    }
+    if (!validateForm() || !user) return
 
     setLoading(true)
     setErrors({})
 
     try {
-      const profileData = {
-        user_id: user.id,
-        nom: formData.nom.trim(),
-        region: formData.region.trim(),
-        members_count: 0
-      }
+      const payload = { nom: formData.nom.trim(), region: formData.region.trim(), members_count: 0 }
+      const method = existingProfile ? 'PATCH' : 'POST'
+      const res = await fetch(`/api/profile-data?table=cooperative_profiles&userId=${encodeURIComponent(user.id)}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
 
-      let result
-      if (existingProfile) {
-        // Update existing profile
-        result = await supabase
-          .from('cooperative_profiles')
-          .update(profileData)
-          .eq('id', existingProfile.id)
-      } else {
-        // Create new profile
-        result = await supabase
-          .from('cooperative_profiles')
-          .insert([profileData])
-      }
-
-      if (result.error) {
+      if (!res.ok) {
         setErrors({ general: 'Erreur lors de la sauvegarde du profil' })
         return
       }
 
-      // Redirect to dashboard
-      router.push('/dashboard/cooperative')
+      router.push('/fr/dashboard/cooperative')
     } catch (error) {
-      setErrors({ general: 'Une erreur inattendue s\'est produite' })
+      setErrors({ general: "Une erreur inattendue s'est produite" })
     } finally {
       setLoading(false)
     }
   }
 
-  const handleInputChange = (field: keyof CooperativeProfileData) => (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: e.target.value
-    }))
-    
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: undefined
-      }))
-    }
+  const handleInputChange = (field: keyof CooperativeProfileData) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, [field]: e.target.value }))
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }))
   }
 
   if (!user || profile?.role !== 'cooperative') {
-    return (
-      <div className="text-center">
-        <p>Accès non autorisé</p>
-      </div>
-    )
+    return <div className="text-center"><p>Accès non autorisé</p></div>
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-secondary-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full  mx-auto">
+      <Card className="w-full mx-auto">
         <CardHeader>
           <CardTitle>Profil Coopérative</CardTitle>
           <CardDescription>
@@ -162,33 +108,9 @@ export function CooperativeProfileForm() {
                 {errors.general}
               </div>
             )}
-
-            <Input
-              label="Nom de la coopérative"
-              type="text"
-              value={formData.nom}
-              onChange={handleInputChange('nom')}
-              error={errors.nom}
-              placeholder="Nom de votre coopérative"
-              required
-            />
-
-            <Input
-              label="Région d'activité"
-              type="text"
-              value={formData.region}
-              onChange={handleInputChange('region')}
-              error={errors.region}
-              placeholder="Province ou région"
-              required
-            />
-
-            <Button
-              type="submit"
-              className="w-full"
-              loading={loading}
-              disabled={loading}
-            >
+            <Input label="Nom de la coopérative" type="text" value={formData.nom} onChange={handleInputChange('nom')} error={errors.nom} placeholder="Nom de votre coopérative" required />
+            <Input label="Région d'activité" type="text" value={formData.region} onChange={handleInputChange('region')} error={errors.region} placeholder="Province ou région" required />
+            <Button type="submit" className="w-full" loading={loading} disabled={loading}>
               {existingProfile ? 'Mettre à jour le profil' : 'Créer le profil'}
             </Button>
           </form>

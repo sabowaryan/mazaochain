@@ -1,49 +1,39 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { sql } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
     const { searchParams } = new URL(request.url);
+    const cooperativeId = searchParams.get('cooperative_id');
 
-    const cooperativeId = searchParams.get("cooperative_id");
-
-    let query = supabase
-      .from("profiles")
-      .select(
-        `
-        *,
-        farmer_profiles (
-          nom,
-          superficie,
-          localisation,
-          crop_type,
-          rendement_historique,
-          experience_annees
-        )
-      `
-      )
-      .eq("role", "agriculteur");
-
+    let rows;
     if (cooperativeId) {
-      query = query.eq("farmer_profiles.cooperative_id", cooperativeId);
+      rows = await sql`
+        SELECT
+          p.id, p.role, p.wallet_address, p.is_validated, p.created_at,
+          fp.nom, fp.superficie, fp.localisation, fp.crop_type,
+          fp.rendement_historique, fp.experience_annees
+        FROM profiles p
+        LEFT JOIN farmer_profiles fp ON fp.user_id = p.id
+        WHERE p.role = 'agriculteur' AND fp.cooperative_id = ${cooperativeId}
+        ORDER BY p.created_at DESC
+      `;
+    } else {
+      rows = await sql`
+        SELECT
+          p.id, p.role, p.wallet_address, p.is_validated, p.created_at,
+          fp.nom, fp.superficie, fp.localisation, fp.crop_type,
+          fp.rendement_historique, fp.experience_annees
+        FROM profiles p
+        LEFT JOIN farmer_profiles fp ON fp.user_id = p.id
+        WHERE p.role = 'agriculteur'
+        ORDER BY p.created_at DESC
+      `;
     }
 
-    const { data, error } = await query.order("created_at", {
-      ascending: false,
-    });
-
-    if (error) {
-      console.error("Erreur lors de la récupération des agriculteurs:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json(data || []);
+    return NextResponse.json(rows || []);
   } catch (error) {
-    console.error("Erreur serveur:", error);
-    return NextResponse.json(
-      { error: "Erreur interne du serveur" },
-      { status: 500 }
-    );
+    console.error('Error fetching farmers:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

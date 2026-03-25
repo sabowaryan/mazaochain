@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from '@clerk/nextjs';
 import { ClientNavigation } from "@/components/ClientNavigation";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { OfflineIndicator } from "@/components/pwa/OfflineIndicator";
@@ -38,13 +39,10 @@ export const viewport = {
   themeColor: "#22c55e",
 };
 
-// Only generate static params in production
 export async function generateStaticParams() {
   if (process.env.NODE_ENV === 'development') {
-    // In development, only generate the default language for faster builds
     return [{ lang: 'fr' }];
   }
-  // In production, generate all languages
   return [{ lang: 'en' }, { lang: 'fr' }, { lang: 'ln' }];
 }
 
@@ -60,7 +58,7 @@ export default async function RootLayout({
   const dict = await getDictionary(validLang);
 
   return (
-    <>
+    <ClerkProvider>
       <ErrorBoundary>
         <TranslationProvider messages={dict} locale={validLang}>
           <AuthProvider>
@@ -78,6 +76,6 @@ export default async function RootLayout({
           </AuthProvider>
         </TranslationProvider>
       </ErrorBoundary>
-    </>
+    </ClerkProvider>
   );
 }

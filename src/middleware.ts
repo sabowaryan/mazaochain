@@ -23,6 +23,16 @@ function hasLocalePrefix(pathname: string): boolean {
   return LOCALES.some(l => pathname.startsWith(`/${l}/`) || pathname === `/${l}`);
 }
 
+function isClerkHandshake(request: NextRequest): boolean {
+  const search = request.nextUrl.search;
+  return (
+    search.includes('__clerk_db_jwt') ||
+    search.includes('__clerk_handshake') ||
+    search.includes('__clerk_status') ||
+    search.includes('__clerk_redirect_count')
+  );
+}
+
 export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;
 
@@ -33,6 +43,11 @@ export default clerkMiddleware(async (auth, request) => {
     pathname.startsWith('/api/webhooks') ||
     pathname.startsWith('/api')
   ) {
+    return NextResponse.next();
+  }
+
+  // Let Clerk handle its own handshake without locale redirects
+  if (isClerkHandshake(request)) {
     return NextResponse.next();
   }
 
@@ -47,7 +62,12 @@ export default clerkMiddleware(async (auth, request) => {
 
   if (!hasLocalePrefix(pathname)) {
     const locale = getLocale(request);
-    return NextResponse.redirect(new URL(`/${locale}${pathname}`, request.url));
+    const redirectUrl = new URL(`/${locale}${pathname}`, request.url);
+    // Preserve query params
+    request.nextUrl.searchParams.forEach((value, key) => {
+      redirectUrl.searchParams.set(key, value);
+    });
+    return NextResponse.redirect(redirectUrl);
   }
 
   return NextResponse.next();

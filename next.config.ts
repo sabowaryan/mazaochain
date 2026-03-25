@@ -88,10 +88,8 @@ const nextConfig = {
       {
         source: "/(.*)",
         headers: [
-          {
-            key: "X-Frame-Options",
-            value: "SAMEORIGIN",
-          },
+          // X-Frame-Options omitted in dev so Replit preview iframe works.
+          // In production, set via deployment platform headers.
           {
             key: "X-Content-Type-Options",
             value: "nosniff",
@@ -99,6 +97,10 @@ const nextConfig = {
           {
             key: "Referrer-Policy",
             value: "origin-when-cross-origin",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors 'self' https://*.replit.dev https://*.repl.co https://*.replit.com",
           },
         ],
       },

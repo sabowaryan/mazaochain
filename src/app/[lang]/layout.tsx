@@ -57,8 +57,11 @@ export default async function RootLayout({
   const validLang = ['en', 'fr', 'ln'].includes(lang) ? lang as 'en' | 'fr' | 'ln' : 'fr';
   const dict = await getDictionary(validLang);
 
+  const signInUrl = `/${validLang}/auth/login`;
+  const signUpUrl = `/${validLang}/auth/register`;
+
   return (
-    <ClerkProvider>
+    <ClerkProvider signInUrl={signInUrl} signUpUrl={signUpUrl} afterSignOutUrl={signInUrl}>
       <ErrorBoundary>
         <TranslationProvider messages={dict} locale={validLang}>
           <AuthProvider>

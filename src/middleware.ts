@@ -36,7 +36,12 @@ export default clerkMiddleware(async (auth, request) => {
   }
 
   if (isProtectedRoute(request)) {
-    await auth.protect();
+    const locale = hasLocalePrefix(pathname)
+      ? pathname.split('/')[1]
+      : getLocale(request);
+    await auth.protect({
+      unauthenticatedUrl: `${request.nextUrl.origin}/${locale}/auth/login`,
+    });
   }
 
   if (!hasLocalePrefix(pathname)) {

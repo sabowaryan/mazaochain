@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Allow Replit dev proxy origins for preview iframe
+  allowedDevOrigins: ['*.replit.dev', '*.repl.co', '*.riker.replit.dev'],
   // PWA configuration
   experimental: {
     ppr: false,
@@ -88,7 +90,7 @@ const nextConfig = {
         headers: [
           {
             key: "X-Frame-Options",
-            value: "DENY",
+            value: "SAMEORIGIN",
           },
           {
             key: "X-Content-Type-Options",

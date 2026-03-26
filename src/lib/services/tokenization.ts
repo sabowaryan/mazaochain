@@ -285,9 +285,17 @@ export class TokenizationService {
         throw new Error('Evaluation must be approved before tokenization')
       }
 
-      // Get farmer's wallet address (this would come from the user profile)
-      // For now, we'll use a placeholder - this should be fetched from the farmer's profile
-      const farmerAccountId = '0.0.123456' // Placeholder
+      // Get farmer's wallet address from their profile
+      const { data: farmerProfile } = await this.supabase
+        .from('profiles')
+        .select('wallet_address')
+        .eq('id', evaluation.farmer_id)
+        .single()
+
+      const farmerAccountId = farmerProfile?.wallet_address ?? null
+      if (!farmerAccountId) {
+        throw new Error('Farmer does not have a configured wallet address')
+      }
 
       const request: TokenizationRequest = {
         evaluationId: evaluation.id,

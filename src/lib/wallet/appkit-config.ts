@@ -65,13 +65,19 @@ export async function initializeAppKit(config: AppKitConfig) {
     icons: [`${siteOrigin}/favicon.ico`],
   };
 
+  // Determine active network from env (defaults to testnet for development safety)
+  const isTestnet = env.NEXT_PUBLIC_HEDERA_NETWORK !== 'mainnet';
+  const defaultNetwork = isTestnet
+    ? HederaChainDefinition.Native.Testnet
+    : HederaChainDefinition.Native.Mainnet;
+
   // Create and configure AppKit instance
   return createAppKit({
     // Hedera adapters for native and EVM namespaces
     // @ts-expect-error - HederaAdapter type compatibility with AppKit 1.8.12
     adapters,
 
-    // UniversalProvider from HederaPr properties in HederaProvider's UniversalProvider implementation
+    // UniversalProvider from HederaProvider's UniversalProvider implementation
     universalProvider,
 
     // WalletConnect configuration
@@ -80,13 +86,29 @@ export async function initializeAppKit(config: AppKitConfig) {
     // Application metadata
     metadata,
 
-    // Supported Hedera networks - include both mainnet and testnet per docs recommendation
-    networks: [
-      HederaChainDefinition.EVM.Mainnet,
-      HederaChainDefinition.EVM.Testnet,
-      HederaChainDefinition.Native.Mainnet,
-      HederaChainDefinition.Native.Testnet,
-    ],
+    // Supported Hedera networks.
+    // Testnet is listed first so it becomes the default selected network when
+    // NEXT_PUBLIC_HEDERA_NETWORK=testnet (the env default). This hints to wallets
+    // (e.g. HashPack) that testnet is the primary network for this dApp, prompting
+    // them to expose testnet accounts in the WalletConnect connection popup.
+    networks: isTestnet
+      ? [
+          HederaChainDefinition.Native.Testnet,
+          HederaChainDefinition.EVM.Testnet,
+          HederaChainDefinition.Native.Mainnet,
+          HederaChainDefinition.EVM.Mainnet,
+        ]
+      : [
+          HederaChainDefinition.Native.Mainnet,
+          HederaChainDefinition.EVM.Mainnet,
+          HederaChainDefinition.Native.Testnet,
+          HederaChainDefinition.EVM.Testnet,
+        ],
+
+    // Default network — AppKit selects this chain when the modal first opens.
+    // Setting it to testnet ensures the WalletConnect session proposal prioritises
+    // testnet chains, which prompts HashPack to show testnet accounts.
+    defaultNetwork,
 
     // Feature flags
     // walletConnect is enabled by default — this shows the QR code for any

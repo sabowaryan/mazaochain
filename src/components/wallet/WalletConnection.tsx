@@ -230,11 +230,21 @@ export function WalletConnection({
                                         </span>
                                     )}
                                 </Button>
-                                {isConnecting && (
+                                {isConnecting ? (
                                     <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                                         <p className="text-sm text-blue-700 font-medium">
-                                            💡 Veuillez approuver la connexion dans HashPack
+                                            💡 Scannez le QR code <strong>depuis l&apos;intérieur de HashPack</strong>, puis approuvez la connexion
                                         </p>
+                                    </div>
+                                ) : (
+                                    <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200 text-left">
+                                        <p className="text-xs text-amber-800 font-semibold mb-1">Pour connecter un compte Testnet :</p>
+                                        <ol className="text-xs text-amber-700 space-y-0.5 list-decimal list-inside">
+                                            <li>Ouvrez HashPack → Paramètres → Réseau</li>
+                                            <li>Activez le mode <strong>Testnet</strong></li>
+                                            <li>Revenez ici et cliquez "Connecter HashPack"</li>
+                                            <li>Scannez le QR code <strong>depuis HashPack</strong></li>
+                                        </ol>
                                     </div>
                                 )}
                                 <button

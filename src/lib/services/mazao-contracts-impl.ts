@@ -105,8 +105,12 @@ export class MazaoContractsServiceImpl {
       );
       if (!res.ok) return 0;
       const data = await res.json();
-      const tokens: { balance: number }[] = data?.tokens ?? [];
-      return tokens.reduce((sum, t) => sum + (t.balance ?? 0), 0);
+      const tokens: { balance: number; decimals?: number }[] = data?.tokens ?? [];
+      // Sum human-readable (normalized) balances across all tokens
+      return tokens.reduce(
+        (sum, t) => sum + (t.balance ?? 0) / Math.pow(10, t.decimals ?? 2),
+        0
+      );
     } catch (error) {
       console.error("Error getting farmer total balance from Mirror Node:", error);
       return 0;
@@ -126,14 +130,17 @@ export class MazaoContractsServiceImpl {
         decimals?: number;
       }[] = data?.tokens ?? [];
 
-      return tokens.map((t) => ({
-        tokenId: t.token_id,
-        cropType: 'unknown',
-        amount: t.balance,
-        estimatedValue: t.balance / Math.pow(10, t.decimals ?? 2),
-        harvestDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'active' as const,
-      }));
+      return tokens.map((t) => {
+        const normalized = (t.balance ?? 0) / Math.pow(10, t.decimals ?? 2);
+        return {
+          tokenId: t.token_id,
+          cropType: 'unknown',
+          amount: normalized,
+          estimatedValue: normalized,
+          harvestDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'active' as const,
+        };
+      });
     } catch (error) {
       console.error("Error getting farmer token holdings from Mirror Node:", error);
       return [];

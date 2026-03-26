@@ -34,9 +34,16 @@ export interface TokenHolding {
   tokenId: string;
   cropType: string;
   amount: number;
+  /** Total tokens issued on-chain (operator-custodied + farmer wallet). */
+  issuedAmount?: number;
   estimatedValue: number;
   harvestDate: string;
   status: 'active' | 'harvested' | 'expired';
+  evaluationId?: string;
+  tokenName?: string;
+  tokenSymbol?: string;
+  transferredToFarmer?: boolean;
+  mirrorNodeBalance?: number;
 }
 
 class MazaoContractsService {

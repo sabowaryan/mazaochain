@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
 
         const now = new Date();
         const status: PortfolioToken['status'] = harvestDate < now ? 'harvested' : 'active';
-        const estimatedValue = evaluation.valeur_estimee ?? 0;
+        const estimatedValue = Number(evaluation.valeur_estimee ?? 0);
         const tokenId = record.token_id!;
 
         // Fetch real token metadata from Mirror Node

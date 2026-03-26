@@ -43,10 +43,17 @@ export async function createCropToken(params: {
     const { getHederaClient } = await import('@/lib/hedera/client');
     const client = getHederaClient();
 
+    if (!params.quantity || params.quantity <= 0) {
+      return {
+        success: false,
+        error: `Evaluated crop quantity must be positive (got ${params.quantity}). Check superficie and rendement_historique fields.`,
+      };
+    }
+
     const tokenName = `MAZAO-${params.cropType.toUpperCase()}`;
     const symbol = params.tokenSymbol.substring(0, 10);
-    // initialSupply = quantity × 100 (2 decimal places represent fractional units)
-    const initialSupply = Math.max(1, Math.round(params.quantity * 100));
+    // initialSupply = quantity × 100 (2 decimal places represent fractional units of crop volume)
+    const initialSupply = Math.round(params.quantity * 100);
     const treasuryId = AccountId.fromString(operatorAccountId);
 
     // Step 1: Create the HTS fungible token (treasury = operator)

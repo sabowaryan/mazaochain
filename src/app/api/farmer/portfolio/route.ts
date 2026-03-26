@@ -111,12 +111,16 @@ export async function GET(request: NextRequest) {
         const tokenId = record.token_id!;
 
         // Fetch real token metadata from Mirror Node
-        const [mirrorInfo, mirrorBalance] = await Promise.all([
+        const [mirrorInfo, mirrorBalanceBaseUnits] = await Promise.all([
           fetchMirrorNodeTokenInfo(tokenId),
           farmerWalletAddress
             ? fetchFarmerTokenBalance(farmerWalletAddress, tokenId)
             : Promise.resolve(0),
         ]);
+
+        // Normalize from Mirror Node base units to human-readable token units
+        const decimals = mirrorInfo?.decimals ? Number(mirrorInfo.decimals) : 2;
+        const mirrorBalance = mirrorBalanceBaseUnits / Math.pow(10, decimals);
 
         return {
           tokenId,

@@ -36,3 +36,9 @@ externalPort = 80
 [[ports]]
 localPort = 5555
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+NEXT_PUBLIC_HEDERA_ACCOUNT_ID = "0.0.6913405"
+NEXT_PUBLIC_HEDERA_NETWORK = "testnet"

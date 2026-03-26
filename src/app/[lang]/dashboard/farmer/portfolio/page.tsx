@@ -279,12 +279,12 @@ export default function FarmerPortfolioPage() {
                           <p className="font-medium">
                             {holding.amount.toLocaleString()} {holding.tokenSymbol ?? 'MAZAO'}
                           </p>
-                          <p className="text-sm text-gray-600">${holding.estimatedValue.toLocaleString()}</p>
-                          {holding.mirrorNodeBalance !== undefined && holding.mirrorNodeBalance > 0 && (
-                            <p className="text-xs text-emerald-600 mt-0.5">
-                              Solde Mirror Node: {holding.mirrorNodeBalance.toLocaleString()}
+                          {holding.issuedAmount !== undefined && holding.issuedAmount > 0 && holding.amount !== holding.issuedAmount && (
+                            <p className="text-xs text-amber-700 mt-0.5">
+                              Émis: {holding.issuedAmount.toLocaleString()} (garde opérateur)
                             </p>
                           )}
+                          <p className="text-sm text-gray-600">${holding.estimatedValue.toLocaleString()}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusIcon(holding.status)}

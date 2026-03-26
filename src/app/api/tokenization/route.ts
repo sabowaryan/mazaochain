@@ -93,6 +93,25 @@ export async function POST(request: NextRequest) {
     });
 
     if (!tokenResult.success) {
+      // Persist a pending/failed record for retry observability and audit trail
+      const existingForFailure = await prisma.tokenizationRecord.findFirst({
+        where: { evaluation_id: evaluationId },
+        orderBy: { created_at: 'desc' },
+      });
+      if (existingForFailure) {
+        await prisma.tokenizationRecord.update({
+          where: { id: existingForFailure.id },
+          data: { status: 'pending', error_message: tokenResult.error ?? 'Token creation failed' },
+        });
+      } else {
+        await prisma.tokenizationRecord.create({
+          data: {
+            evaluation_id: evaluationId,
+            status: 'pending',
+            error_message: tokenResult.error ?? 'Token creation failed',
+          },
+        });
+      }
       return NextResponse.json(
         { error: tokenResult.error ?? 'Token creation failed' },
         { status: 500 }

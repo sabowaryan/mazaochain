@@ -5,7 +5,10 @@ import { prisma } from '@/lib/db';
 export interface PortfolioToken {
   tokenId: string;
   cropType: string;
+  /** Farmer's current wallet balance (Mirror Node). 0 when operator-custodied. */
   amount: number;
+  /** Total tokens issued on-chain for this crop (operator + farmer combined). */
+  issuedAmount: number;
   estimatedValue: number;
   harvestDate: string;
   status: 'active' | 'harvested' | 'expired';
@@ -121,11 +124,16 @@ export async function GET(request: NextRequest) {
         // Normalize from Mirror Node base units to human-readable token units
         const decimals = mirrorInfo?.decimals ? Number(mirrorInfo.decimals) : 2;
         const mirrorBalance = mirrorBalanceBaseUnits / Math.pow(10, decimals);
+        // issuedAmount = full on-chain supply (operator-custodied + farmer wallet combined)
+        const issuedAmount = mirrorInfo?.total_supply
+          ? Number(mirrorInfo.total_supply) / Math.pow(10, decimals)
+          : 0;
 
         return {
           tokenId,
           cropType: evaluation.crop_type,
           amount: mirrorBalance,
+          issuedAmount,
           estimatedValue,
           harvestDate: harvestDate.toISOString(),
           status,

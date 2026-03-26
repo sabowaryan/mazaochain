@@ -51,7 +51,7 @@ function FarmerProfileContent() {
   const [isEditing, setIsEditing] = useState(false);
   const params = useParams();
   const lang = params.lang as string;
-  const { isConnected, isConnecting, connection, connectWallet, disconnectWallet } = useWallet();
+  const { isConnected, isConnecting, connection, connectWallet, disconnectWallet, error: walletError } = useWallet();
 
   // Show loading while authentication is initializing or profile data is loading
   if (!initialized || authLoading || profileLoading) {
@@ -268,7 +268,7 @@ function FarmerProfileContent() {
                             className="text-red-600 border-red-300 hover:bg-red-50 w-full"
                             onClick={async () => {
                               await disconnectWallet();
-                              await refreshAuthProfile();
+                              if (!walletError) await refreshAuthProfile();
                             }}
                           >
                             Déconnecter le wallet
@@ -280,16 +280,19 @@ function FarmerProfileContent() {
                             className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                             onClick={async () => {
                               await connectWallet('hedera');
-                              await refreshAuthProfile();
+                              if (!walletError) await refreshAuthProfile();
                             }}
                             disabled={isConnecting}
                           >
                             {isConnecting ? "Connexion en cours..." : "Connecter mon wallet"}
                           </Button>
                         )}
+                        {walletError && (
+                          <p className="text-sm text-red-600 mt-2">{walletError}</p>
+                        )}
                       </div>
                     </ClientOnly>
-                    {!isConnected && !profile?.wallet_address && (
+                    {!isConnected && !profile?.wallet_address && !walletError && (
                       <p className="text-sm text-purple-700 mt-2">
                         Connectez votre wallet pour activer toutes les fonctionnalités
                       </p>
@@ -333,10 +336,17 @@ function FarmerProfileContent() {
                     <WalletIcon className="w-4 h-4 text-gray-500" />
                     <span className="text-sm font-medium text-gray-700">Wallet</span>
                   </div>
-                  <StatusBadge
-                    status={profile?.wallet_address ? "success" : "error"}
-                    label={profile?.wallet_address ? "Configuré" : "Non configuré"}
-                  />
+                  <ClientOnly fallback={
+                    <StatusBadge
+                      status={profile?.wallet_address ? "success" : "error"}
+                      label={profile?.wallet_address ? "Configuré" : "Non configuré"}
+                    />
+                  }>
+                    <StatusBadge
+                      status={(isConnected || !!profile?.wallet_address) ? "success" : "error"}
+                      label={(isConnected || !!profile?.wallet_address) ? "Configuré" : "Non configuré"}
+                    />
+                  </ClientOnly>
                 </div>
               </div>
             </Card>

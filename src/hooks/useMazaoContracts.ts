@@ -173,12 +173,12 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
 
   const getFarmerTotalBalance = useCallback(async (_farmerAddress: string): Promise<number> => {
     return handleAsyncOperation(async () => {
-      // Use DB-backed portfolio for accurate count of tokenized crops.
-      // Mirror Node balance may be 0 if farmer hasn't associated their wallet yet.
+      // Use portfolio API which returns the sum of Mirror Node balances (normalized by decimals).
+      // Falls back to 0 if farmer hasn't associated their wallet (tokens held by operator).
       const res = await fetch('/api/farmer/portfolio');
       if (!res.ok) return 0;
       const data = await res.json();
-      return data?.tokenCount ?? 0;
+      return data?.totalAmount ?? 0;
     });
   }, [handleAsyncOperation]);
 

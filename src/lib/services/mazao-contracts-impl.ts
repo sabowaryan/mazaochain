@@ -186,13 +186,21 @@ export class MazaoContractsServiceImpl {
     tokenId: string
   ): Promise<number> {
     try {
-      const res = await fetch(
-        `${this.mirrorNodeBase}/accounts/${encodeURIComponent(farmerAddress)}/tokens?token.id=${encodeURIComponent(tokenId)}`
-      );
-      if (!res.ok) return 0;
-      const data = await res.json();
-      const tokens: { balance: number }[] = data?.tokens ?? [];
-      return tokens[0]?.balance ?? 0;
+      // Fetch balance and token decimals in parallel for correct normalization
+      const [balanceRes, tokenRes] = await Promise.all([
+        fetch(`${this.mirrorNodeBase}/accounts/${encodeURIComponent(farmerAddress)}/tokens?token.id=${encodeURIComponent(tokenId)}`),
+        fetch(`${this.mirrorNodeBase}/tokens/${encodeURIComponent(tokenId)}`),
+      ]);
+      if (!balanceRes.ok) return 0;
+      const balanceData = await balanceRes.json();
+      const tokens: { balance: number }[] = balanceData?.tokens ?? [];
+      const baseUnits = tokens[0]?.balance ?? 0;
+
+      const decimals = tokenRes.ok
+        ? Number((await tokenRes.json()).decimals ?? 2)
+        : 2;
+
+      return baseUnits / Math.pow(10, decimals);
     } catch (error) {
       console.error("Error getting farmer balance for token from Mirror Node:", error);
       return 0;

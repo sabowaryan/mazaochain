@@ -48,38 +48,32 @@ export default function FarmerPortfolioPage() {
       try {
         setLoading(true);
 
-        // Charger les données réelles du portfolio avec timeout global
-        if (profile?.wallet_address) {
-          const loadDataWithTimeout = async () => {
-            try {
-              // Timeout global de 3 secondes pour toutes les opérations
-              const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error('Timeout')), 3000)
-              );
+        // Load portfolio from DB + Mirror Node — does not require local wallet address.
+        // Tokens may be operator-custodied (not yet in farmer wallet) but are still shown.
+        const loadDataWithTimeout = async () => {
+          try {
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Timeout')), 5000)
+            );
 
-              const dataPromise = (async () => {
-                const balance = await getFarmerTotalBalance(profile.wallet_address!);
-                const holdings = await getFarmerTokenHoldings(profile.wallet_address!);
-                return { balance, holdings };
-              })();
+            const dataPromise = (async () => {
+              const walletOrEmpty = profile?.wallet_address ?? '';
+              const balance = await getFarmerTotalBalance(walletOrEmpty);
+              const holdings = await getFarmerTokenHoldings(walletOrEmpty);
+              return { balance, holdings };
+            })();
 
-              const result = await Promise.race([dataPromise, timeoutPromise]);
-              setTotalBalance(result.balance);
-              setTokenHoldings(result.holdings);
-            } catch (error) {
-              console.warn('Could not fetch data from blockchain (timeout or error):', error);
-              // Utiliser des données par défaut si la blockchain n'est pas accessible
-              setTotalBalance(0);
-              setTokenHoldings([]);
-            }
-          };
+            const result = await Promise.race([dataPromise, timeoutPromise]);
+            setTotalBalance(result.balance);
+            setTokenHoldings(result.holdings);
+          } catch (error) {
+            console.warn('Could not fetch portfolio data (timeout or error):', error);
+            setTotalBalance(0);
+            setTokenHoldings([]);
+          }
+        };
 
-          await loadDataWithTimeout();
-        } else {
-          // Pas d'adresse wallet, portfolio vide
-          setTotalBalance(0);
-          setTokenHoldings([]);
-        }
+        await loadDataWithTimeout();
 
       } catch (error) {
         console.error('Erreur lors du chargement du portfolio:', error);

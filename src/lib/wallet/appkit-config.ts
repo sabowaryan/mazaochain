@@ -83,31 +83,15 @@ export async function initializeAppKit(config: AppKitConfig) {
       HederaChainDefinition.Native.Testnet,
     ],
 
-    // HashPack wallet configuration - force HashPack as the primary wallet
-    includeWalletIds: [
-      "hashpack", // HashPack wallet ID
-      "c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96", // HashPack official ID
-    ],
-
-    // Custom wallet configuration for HashPack
-    customWallets: [
-      {
-        id: "hashpack_custom",
-        name: "HashPack",
-        homepage: "https://hashpack.app/",
-        mobile_link: "hashpack://app",
-        desktop_link: "https://hashpack.app/",
-        webapp_link: "https://hashpack.app/",
-        app_store: "https://apps.apple.com/app/hashpack/id1580324734",
-        play_store: "https://play.google.com/store/apps/details?id=com.hashpack.wallet",
-      }
-    ],
-
-    // Feature flags - disable unnecessary features
+    // Feature flags
+    // walletConnect is enabled by default — this shows the QR code for any
+    // WalletConnect-compatible wallet (HashPack, Blade, etc.).
+    // Do NOT use includeWalletIds to restrict to HashPack only: that suppresses
+    // the generic WalletConnect QR view and forces a deep-link redirect instead.
     features: {
-      analytics: false,  // Disable analytics tracking
-      email: false,      // Disable email login
-      socials: [],       // Disable social login providers
+      analytics: false,
+      email: false,
+      socials: [],
     },
 
     // Theme configuration

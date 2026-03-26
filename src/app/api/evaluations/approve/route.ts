@@ -103,17 +103,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Évaluation approuvée. La tokenisation blockchain sera retentée ultérieurement.",
-      evaluationId,
-      tokenSymbol,
-      farmerAddress: evaluation.farmer.wallet_address,
-      estimatedValue: evaluation.valeur_estimee,
-      harvestDate: harvestDate.toISOString(),
-      tokenizationPending: true,
-      tokenizationError: tokenResult.error,
-    });
+    // HTTP 207 Multi-Status: evaluation approval succeeded but on-chain tokenization failed.
+    // Clients must inspect tokenizationSuccess to distinguish partial from full success.
+    return NextResponse.json(
+      {
+        success: false,
+        approvalSuccess: true,
+        tokenizationSuccess: false,
+        message: "Évaluation approuvée. La tokenisation blockchain a échoué et sera retentée ultérieurement.",
+        evaluationId,
+        tokenSymbol,
+        farmerAddress: evaluation.farmer.wallet_address,
+        estimatedValue: evaluation.valeur_estimee,
+        harvestDate: harvestDate.toISOString(),
+        tokenizationError: tokenResult.error,
+      },
+      { status: 207 }
+    );
   } catch (error) {
     console.error('Error approving evaluation:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

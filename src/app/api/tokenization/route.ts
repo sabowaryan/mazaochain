@@ -69,12 +69,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (evaluation.status !== 'approved') {
-      return NextResponse.json(
-        { error: "Seules les évaluations approuvées peuvent être tokenisées. Statut actuel : " + evaluation.status },
-        { status: 400 }
-      );
-    }
     if (!evaluation.farmer.wallet_address) {
       return NextResponse.json(
         { error: "Le fermier n'a pas d'adresse wallet configurée" },
@@ -85,6 +79,37 @@ export async function POST(request: NextRequest) {
     // Derive token params from evaluation (shared helper, avoids duplication with /api/evaluations/approve)
     const { cropType, quantity, tokenSymbol } = deriveTokenParams(evaluation);
 
+    // Atomic concurrency guard: transition evaluation from 'approved' → 'tokenizing' so that
+    // a second concurrent request sees 0 updated rows and returns 409 instead of double-minting.
+    const { count: claimedCount } = await prisma.cropEvaluation.updateMany({
+      where: { id: evaluationId, status: 'approved' },
+      data: { status: 'tokenizing' },
+    });
+    if (claimedCount === 0) {
+      // Either not approved (wrong status) or another request already claimed it
+      const current = await prisma.cropEvaluation.findUnique({ where: { id: evaluationId }, select: { status: true } });
+      if (current?.status === 'tokenized') {
+        return NextResponse.json(
+          { error: 'Cette évaluation a déjà été tokenisée' },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: "Seules les évaluations approuvées peuvent être tokenisées. Statut actuel : " + (current?.status ?? 'inconnu') },
+        { status: 400 }
+      );
+    }
+
+    // Create pending record immediately after winning the atomic claim
+    const pendingRecord = await prisma.tokenizationRecord.create({
+      data: {
+        evaluation_id: evaluationId,
+        token_symbol: tokenSymbol,
+        status: 'pending',
+        error_message: 'Tokenisation en cours...',
+      },
+    });
+
     const tokenResult = await createCropToken({
       cropType,
       farmerWalletAddress: evaluation.farmer.wallet_address,
@@ -93,58 +118,35 @@ export async function POST(request: NextRequest) {
     });
 
     if (!tokenResult.success) {
-      // Persist a pending/failed record for retry observability and audit trail
-      const existingForFailure = await prisma.tokenizationRecord.findFirst({
-        where: { evaluation_id: evaluationId },
-        orderBy: { created_at: 'desc' },
-      });
-      if (existingForFailure) {
-        await prisma.tokenizationRecord.update({
-          where: { id: existingForFailure.id },
+      // Roll evaluation back to 'approved' so it can be retried; persist failure for audit
+      await prisma.$transaction([
+        prisma.cropEvaluation.update({ where: { id: evaluationId }, data: { status: 'approved' } }),
+        prisma.tokenizationRecord.update({
+          where: { id: pendingRecord.id },
           data: { status: 'pending', error_message: tokenResult.error ?? 'Token creation failed' },
-        });
-      } else {
-        await prisma.tokenizationRecord.create({
-          data: {
-            evaluation_id: evaluationId,
-            status: 'pending',
-            error_message: tokenResult.error ?? 'Token creation failed',
-          },
-        });
-      }
+        }),
+      ]);
       return NextResponse.json(
         { error: tokenResult.error ?? 'Token creation failed' },
         { status: 500 }
       );
     }
 
-    // Persist the tokenization record and update evaluation status atomically
-    const existing = await prisma.tokenizationRecord.findFirst({
-      where: { evaluation_id: evaluationId },
-      orderBy: { created_at: 'desc' },
-    });
-
+    // Atomically mark record as completed and evaluation as tokenized
     const [, record] = await prisma.$transaction([
       prisma.cropEvaluation.update({
         where: { id: evaluationId },
         data: { status: 'tokenized' },
       }),
-      existing
-        ? prisma.tokenizationRecord.update({
-            where: { id: existing.id },
-            data: {
-              token_id: tokenResult.tokenId,
-              status: 'completed',
-              error_message: null,
-            },
-          })
-        : prisma.tokenizationRecord.create({
-            data: {
-              evaluation_id: evaluationId,
-              token_id: tokenResult.tokenId,
-              status: 'completed',
-            },
-          }),
+      prisma.tokenizationRecord.update({
+        where: { id: pendingRecord.id },
+        data: {
+          token_id: tokenResult.tokenId,
+          token_symbol: tokenSymbol,
+          status: 'completed',
+          error_message: null,
+        },
+      }),
     ]);
 
     return NextResponse.json({

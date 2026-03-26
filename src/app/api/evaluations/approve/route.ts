@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
     const tokenRecord = await prisma.tokenizationRecord.create({
       data: {
         evaluation_id: evaluationId,
+        token_symbol: tokenSymbol,
         status: 'pending',
         error_message: 'Tokenisation en cours...',
       },
@@ -105,6 +106,7 @@ export async function POST(request: NextRequest) {
           where: { id: tokenRecord.id },
           data: {
             token_id: tokenResult.tokenId,
+            token_symbol: tokenSymbol,
             status: 'completed',
             error_message: null,
           },

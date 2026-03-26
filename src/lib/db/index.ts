@@ -11,9 +11,9 @@ function getPrismaClient(): PrismaClient {
   const adapter = new PrismaNeon(sql);
   const client = new PrismaClient({ adapter });
 
-  if (process.env.NODE_ENV !== 'production') {
-    globalForPrisma.prisma = client;
-  }
+  // Cache unconditionally — in dev this avoids HMR instantiation churn;
+  // in production it prevents per-request client creation and DB connection exhaustion.
+  globalForPrisma.prisma = client;
 
   return client;
 }

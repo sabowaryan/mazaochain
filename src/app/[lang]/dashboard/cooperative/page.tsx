@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -84,6 +85,10 @@ function CooperativeDashboardContent() {
   const [members, setMembers] = useState<Member[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
+  const pathname = usePathname();
+  const lang = pathname.split('/')[1] || 'fr';
+
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberInput, setNewMemberInput] = useState('');
   const [addMemberLoading, setAddMemberLoading] = useState(false);
@@ -212,6 +217,7 @@ function CooperativeDashboardContent() {
   }
 
   return (
+    <>
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Tableau de bord - Coopérative</h1>
@@ -526,12 +532,12 @@ function CooperativeDashboardContent() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <a
-                                href={`/fr/dashboard/farmer?member_id=${member.user_id}`}
+                              <button
+                                onClick={() => setSelectedMember(member)}
                                 className="text-xs text-primary-600 hover:text-primary-800 hover:underline"
                               >
                                 Profil
-                              </a>
+                              </button>
                               <button
                                 onClick={() => handleRemoveMember(member.user_id)}
                                 className="text-xs text-red-500 hover:text-red-700 hover:underline"
@@ -552,6 +558,88 @@ function CooperativeDashboardContent() {
         )}
       </div>
     </div>
+
+    {selectedMember && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div className="bg-white rounded-xl max-w-lg w-full shadow-xl">
+          <div className="p-6">
+            <div className="flex items-start justify-between mb-5">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{selectedMember.nom}</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Profil agriculteur</p>
+              </div>
+              <button onClick={() => setSelectedMember(null)} className="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">×</button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-0.5">Téléphone</p>
+                  <p className="font-medium text-sm">
+                    {selectedMember.telephone
+                      ? <a href={`tel:${selectedMember.telephone}`} className="text-primary-600 hover:underline">{selectedMember.telephone}</a>
+                      : <span className="text-gray-400 italic">Non renseigné</span>}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-0.5">Localisation</p>
+                  <p className="font-medium text-sm">{selectedMember.localisation}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-0.5">Culture principale</p>
+                  <p className="font-medium text-sm">{selectedMember.crop_type || '—'}</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-0.5">Superficie exploitée</p>
+                  <p className="font-medium text-sm">{selectedMember.superficie} ha</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-0.5">Expérience</p>
+                  <p className="font-medium text-sm">
+                    {selectedMember.experience_annees !== null ? `${selectedMember.experience_annees} ans` : '—'}
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-0.5">Évaluations</p>
+                  <p className="font-medium text-sm">{selectedMember.evaluation_count} évaluation(s)</p>
+                </div>
+              </div>
+
+              {selectedMember.latest_evaluation_status && (
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <p className="text-xs text-gray-500 mb-1">Dernière évaluation</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                      selectedMember.latest_evaluation_status === 'approved' ? 'bg-emerald-100 text-emerald-700'
+                      : selectedMember.latest_evaluation_status === 'pending' ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-red-100 text-red-700'
+                    }`}>
+                      {selectedMember.latest_evaluation_status === 'approved' ? 'Approuvée'
+                        : selectedMember.latest_evaluation_status === 'pending' ? 'En attente'
+                        : 'Rejetée'}
+                    </span>
+                    {selectedMember.latest_evaluation_crop && (
+                      <span className="text-sm text-gray-600">· {selectedMember.latest_evaluation_crop}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <a
+                href={`/${lang}/dashboard/farmer?view=member&member_id=${selectedMember.user_id}`}
+                className="flex-1 text-center text-sm py-2 px-4 border border-primary-300 text-primary-600 rounded-lg hover:bg-primary-50 transition-colors"
+              >
+                Voir tableau de bord complet
+              </a>
+              <Button className="flex-shrink-0" variant="outline" onClick={() => setSelectedMember(null)}>Fermer</Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 

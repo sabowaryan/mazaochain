@@ -102,7 +102,15 @@ Tables: `profiles`, `farmer_profiles`, `cooperative_profiles`, `lender_profiles`
 - `GET /api/farmer/portfolio` — DB-backed portfolio endpoint returning completed tokenization records with crop metadata
 
 ### Turbopack / Prisma note
-`src/lib/db/index.ts` uses a `Proxy` for lazy Prisma initialization to avoid `base64url` encoding errors in Turbopack SSR chunks. The client is only instantiated on the first actual DB method call, not at module evaluation time.
+`src/lib/db/index.ts` uses a `Proxy` for lazy Prisma initialization to avoid `base64url` encoding errors in Turbopack SSR chunks. The client is only instantiated on the first actual DB method call, not at module evaluation time. The singleton is cached in `globalForPrisma` unconditionally (dev and production) to prevent per-request client creation.
+
+### Database migration note
+`prisma/schema.prisma` has new columns on the `Loan` model (`collateral_token_id`, `collateral_record_id`) and a back-relation on `TokenizationRecord`. Apply to any environment with:
+```
+npx prisma db push
+npx prisma generate
+```
+This was applied to the development DB. Run the same commands when deploying to a new environment.
 
 ## Security Notes
 

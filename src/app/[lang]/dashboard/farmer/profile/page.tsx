@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { FarmerProfileForm } from "@/components/profiles/FarmerProfileForm";
 import { ClientOnly } from "@/components/ClientOnly";
+import { useWallet } from "@/hooks/useWallet";
 import { ModernPageHeader } from "@/components/ui/ModernPageHeader";
 import { StatCard } from "@/components/ui/StatCard";
 import { InfoCard } from "@/components/ui/InfoCard";
@@ -50,6 +51,7 @@ function FarmerProfileContent() {
   const [isEditing, setIsEditing] = useState(false);
   const params = useParams();
   const lang = params.lang as string;
+  const { isConnected, isConnecting, connectWallet, disconnectWallet } = useWallet();
 
   // Show loading while authentication is initializing or profile data is loading
   if (!initialized || authLoading || profileLoading) {
@@ -257,7 +259,31 @@ function FarmerProfileContent() {
                         {profile?.wallet_address || "Non configuré"}
                       </p>
                     </div>
-                    {!profile?.wallet_address && (
+                    <ClientOnly>
+                      <div className="mt-3">
+                        {isConnected || profile?.wallet_address ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-300 hover:bg-red-50 w-full"
+                            onClick={disconnectWallet}
+                          >
+                            Déconnecter le wallet
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                            onClick={() => connectWallet('hedera')}
+                            disabled={isConnecting}
+                          >
+                            {isConnecting ? "Connexion en cours..." : "Connecter mon wallet"}
+                          </Button>
+                        )}
+                      </div>
+                    </ClientOnly>
+                    {!profile?.wallet_address && !isConnected && (
                       <p className="text-sm text-purple-700 mt-2">
                         Connectez votre wallet pour activer toutes les fonctionnalités
                       </p>

@@ -9,7 +9,6 @@ import {
   WalletError,
 } from "@/types/wallet";
 import { useAuth } from "@/hooks/useAuth";
-import { createClient } from "@/lib/supabase/client";
 
 export interface UseWalletReturn {
   // Connection state
@@ -184,17 +183,16 @@ export function useWallet(): UseWalletReturn {
       if (!user) return;
 
       try {
-        const supabase = createClient();
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update({ wallet_address: walletAddress })
-          .eq("id", user.id);
+        const response = await fetch('/api/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wallet_address: walletAddress }),
+        });
 
-        if (updateError) {
-          throw updateError;
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to update wallet address');
         }
-
-        // Note: Profile will be updated automatically via useAuth subscription
       } catch (err) {
         console.error("Failed to update wallet address:", err);
         throw new Error(

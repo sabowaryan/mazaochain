@@ -49,6 +49,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Idempotency guard: return existing completed token record if one already exists
+    const existingCompleted = await prisma.tokenizationRecord.findFirst({
+      where: { evaluation_id: evaluationId, status: 'completed', token_id: { not: null } },
+      orderBy: { created_at: 'desc' },
+    });
+    if (existingCompleted?.token_id) {
+      return NextResponse.json({
+        data: {
+          tokenId: existingCompleted.token_id,
+          transactionId: null,
+          transferredToFarmer: false,
+          recordId: existingCompleted.id,
+        },
+        message: 'Token déjà créé (réponse idempotente)',
+      });
+    }
+
     const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;
 
     // Evaluated quantity = superficie × rendement_historique (total crop volume)

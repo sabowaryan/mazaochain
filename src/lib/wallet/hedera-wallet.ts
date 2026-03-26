@@ -2252,25 +2252,34 @@ class HederaWalletService {
         // is already established at this point. When we see isConnected=true with an
         // empty address, read the real account ID directly from the provider session.
         if (account.isConnected && !account.address) {
-          const sessionAccount = this.getAccountFromSession();
-          if (sessionAccount) {
-            console.log("🔄 Enriching empty AppKit address from session:", sessionAccount.address);
-            account = { ...account, address: sessionAccount.address };
+          const enrichAndNotify = (attempt: number) => {
+            const sessionAccount = this.getAccountFromSession();
+            if (sessionAccount) {
+              const enriched = { ...account, address: sessionAccount.address };
 
-            // Also update connectionState if not already set
-            if (!this.connectionState?.isConnected) {
-              const detectedNamespace = sessionAccount.chainId.startsWith('eip155') ? 'eip155' : 'hedera';
-              this.connectionState = {
-                accountId: sessionAccount.address,
-                network: sessionAccount.chainId.includes('mainnet') ? 'mainnet' : 'testnet',
-                isConnected: true,
-                namespace: detectedNamespace,
-                chainId: sessionAccount.chainId,
-              };
-              this.saveSession();
-              console.log("✅ Connection state set from session:", this.connectionState);
+              if (!this.connectionState?.isConnected) {
+                const detectedNamespace = sessionAccount.chainId.startsWith('eip155') ? 'eip155' : 'hedera';
+                this.connectionState = {
+                  accountId: sessionAccount.address,
+                  network: sessionAccount.chainId.includes('mainnet') ? 'mainnet' : 'testnet',
+                  isConnected: true,
+                  namespace: detectedNamespace,
+                  chainId: sessionAccount.chainId,
+                };
+                this.saveSession();
+              }
+
+              this.accountChangeCallbacks.forEach((cb) => cb(enriched));
+            } else if (attempt < 3) {
+              // Session not ready yet — retry up to 3 times with increasing delay
+              setTimeout(() => enrichAndNotify(attempt + 1), 400 * attempt + 400);
+            } else {
+              // All retries exhausted — fire as-is so the hook can handle it
+              this.accountChangeCallbacks.forEach((cb) => cb(account));
             }
-          }
+          };
+          enrichAndNotify(1);
+          return; // Don't fall through to the forEach below
         }
 
         this.accountChangeCallbacks.forEach((cb) => cb(account));

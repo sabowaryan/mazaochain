@@ -230,21 +230,30 @@ export function useWallet(): UseWalletReturn {
           setIsConnecting(false);
         }
 
-        // Keep React state in sync with the service in case of out-of-band changes
-        const currentState = walletService.getConnectionState();
-        const serviceConnected = currentState?.isConnected ?? false;
-        if (serviceConnected !== isConnectedRef.current) {
-          if (serviceConnected && currentState) {
-            setConnection(currentState);
-            setIsConnected(true);
-            setNamespace(currentState.namespace);
-            loadBalances(currentState.accountId);
-          } else {
-            setConnection(null);
-            setIsConnected(false);
-            setNamespace(null);
-            setBalances(null);
-          }
+        // Sync after modal closes — small delay lets the service finish updating
+        // connectionState (session enrichment may be async with retries)
+        if (!state.open) {
+          const syncState = () => {
+            const currentState = walletService.getConnectionState();
+            const serviceConnected = currentState?.isConnected ?? false;
+            if (serviceConnected !== isConnectedRef.current) {
+              if (serviceConnected && currentState) {
+                setConnection(currentState);
+                setIsConnected(true);
+                setNamespace(currentState.namespace);
+                loadBalances(currentState.accountId);
+              } else {
+                setConnection(null);
+                setIsConnected(false);
+                setNamespace(null);
+                setBalances(null);
+              }
+            }
+          };
+          // Immediate check first, then delayed fallback for async enrichment
+          syncState();
+          setTimeout(syncState, 600);
+          setTimeout(syncState, 1400);
         }
       }
     );

@@ -72,14 +72,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Cooperatives can only create loans for farmers in their cooperative
+    // Cooperatives can only create loans for farmers belonging to their cooperative
     if (isCooperative && !isAdmin) {
-      const farmerProfile = await prisma.farmerProfile.findFirst({
-        where: { user_id: body.borrower_id },
-        include: { user: { select: { id: true } } },
-      });
+      const [callerCoopProfile, farmerProfile] = await Promise.all([
+        prisma.cooperativeProfile.findUnique({ where: { user_id: userId }, select: { id: true } }),
+        prisma.farmerProfile.findFirst({ where: { user_id: body.borrower_id }, select: { cooperative_id: true } }),
+      ]);
       if (!farmerProfile) {
         return NextResponse.json({ error: 'Borrower farmer profile not found' }, { status: 404 });
+      }
+      if (!callerCoopProfile || farmerProfile.cooperative_id !== callerCoopProfile.id) {
+        return NextResponse.json(
+          { error: 'Cooperative can only create loans for farmers in their own cooperative' },
+          { status: 403 }
+        );
       }
     }
 

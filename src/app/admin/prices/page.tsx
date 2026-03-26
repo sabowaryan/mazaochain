@@ -1,6 +1,8 @@
 import { PriceManagement } from '@/components/price-oracle/PriceManagement'
 import { PriceTrends } from '@/components/price-oracle/PriceTrends'
 
+export const dynamic = 'force-dynamic';
+
 export default function AdminPricesPage() {
   return (
     <div className="container mx-auto px-4 py-8">

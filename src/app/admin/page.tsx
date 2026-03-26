@@ -2,6 +2,8 @@ import { Metadata } from 'next';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { requireAuth } from '@/lib/supabase/auth';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Admin Dashboard - MazaoChain',
   description: 'System administration and monitoring dashboard',

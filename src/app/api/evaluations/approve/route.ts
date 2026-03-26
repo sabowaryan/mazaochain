@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
-import { createCropToken } from '@/lib/services/hedera-token-server';
+import { createCropToken, deriveTokenParams } from '@/lib/services/hedera-token-server';
 
 export const maxDuration = 60;
 
@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Le fermier n'a pas d'adresse wallet configurée" }, { status: 400 });
     }
 
-    const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;
+    // Derive token params from evaluation (shared helper, avoids duplication with /api/tokenization)
+    const { cropType, quantity, tokenSymbol } = deriveTokenParams(evaluation);
     const daysUntilHarvest = evaluation.crop_type === 'cafe' ? 90 : 120;
     const harvestDate = new Date();
     harvestDate.setDate(harvestDate.getDate() + daysUntilHarvest);
@@ -68,12 +69,9 @@ export async function POST(request: NextRequest) {
       }),
     ]);
 
-    // Evaluated quantity = superficie × rendement_historique (total crop volume)
-    const quantity = Number(evaluation.superficie ?? 0) * Number(evaluation.rendement_historique ?? 0);
-
     // Attempt real on-chain token creation
     const tokenResult = await createCropToken({
-      cropType: evaluation.crop_type,
+      cropType,
       farmerWalletAddress: evaluation.farmer.wallet_address,
       quantity,
       tokenSymbol,

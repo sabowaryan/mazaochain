@@ -10,6 +10,20 @@ export interface CropTokenCreationResult {
 }
 
 /**
+ * Derive token creation params from a crop evaluation row.
+ * Shared between /api/evaluations/approve and /api/tokenization to avoid duplication.
+ */
+export function deriveTokenParams(evaluation: {
+  crop_type: string;
+  superficie: unknown;
+  rendement_historique: unknown;
+}): { cropType: string; quantity: number; tokenSymbol: string } {
+  const quantity = Number(evaluation.superficie ?? 0) * Number(evaluation.rendement_historique ?? 0);
+  const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;
+  return { cropType: evaluation.crop_type, quantity, tokenSymbol };
+}
+
+/**
  * @param params.quantity — evaluated crop quantity (superficie × rendement_historique).
  *   Each whole unit = 1.00 token (2 decimal places), so initialSupply = round(quantity × 100).
  *   This represents the actual physical crop volume, not the monetary value.

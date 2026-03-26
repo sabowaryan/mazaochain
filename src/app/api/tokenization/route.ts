@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
-import { createCropToken } from '@/lib/services/hedera-token-server';
+import { createCropToken, deriveTokenParams } from '@/lib/services/hedera-token-server';
 
 export const maxDuration = 60;
 
@@ -82,13 +82,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;
-
-    // Evaluated quantity = superficie × rendement_historique (total crop volume)
-    const quantity = Number(evaluation.superficie ?? 0) * Number(evaluation.rendement_historique ?? 0);
+    // Derive token params from evaluation (shared helper, avoids duplication with /api/evaluations/approve)
+    const { cropType, quantity, tokenSymbol } = deriveTokenParams(evaluation);
 
     const tokenResult = await createCropToken({
-      cropType: evaluation.crop_type,
+      cropType,
       farmerWalletAddress: evaluation.farmer.wallet_address,
       quantity,
       tokenSymbol,

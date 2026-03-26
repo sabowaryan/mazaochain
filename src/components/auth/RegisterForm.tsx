@@ -7,9 +7,10 @@ import { useSignUp } from '@clerk/nextjs';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
-import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, CheckCircleIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 
 type UserRole = 'agriculteur' | 'cooperative' | 'preteur';
+type Step = 'form' | 'verify' | 'success';
 
 interface FormData {
   email: string;
@@ -24,6 +25,7 @@ interface FormErrors {
   confirmPassword?: string;
   role?: string;
   general?: string;
+  code?: string;
 }
 
 const ROLE_LABELS: Record<UserRole, { label: string; description: string }> = {
@@ -32,19 +34,26 @@ const ROLE_LABELS: Record<UserRole, { label: string; description: string }> = {
   preteur: { label: 'Prêteur', description: 'Je souhaite financer des projets agricoles' },
 };
 
+const DASHBOARD_PATHS: Record<UserRole, string> = {
+  agriculteur: '/fr/dashboard/farmer',
+  cooperative: '/fr/dashboard/cooperative',
+  preteur: '/fr/dashboard/lender',
+};
+
 export function RegisterForm() {
   const router = useRouter();
   const { isLoaded, signUp, setActive } = useSignUp();
 
+  const [step, setStep] = useState<Step>('form');
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
     confirmPassword: '',
     role: 'agriculteur',
   });
+  const [verificationCode, setVerificationCode] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -74,24 +83,16 @@ export function RegisterForm() {
 
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-
         await fetch('/api/profile', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ role: formData.role }),
         });
-
-        setSuccess(true);
-        setTimeout(() => {
-          const dashboardPaths: Record<UserRole, string> = {
-            agriculteur: '/fr/dashboard/farmer',
-            cooperative: '/fr/dashboard/cooperative',
-            preteur: '/fr/dashboard/lender',
-          };
-          router.push(dashboardPaths[formData.role]);
-        }, 1500);
+        setStep('success');
+        setTimeout(() => router.push(DASHBOARD_PATHS[formData.role]), 1500);
       } else if (result.status === 'missing_requirements') {
-        setErrors({ general: 'Vérification email requise. Consultez votre boîte mail.' });
+        await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+        setStep('verify');
       } else {
         setErrors({ general: 'Inscription incomplète. Veuillez réessayer.' });
       }
@@ -109,13 +110,66 @@ export function RegisterForm() {
     }
   };
 
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isLoaded || !verificationCode.trim()) {
+      setErrors({ code: 'Veuillez entrer le code de vérification' });
+      return;
+    }
+
+    setLoading(true);
+    setErrors({});
+
+    try {
+      const result = await signUp.attemptEmailAddressVerification({ code: verificationCode });
+
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: formData.role }),
+        });
+        setStep('success');
+        setTimeout(() => router.push(DASHBOARD_PATHS[formData.role]), 1500);
+      } else {
+        setErrors({ code: 'Code invalide. Veuillez réessayer.' });
+      }
+    } catch (err: any) {
+      const code = err?.errors?.[0]?.code;
+      if (code === 'form_code_incorrect' || code === 'verification_failed') {
+        setErrors({ code: 'Code incorrect. Vérifiez votre boîte mail et réessayez.' });
+      } else if (code === 'verification_expired') {
+        setErrors({ code: 'Le code a expiré. Cliquez sur "Renvoyer le code".' });
+      } else {
+        setErrors({ code: "Une erreur s'est produite. Veuillez réessayer." });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!isLoaded) return;
+    setLoading(true);
+    setErrors({});
+    try {
+      await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      setErrors({ general: 'Un nouveau code a été envoyé à votre adresse email.' });
+    } catch {
+      setErrors({ general: "Impossible de renvoyer le code. Veuillez réessayer." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleInputChange =
     (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       setFormData(prev => ({ ...prev, [field]: e.target.value }));
       if (errors[field as keyof FormErrors]) setErrors(prev => ({ ...prev, [field]: undefined }));
     };
 
-  if (success) {
+  if (step === 'success') {
     return (
       <div className="w-full max-w-screen-md mx-auto">
         <Card className="bg-white/80 border-0 shadow-xl">
@@ -123,6 +177,92 @@ export function RegisterForm() {
             <CheckCircleIcon className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Compte créé avec succès !</h2>
             <p className="text-gray-600">Redirection vers votre tableau de bord...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (step === 'verify') {
+    return (
+      <div className="w-full max-w-screen-md mx-auto">
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
+          <CardHeader className="p-8 pb-0 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+                <EnvelopeIcon className="w-8 h-8 text-emerald-600" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl font-bold text-gray-900">Vérifiez votre email</CardTitle>
+            <CardDescription className="text-gray-600 mt-2">
+              Un code de vérification a été envoyé à{' '}
+              <span className="font-medium text-gray-800">{formData.email}</span>.
+              Consultez votre boîte mail (et les spams).
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="p-8">
+            <form onSubmit={handleVerify} className="space-y-5">
+              {errors.general && (
+                <div className={`p-4 text-sm rounded-lg flex items-center space-x-3 ${
+                  errors.general.includes('nouveau code')
+                    ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                    : 'text-red-700 bg-red-50 border border-red-200'
+                }`}>
+                  <span>{errors.general}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Code de vérification (6 chiffres)
+                </label>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  value={verificationCode}
+                  onChange={e => {
+                    setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                    if (errors.code) setErrors(prev => ({ ...prev, code: undefined }));
+                  }}
+                  className={`text-center text-xl tracking-widest font-mono ${errors.code ? 'border-red-500' : ''}`}
+                  disabled={loading}
+                  maxLength={6}
+                  autoFocus
+                />
+                {errors.code && <p className="mt-1 text-sm text-red-600">{errors.code}</p>}
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading || !isLoaded || verificationCode.length < 6}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl"
+              >
+                {loading ? 'Vérification...' : 'Vérifier mon email'}
+              </Button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  disabled={loading}
+                  className="text-sm text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-50"
+                >
+                  Renvoyer le code
+                </button>
+              </div>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => { setStep('form'); setErrors({}); setVerificationCode(''); }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  ← Modifier l&apos;adresse email
+                </button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </div>

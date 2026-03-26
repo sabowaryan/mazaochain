@@ -118,15 +118,10 @@ export async function GET(request: NextRequest) {
             : Promise.resolve(0),
         ]);
 
-        const decimals = mirrorInfo?.decimals ? Number(mirrorInfo.decimals) : 2;
-        const amount = mirrorBalance > 0
-          ? mirrorBalance
-          : Math.round(estimatedValue * Math.pow(10, decimals));
-
         return {
           tokenId,
           cropType: evaluation.crop_type,
-          amount,
+          amount: mirrorBalance,
           estimatedValue,
           harvestDate: harvestDate.toISOString(),
           status,

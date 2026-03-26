@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
       include: {
         farmer: {
           select: { wallet_address: true },
-          include: { farmer_profile: true },
         },
       },
     });

@@ -165,9 +165,11 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
       );
       if (!res.ok) return 0;
       const data = await res.json();
-      const tokens: { token_id: string; balance: number }[] = data?.tokens ?? [];
+      const tokens: { token_id: string; balance: number; decimals?: number }[] = data?.tokens ?? [];
       const found = tokens.find((t) => t.token_id === tokenId);
-      return found ? found.balance : 0;
+      if (!found) return 0;
+      // Normalize from Mirror Node base units to human-readable token units
+      return found.balance / Math.pow(10, found.decimals ?? 2);
     });
   }, [handleAsyncOperation]);
 

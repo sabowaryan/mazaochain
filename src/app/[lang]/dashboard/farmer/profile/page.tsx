@@ -40,7 +40,7 @@ import {
 } from '@heroicons/react/24/solid';
 
 function FarmerProfileContent() {
-  const { user, profile, loading: authLoading, initialized } = useAuth();
+  const { user, profile, loading: authLoading, initialized, refreshProfile } = useAuth();
   const {
     profileData: farmerProfile,
     loading: profileLoading,
@@ -51,7 +51,7 @@ function FarmerProfileContent() {
   const [isEditing, setIsEditing] = useState(false);
   const params = useParams();
   const lang = params.lang as string;
-  const { isConnected, isConnecting, connectWallet, disconnectWallet } = useWallet();
+  const { isConnected, isConnecting, connection, connectWallet, disconnectWallet } = useWallet();
 
   // Show loading while authentication is initializing or profile data is loading
   if (!initialized || authLoading || profileLoading) {
@@ -256,17 +256,20 @@ function FarmerProfileContent() {
                     </div>
                     <div className="bg-white p-4 rounded-lg border border-purple-200">
                       <p className="text-sm font-mono text-gray-900 break-all">
-                        {profile?.wallet_address || "Non configuré"}
+                        {connection?.accountId ?? profile?.wallet_address ?? "Non configuré"}
                       </p>
                     </div>
                     <ClientOnly>
                       <div className="mt-3">
-                        {isConnected || profile?.wallet_address ? (
+                        {isConnected ? (
                           <Button
                             variant="outline"
                             size="sm"
                             className="text-red-600 border-red-300 hover:bg-red-50 w-full"
-                            onClick={disconnectWallet}
+                            onClick={async () => {
+                              await disconnectWallet();
+                              await refreshProfile();
+                            }}
                           >
                             Déconnecter le wallet
                           </Button>
@@ -275,7 +278,10 @@ function FarmerProfileContent() {
                             variant="primary"
                             size="sm"
                             className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                            onClick={() => connectWallet('hedera')}
+                            onClick={async () => {
+                              await connectWallet('hedera');
+                              await refreshProfile();
+                            }}
                             disabled={isConnecting}
                           >
                             {isConnecting ? "Connexion en cours..." : "Connecter mon wallet"}
@@ -283,7 +289,7 @@ function FarmerProfileContent() {
                         )}
                       </div>
                     </ClientOnly>
-                    {!profile?.wallet_address && !isConnected && (
+                    {!isConnected && !profile?.wallet_address && (
                       <p className="text-sm text-purple-700 mt-2">
                         Connectez votre wallet pour activer toutes les fonctionnalités
                       </p>

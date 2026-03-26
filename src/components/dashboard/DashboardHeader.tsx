@@ -20,6 +20,13 @@ const ROUTE_META: Record<string, { title: string; breadcrumbs: string[] }> = {
   'lender/portfolio': { title: 'Portfolio', breadcrumbs: ['Prêteur', 'Portfolio'] },
   'lender/profile': { title: 'Profil', breadcrumbs: ['Prêteur', 'Profil'] },
   notifications: { title: 'Notifications', breadcrumbs: ['Notifications'] },
+  'farmer/notifications': { title: 'Notifications', breadcrumbs: ['Agriculteur', 'Notifications'] },
+  'cooperative/notifications': { title: 'Notifications', breadcrumbs: ['Coopérative', 'Notifications'] },
+  'lender/notifications': { title: 'Notifications', breadcrumbs: ['Prêteur', 'Notifications'] },
+  'farmer/evaluations/new': { title: 'Nouvelle évaluation', breadcrumbs: ['Agriculteur', 'Évaluations', 'Nouvelle'] },
+  'farmer/loans/request': { title: 'Demander un prêt', breadcrumbs: ['Agriculteur', 'Prêts', 'Demande'] },
+  admin: { title: 'Administration', breadcrumbs: ['Admin', 'Panneau de contrôle'] },
+  'admin/prices': { title: 'Prix agricoles', breadcrumbs: ['Admin', 'Prix'] },
 };
 
 export function DashboardHeader() {

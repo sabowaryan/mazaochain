@@ -40,7 +40,7 @@ import {
 } from '@heroicons/react/24/solid';
 
 function FarmerProfileContent() {
-  const { user, profile, loading: authLoading, initialized, refreshProfile } = useAuth();
+  const { user, profile, loading: authLoading, initialized, refreshProfile: refreshAuthProfile } = useAuth();
   const {
     profileData: farmerProfile,
     loading: profileLoading,
@@ -268,7 +268,7 @@ function FarmerProfileContent() {
                             className="text-red-600 border-red-300 hover:bg-red-50 w-full"
                             onClick={async () => {
                               await disconnectWallet();
-                              await refreshProfile();
+                              await refreshAuthProfile();
                             }}
                           >
                             Déconnecter le wallet
@@ -280,7 +280,7 @@ function FarmerProfileContent() {
                             className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                             onClick={async () => {
                               await connectWallet('hedera');
-                              await refreshProfile();
+                              await refreshAuthProfile();
                             }}
                             disabled={isConnecting}
                           >

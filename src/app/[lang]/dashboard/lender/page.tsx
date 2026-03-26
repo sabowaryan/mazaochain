@@ -32,11 +32,12 @@ interface LoanOpportunity {
   interest_rate: number;
   status: string;
   created_at: string;
-  profiles?: {
-    farmer_profiles?: {
-      nom: string;
-      crop_type: string;
-    };
+  due_date?: string;
+  farmer?: {
+    nom: string;
+    crop_type: string | null;
+    superficie: number;
+    localisation: string;
   };
   risk_assessment?: RiskAssessment;
 }
@@ -355,10 +356,10 @@ function LenderDashboardContent() {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="font-medium">
-                          {opportunity.profiles?.farmer_profiles?.nom || 'Agriculteur'}
+                          {opportunity.farmer?.nom || 'Agriculteur'}
                         </p>
                         <p className="text-sm text-gray-600">
-                          {opportunity.profiles?.farmer_profiles?.crop_type || 'Culture mixte'}
+                          {opportunity.farmer?.crop_type || 'Culture mixte'}
                         </p>
                       </div>
                       <span className="text-lg font-bold text-primary-600">
@@ -407,20 +408,24 @@ function LenderDashboardContent() {
               <h3 className="text-lg font-semibold mb-4">Performance du portfolio</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Rendement moyen</span>
-                  <span className="font-bold text-success-600">15%</span>
+                  <span className="text-gray-600">Capital total déployé</span>
+                  <span className="font-bold text-secondary-600">${stats.totalInvested.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Taux de défaut</span>
-                  <span className="font-bold text-error-600">2%</span>
+                  <span className="text-gray-600">Rendements projetés</span>
+                  <span className="font-bold text-success-600">${stats.totalReturns.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Diversification</span>
-                  <span className="font-bold text-primary-600">Élevée</span>
+                  <span className="text-gray-600">Valeur totale du portfolio</span>
+                  <span className="font-bold text-primary-600">${stats.portfolioValue.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Opportunités disponibles</span>
+                  <span className="font-bold text-accent-600">{loanOpportunities.length}</span>
                 </div>
                 <div className="pt-4 border-t">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full"
                     onClick={() => setActiveTab('analytics')}
                   >
@@ -451,8 +456,8 @@ function LenderDashboardContent() {
             {selectedOpportunityForRisk && selectedOpportunityForRisk.risk_assessment ? (
               <RiskAssessmentDisplay
                 riskAssessment={selectedOpportunityForRisk.risk_assessment}
-                farmerName={selectedOpportunityForRisk.profiles?.farmer_profiles?.nom || 'Agriculteur'}
-                cropType={selectedOpportunityForRisk.profiles?.farmer_profiles?.crop_type || 'Culture'}
+                farmerName={selectedOpportunityForRisk.farmer?.nom || 'Agriculteur'}
+                cropType={selectedOpportunityForRisk.farmer?.crop_type || 'Culture'}
               />
             ) : (
               <Card className="p-6">
@@ -460,8 +465,8 @@ function LenderDashboardContent() {
                   <p className="text-gray-500">
                     Sélectionnez une opportunité dans l&apos;onglet Vue d&apos;ensemble pour voir l&apos;analyse de risque détaillée
                   </p>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="mt-4"
                     onClick={() => setActiveTab('overview')}
                   >
@@ -473,14 +478,72 @@ function LenderDashboardContent() {
           </div>
         )}
 
-        {activeTab === 'analytics' && (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Analyses de risque et performance</h3>
-            <div className="text-center py-8">
-              <p className="text-gray-500">Analyses de risque en cours de développement</p>
+        {activeTab === 'analytics' && (() => {
+          const avgRate = loanOpportunities.length > 0
+            ? loanOpportunities.reduce((s, o) => s + o.interest_rate, 0) / loanOpportunities.length
+            : 0;
+          const totalCapital = stats.totalInvested + stats.availableFunds;
+          const utilizationRate = totalCapital > 0 ? (stats.totalInvested / totalCapital) * 100 : 0;
+          return (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="p-6">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Taux d&apos;intérêt moyen (opportunités)</p>
+                  <p className="text-3xl font-bold text-primary-600">
+                    {avgRate > 0 ? `${(avgRate * 100).toFixed(1)}%` : '—'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Sur {loanOpportunities.length} opportunités disponibles</p>
+                </Card>
+                <Card className="p-6">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Taux d&apos;utilisation du capital</p>
+                  <p className="text-3xl font-bold text-secondary-600">
+                    {totalCapital > 0 ? `${utilizationRate.toFixed(1)}%` : '—'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">${stats.totalInvested.toLocaleString()} sur ${totalCapital.toLocaleString()} disponibles</p>
+                </Card>
+                <Card className="p-6">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Prêts actifs</p>
+                  <p className="text-3xl font-bold text-success-600">{stats.activeLoans}</p>
+                  <p className="text-xs text-gray-400 mt-1">Rendements projetés : ${stats.totalReturns.toLocaleString()}</p>
+                </Card>
+              </div>
+
+              <Card className="p-6">
+                <h4 className="text-base font-semibold mb-4">Opportunités par culture</h4>
+                {loanOpportunities.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-4">Aucune opportunité disponible actuellement</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Agriculteur</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Culture</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Localisation</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Montant</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Taux</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Garantie</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {loanOpportunities.map(op => (
+                          <tr key={op.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 text-sm font-medium text-gray-900">{op.farmer?.nom || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{op.farmer?.crop_type || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-gray-600">{op.farmer?.localisation || '—'}</td>
+                            <td className="px-4 py-2 text-sm text-right font-semibold text-primary-600">${op.principal.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-sm text-right text-success-600">{(op.interest_rate * 100).toFixed(1)}%</td>
+                            <td className="px-4 py-2 text-sm text-right text-gray-600">${op.collateral_amount.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
             </div>
-          </Card>
-        )}
+          );
+        })()}
       </div>
 
       {/* Risk Assessment Modal */}
@@ -500,8 +563,8 @@ function LenderDashboardContent() {
               </div>
               <RiskAssessmentDisplay
                 riskAssessment={selectedOpportunityForRisk.risk_assessment}
-                farmerName={selectedOpportunityForRisk.profiles?.farmer_profiles?.nom || 'Agriculteur'}
-                cropType={selectedOpportunityForRisk.profiles?.farmer_profiles?.crop_type || 'Culture'}
+                farmerName={selectedOpportunityForRisk.farmer?.nom || 'Agriculteur'}
+                cropType={selectedOpportunityForRisk.farmer?.crop_type || 'Culture'}
               />
             </div>
           </div>

@@ -36,9 +36,9 @@ export async function POST(request: NextRequest) {
     if (!evaluation) {
       return NextResponse.json({ error: 'Évaluation non trouvée' }, { status: 404 });
     }
-    if (!['approved', 'pending'].includes(evaluation.status)) {
+    if (evaluation.status !== 'approved') {
       return NextResponse.json(
-        { error: 'Cette évaluation ne peut pas être tokenisée dans son état actuel' },
+        { error: "Seules les évaluations approuvées peuvent être tokenisées. Statut actuel : " + evaluation.status },
         { status: 400 }
       );
     }
@@ -51,10 +51,13 @@ export async function POST(request: NextRequest) {
 
     const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;
 
+    // Evaluated quantity = superficie × rendement_historique (total crop volume)
+    const quantity = Number(evaluation.superficie ?? 0) * Number(evaluation.rendement_historique ?? 0);
+
     const tokenResult = await createCropToken({
       cropType: evaluation.crop_type,
       farmerWalletAddress: evaluation.farmer.wallet_address,
-      estimatedValue: evaluation.valeur_estimee ?? 0,
+      quantity,
       tokenSymbol,
     });
 

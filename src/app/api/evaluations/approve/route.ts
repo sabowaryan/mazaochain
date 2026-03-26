@@ -54,11 +54,14 @@ export async function POST(request: NextRequest) {
       }),
     ]);
 
+    // Evaluated quantity = superficie × rendement_historique (total crop volume)
+    const quantity = Number(evaluation.superficie ?? 0) * Number(evaluation.rendement_historique ?? 0);
+
     // Attempt real on-chain token creation
     const tokenResult = await createCropToken({
       cropType: evaluation.crop_type,
       farmerWalletAddress: evaluation.farmer.wallet_address,
-      estimatedValue: evaluation.valeur_estimee ?? 0,
+      quantity,
       tokenSymbol,
     });
 

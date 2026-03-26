@@ -56,12 +56,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: borrower_id and principal' }, { status: 400 });
     }
 
+    // Validate and link collateral tokenization record if provided
+    let collateralTokenId: string | null = null;
+    let collateralRecordId: string | null = null;
+
+    if (body.collateral_record_id) {
+      const tokenRecord = await prisma.tokenizationRecord.findUnique({
+        where: { id: body.collateral_record_id },
+        include: { evaluation: { select: { farmer_id: true } } },
+      });
+
+      if (!tokenRecord) {
+        return NextResponse.json({ error: 'Collateral tokenization record not found' }, { status: 404 });
+      }
+      if (tokenRecord.status !== 'completed' || !tokenRecord.token_id) {
+        return NextResponse.json(
+          { error: 'Collateral must be a completed (fully tokenized) record with a valid Hedera token ID' },
+          { status: 400 }
+        );
+      }
+      if (tokenRecord.evaluation.farmer_id !== body.borrower_id) {
+        return NextResponse.json(
+          { error: 'Collateral record does not belong to the borrower' },
+          { status: 403 }
+        );
+      }
+
+      collateralTokenId = tokenRecord.token_id;
+      collateralRecordId = tokenRecord.id;
+    }
+
     const loan = await prisma.loan.create({
       data: {
         borrower_id: body.borrower_id,
         lender_id: body.lender_id ?? null,
         principal: body.principal,
         collateral_amount: body.collateral_amount,
+        collateral_token_id: collateralTokenId,
+        collateral_record_id: collateralRecordId,
         interest_rate: body.interest_rate,
         due_date: new Date(body.due_date),
         status: body.status ?? 'pending',

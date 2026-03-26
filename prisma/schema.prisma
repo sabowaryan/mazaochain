@@ -97,18 +97,21 @@ model CropEvaluation {
 }
 
 model Loan {
-  id                String   @id @default(uuid())
-  borrower_id       String
-  lender_id         String?
-  principal         Decimal
-  collateral_amount Decimal
-  interest_rate     Decimal
-  due_date          DateTime
-  status            String   @default("pending")
-  created_at        DateTime @default(now())
+  id                   String   @id @default(uuid())
+  borrower_id          String
+  lender_id            String?
+  principal            Decimal
+  collateral_amount    Decimal
+  collateral_token_id  String?
+  collateral_record_id String?
+  interest_rate        Decimal
+  due_date             DateTime
+  status               String   @default("pending")
+  created_at           DateTime @default(now())
 
-  borrower Profile  @relation("LoanBorrower", fields: [borrower_id], references: [id], onDelete: Cascade)
-  lender   Profile? @relation("LoanLender", fields: [lender_id], references: [id])
+  borrower            Profile              @relation("LoanBorrower", fields: [borrower_id], references: [id], onDelete: Cascade)
+  lender              Profile?             @relation("LoanLender", fields: [lender_id], references: [id])
+  collateral_record   TokenizationRecord?  @relation(fields: [collateral_record_id], references: [id])
 
   @@map("loans")
 }
@@ -155,6 +158,7 @@ model TokenizationRecord {
   created_at    DateTime @default(now())
 
   evaluation CropEvaluation @relation(fields: [evaluation_id], references: [id], onDelete: Cascade)
+  loans      Loan[]
 
   @@map("tokenization_records")
 }

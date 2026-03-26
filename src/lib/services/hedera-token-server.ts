@@ -9,10 +9,15 @@ export interface CropTokenCreationResult {
   error?: string;
 }
 
+/**
+ * @param params.quantity — evaluated crop quantity (superficie × rendement_historique).
+ *   Each whole unit = 1.00 token (2 decimal places), so initialSupply = round(quantity × 100).
+ *   This represents the actual physical crop volume, not the monetary value.
+ */
 export async function createCropToken(params: {
   cropType: string;
   farmerWalletAddress: string;
-  estimatedValue: number;
+  quantity: number;
   tokenSymbol: string;
 }): Promise<CropTokenCreationResult> {
   const operatorAccountId = process.env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID;
@@ -40,7 +45,8 @@ export async function createCropToken(params: {
 
     const tokenName = `MAZAO-${params.cropType.toUpperCase()}`;
     const symbol = params.tokenSymbol.substring(0, 10);
-    const initialSupply = Math.max(1, Math.round(params.estimatedValue * 100));
+    // initialSupply = quantity × 100 (2 decimal places represent fractional units)
+    const initialSupply = Math.max(1, Math.round(params.quantity * 100));
     const treasuryId = AccountId.fromString(operatorAccountId);
 
     // Step 1: Create the HTS fungible token (treasury = operator)

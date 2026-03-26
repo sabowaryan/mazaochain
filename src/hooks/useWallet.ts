@@ -48,11 +48,12 @@ export function useWallet(): UseWalletReturn {
 
   const { user } = useAuth();
 
-  // Ref to track the latest isConnected value inside subscription callbacks
-  // Updated after every render so it is always current when the callback fires
+  // Refs to track latest state inside subscription callbacks (avoids stale closures)
   const isConnectedRef = useRef(isConnected);
+  const isConnectingRef = useRef(isConnecting);
   useEffect(() => {
     isConnectedRef.current = isConnected;
+    isConnectingRef.current = isConnecting;
   });
 
   // Load wallet service dynamically (only once)
@@ -74,9 +75,7 @@ export function useWallet(): UseWalletReturn {
     
     setIsLoadingBalances(true);
     try {
-      const walletBalances = await walletService.getAccountBalance(
-        accountId
-      );
+      const walletBalances = await walletService.getAccountBalance(accountId);
       setBalances(walletBalances);
     } catch (err) {
       console.warn("Failed to load balances:", err);
@@ -84,12 +83,8 @@ export function useWallet(): UseWalletReturn {
       // If account doesn't exist (404), show zero balance instead of error
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes("404") || errorMessage.includes("not found")) {
-        setBalances({
-          hbar: "0",
-          tokens: [],
-        });
+        setBalances({ hbar: "0", tokens: [] });
       } else {
-        // Only show error for non-404 errors
         if (err instanceof WalletError) {
           setError(err.message);
           setErrorCode(err.code);
@@ -154,38 +149,7 @@ export function useWallet(): UseWalletReturn {
     };
   }, [walletService, loadBalances]);
 
-  // Subscribe to AppKit state changes to detect connect/disconnect events reactively.
-  // This replaces the previous setInterval polling approach and provides instant updates.
-  useEffect(() => {
-    if (!walletService || isRestoring) return;
-
-    const appKitInstance = (walletService as any).getAppKitInstance?.();
-    if (!appKitInstance || typeof appKitInstance.subscribeState !== "function") return;
-
-    const unsubscribe = appKitInstance.subscribeState(() => {
-      const currentState = walletService.getConnectionState();
-      const serviceConnected = currentState?.isConnected ?? false;
-
-      if (serviceConnected !== isConnectedRef.current) {
-        if (serviceConnected && currentState) {
-          setConnection(currentState);
-          setIsConnected(true);
-          setNamespace(currentState.namespace);
-          loadBalances(currentState.accountId);
-        } else {
-          setConnection(null);
-          setIsConnected(false);
-          setNamespace(null);
-          setBalances(null);
-        }
-      }
-    });
-
-    return () => {
-      if (typeof unsubscribe === "function") unsubscribe();
-    };
-  }, [walletService, isRestoring, loadBalances]);
-
+  // Helper to update the user's wallet address in the profile
   const updateUserWalletAddress = useCallback(
     async (walletAddress: string | null) => {
       if (!user) return;
@@ -211,8 +175,100 @@ export function useWallet(): UseWalletReturn {
     [user]
   );
 
+  // Subscribe to AppKit state changes (subscribeState) to detect modal open/close.
+  // When the modal closes without a connection being established, clear isConnecting.
+  // Also syncs connection state if walletService detects a change.
+  useEffect(() => {
+    if (!walletService || isRestoring) return;
+
+    const appKitInstance = (walletService as any).getAppKitInstance?.();
+    if (!appKitInstance || typeof appKitInstance.subscribeState !== "function") return;
+
+    const unsubState = appKitInstance.subscribeState((state: { open: boolean }) => {
+      // Modal just closed while we were waiting for a connection — clear loading state
+      if (!state.open && isConnectingRef.current && !isConnectedRef.current) {
+        setIsConnecting(false);
+      }
+
+      // Sync walletService connection state in case it changed outside of the events path
+      const currentState = walletService.getConnectionState();
+      const serviceConnected = currentState?.isConnected ?? false;
+      if (serviceConnected !== isConnectedRef.current) {
+        if (serviceConnected && currentState) {
+          setConnection(currentState);
+          setIsConnected(true);
+          setNamespace(currentState.namespace);
+          loadBalances(currentState.accountId);
+        } else {
+          setConnection(null);
+          setIsConnected(false);
+          setNamespace(null);
+          setBalances(null);
+        }
+      }
+    });
+
+    return () => {
+      if (typeof unsubState === "function") unsubState();
+    };
+  }, [walletService, isRestoring, loadBalances]);
+
+  // Subscribe to AppKit account events (subscribeEvents) for CONNECT_SUCCESS /
+  // DISCONNECT_SUCCESS. These provide authoritative notification of wallet state
+  // changes and drive profile updates + balance refreshes.
+  useEffect(() => {
+    if (!walletService || isRestoring) return;
+
+    const appKitInstance = (walletService as any).getAppKitInstance?.();
+    if (!appKitInstance || typeof appKitInstance.subscribeEvents !== "function") return;
+
+    const unsubEvents = appKitInstance.subscribeEvents(async (events: any) => {
+      const eventName = events?.data?.event as string | undefined;
+
+      if (eventName === "CONNECT_SUCCESS") {
+        setIsConnecting(false);
+        const currentState = walletService.getConnectionState();
+        if (currentState?.isConnected) {
+          setConnection(currentState);
+          setIsConnected(true);
+          setNamespace(currentState.namespace);
+          // Persist wallet address to user profile
+          if (user && currentState.accountId) {
+            await updateUserWalletAddress(currentState.accountId).catch(console.error);
+          }
+          await loadBalances(currentState.accountId).catch(console.error);
+        }
+      } else if (eventName === "DISCONNECT_SUCCESS") {
+        setIsConnecting(false);
+        setConnection(null);
+        setIsConnected(false);
+        setNamespace(null);
+        setBalances(null);
+        if (user) {
+          await updateUserWalletAddress(null).catch(console.error);
+        }
+      }
+    });
+
+    return () => {
+      if (typeof unsubEvents === "function") unsubEvents();
+    };
+  }, [walletService, isRestoring, user, updateUserWalletAddress, loadBalances]);
+
+  // Open the AppKit modal directly using the AppKit instance.
+  // Works for both initial connection and account management views.
+  const openModal = useCallback(async () => {
+    if (!walletService) return;
+    const appKitInstance = (walletService as any).getAppKitInstance?.();
+    if (appKitInstance) {
+      await appKitInstance.open();
+    }
+  }, [walletService]);
+
+  // Connect wallet: opens the AppKit modal directly and lets reactive subscriptions
+  // (subscribeState + subscribeEvents) handle state synchronisation.
   const connectWallet = useCallback(
-    async (selectedNamespace: "hedera" | "eip155" = "hedera") => {
+    async (_namespace: "hedera" | "eip155" = "hedera") => {
       if (isConnecting || isConnected || !walletService) return;
 
       setIsConnecting(true);
@@ -220,24 +276,13 @@ export function useWallet(): UseWalletReturn {
       setErrorCode(null);
 
       try {
-        const walletConnection = await walletService.connectWallet(
-          selectedNamespace
-        );
-
-        setConnection(walletConnection);
-        setIsConnected(true);
-        setNamespace(walletConnection.namespace);
-
-        // Update user profile with wallet address
-        if (user && walletConnection.accountId) {
-          await updateUserWalletAddress(walletConnection.accountId);
-        }
-
-        // Load balances
-        await loadBalances(walletConnection.accountId);
+        // Open AppKit modal — the user picks their wallet inside the modal.
+        // CONNECT_SUCCESS / DISCONNECT_SUCCESS events (subscribeEvents above) drive
+        // the actual state update; subscribeState clears isConnecting if modal closes
+        // without a connection.
+        await openModal();
       } catch (err: unknown) {
         if (err instanceof WalletError) {
-          // Handle specific error codes
           switch (err.code) {
             case WalletErrorCode.CONNECTION_REJECTED:
               setError("Connexion refusée dans HashPack");
@@ -251,9 +296,7 @@ export function useWallet(): UseWalletReturn {
               );
               break;
             case WalletErrorCode.INVALID_PROJECT_ID:
-              setError(
-                "Configuration invalide. Veuillez contacter le support."
-              );
+              setError("Configuration invalide. Veuillez contacter le support.");
               break;
             case WalletErrorCode.NETWORK_ERROR:
               setError(
@@ -264,23 +307,21 @@ export function useWallet(): UseWalletReturn {
               setError(err.message);
           }
           setErrorCode(err.code);
+          setIsConnecting(false);
         } else {
           const errorMessage =
             err instanceof Error
               ? err.message
               : "Échec de la connexion au portefeuille";
-
-          // Si l'utilisateur a fermé le modal, ne pas afficher d'erreur
           if (errorMessage !== "MODAL_CLOSED_BY_USER") {
             setError(errorMessage);
             setErrorCode(WalletErrorCode.UNKNOWN_ERROR);
           }
+          setIsConnecting(false);
         }
-      } finally {
-        setIsConnecting(false);
       }
     },
-    [isConnecting, isConnected, user, updateUserWalletAddress, walletService, loadBalances]
+    [isConnecting, isConnected, walletService, openModal]
   );
 
   const disconnectWallet = useCallback(async () => {
@@ -319,15 +360,6 @@ export function useWallet(): UseWalletReturn {
     if (!connection?.accountId) return;
     await loadBalances(connection.accountId);
   }, [connection?.accountId, loadBalances]);
-
-  // Open the AppKit modal (works for both connect and account management views)
-  const openModal = useCallback(async () => {
-    if (!walletService) return;
-    const appKitInstance = (walletService as any).getAppKitInstance?.();
-    if (appKitInstance) {
-      await appKitInstance.open();
-    }
-  }, [walletService]);
 
   const clearError = useCallback(() => {
     setError(null);

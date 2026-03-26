@@ -75,16 +75,13 @@ export async function initializeAppKit(config: AppKitConfig) {
     // Application metadata
     metadata,
 
-    // Supported Hedera networks - configure based on environment
-    networks: env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet' 
-      ? [
-          HederaChainDefinition.EVM.Mainnet,
-          HederaChainDefinition.Native.Mainnet,
-        ]
-      : [
-          HederaChainDefinition.EVM.Testnet,
-          HederaChainDefinition.Native.Testnet,
-        ],
+    // Supported Hedera networks - include both mainnet and testnet per docs recommendation
+    networks: [
+      HederaChainDefinition.EVM.Mainnet,
+      HederaChainDefinition.EVM.Testnet,
+      HederaChainDefinition.Native.Mainnet,
+      HederaChainDefinition.Native.Testnet,
+    ],
 
     // HashPack wallet configuration - force HashPack as the primary wallet
     includeWalletIds: [

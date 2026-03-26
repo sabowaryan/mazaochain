@@ -25,22 +25,27 @@ export function AppKitWalletButton({
   className = '',
   showLabel = true
 }: AppKitWalletButtonProps) {
-  const { isConnected, isConnecting, isRestoring, connection, openModal, connectWallet } = useWallet();
+  const { isConnected, isConnecting, isRestoring, connection, connectWallet } = useWallet();
   const { triggerHaptic } = useHapticFeedback();
 
   const handleConnectClick = async () => {
     triggerHaptic('medium');
+    // connectWallet opens the AppKit modal; subscriptions handle state sync
     await connectWallet('hedera');
   };
 
   const handleAccountClick = async () => {
     triggerHaptic('light');
-    await openModal();
+    // Dynamic import keeps @reown/appkit/react out of the SSR module graph
+    const { modal } = await import('@reown/appkit/react');
+    modal?.open();
   };
 
   const handleNetworkClick = async () => {
     triggerHaptic('light');
-    await openModal();
+    // Dynamic import keeps @reown/appkit/react out of the SSR module graph
+    const { modal } = await import('@reown/appkit/react');
+    modal?.open();
   };
 
   const formatAccountId = (accountId: string) => {

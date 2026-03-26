@@ -207,9 +207,10 @@ class HederaWalletService {
       try {
         this.nativeAdapter = new HederaAdapter({
           projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-          networks: env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet'
-            ? [HederaChainDefinition.Native.Mainnet]
-            : [HederaChainDefinition.Native.Testnet],
+          networks: [
+            HederaChainDefinition.Native.Mainnet,
+            HederaChainDefinition.Native.Testnet,
+          ],
           namespace: hederaNamespace, // 'hedera' as CaipNamespace
         });
       } catch (error) {
@@ -225,9 +226,10 @@ class HederaWalletService {
       try {
         this.evmAdapter = new HederaAdapter({
           projectId: env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-          networks: env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet'
-            ? [HederaChainDefinition.EVM.Mainnet]   // Chain ID 295
-            : [HederaChainDefinition.EVM.Testnet],  // Chain ID 296
+          networks: [
+            HederaChainDefinition.EVM.Mainnet,  // Chain ID 295
+            HederaChainDefinition.EVM.Testnet,  // Chain ID 296
+          ],
           namespace: 'eip155',
         });
       } catch (error) {

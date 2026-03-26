@@ -29,6 +29,21 @@ export async function POST(request: NextRequest) {
     });
 
     if (!evaluation) return NextResponse.json({ error: 'Évaluation non trouvée' }, { status: 404 });
+
+    // Cooperative ownership check: cooperative can only approve evaluations for farmers in their cooperative
+    if (profile.role === 'cooperative') {
+      const [callerCoop, farmerProfile] = await Promise.all([
+        prisma.cooperativeProfile.findUnique({ where: { user_id: userId }, select: { id: true } }),
+        prisma.farmerProfile.findFirst({ where: { user_id: evaluation.farmer_id }, select: { cooperative_id: true } }),
+      ]);
+      if (!callerCoop || farmerProfile?.cooperative_id !== callerCoop.id) {
+        return NextResponse.json(
+          { error: "Cette évaluation appartient à un fermier d'une autre coopérative" },
+          { status: 403 }
+        );
+      }
+    }
+
     if (evaluation.status !== 'pending') {
       return NextResponse.json({ error: 'Cette évaluation a déjà été traitée' }, { status: 400 });
     }

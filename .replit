@@ -43,3 +43,8 @@ externalPort = 3000
 NEXT_PUBLIC_HEDERA_ACCOUNT_ID = "0.0.6913405"
 NEXT_PUBLIC_HEDERA_NETWORK = "testnet"
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID = "b7f40149984135cf1c643959ed0de69a"
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["npm", "start"]
+build = ["npm", "run", "build"]

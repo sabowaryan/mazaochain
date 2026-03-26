@@ -84,6 +84,26 @@ Tables: `profiles`, `farmer_profiles`, `cooperative_profiles`, `lender_profiles`
 3. AuthContext reads profile from `/api/profile?userId=...`
 4. Dashboard pages check `profile.role` to render role-specific content
 
+## Hedera Tokenization Flow
+
+### Server-side token creation
+- `src/lib/services/hedera-token-server.ts` — creates real HTS `FungibleCommon` tokens via `TokenCreateTransaction` using the operator account; server-side only, never bundled client-side
+- `src/lib/hedera/client.ts` — Hedera `Client` singleton with operator key; used only in API routes
+
+### Token creation endpoints
+- `POST /api/evaluations/approve` — approves evaluation + creates real HTS token; updates `tokenization_records` with real `token_id`; falls back to `pending` status if Hedera credentials are missing
+- `POST /api/tokenization` — manual tokenization trigger for cooperative dashboard
+
+### Blockchain reads (Mirror Node)
+- `GET /api/mirror-node/tokens?accountId=0.0.XXXX` — proxies Hedera testnet Mirror Node REST API; returns token list for an account
+- `mazao-contracts-impl.ts` — client-side service that queries Mirror Node directly via `fetch()` for balance reads
+
+### Portfolio
+- `GET /api/farmer/portfolio` — DB-backed portfolio endpoint returning completed tokenization records with crop metadata
+
+### Turbopack / Prisma note
+`src/lib/db/index.ts` uses a `Proxy` for lazy Prisma initialization to avoid `base64url` encoding errors in Turbopack SSR chunks. The client is only instantiated on the first actual DB method call, not at module evaluation time.
+
 ## Security Notes
 
 - `HEDERA_PRIVATE_KEY` and `CLERK_SECRET_KEY` are server-side only — never exposed to client

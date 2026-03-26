@@ -8,8 +8,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { RequireAuth } from '@/components/auth/AuthGuard';
-import { LenderInvestmentDashboard } from '@/components/lender/LenderInvestmentDashboard';
-import { LenderPortfolio } from '@/components/lender/LenderPortfolio';
+
 import { RiskAssessmentDisplay } from '@/components/lender/RiskAssessmentDisplay';
 import dynamic from 'next/dynamic';
 import { WalletBalance } from '@/components/wallet/WalletBalance';
@@ -46,6 +45,15 @@ interface Loan {
   id: string;
   principal: number;
   interest_rate: number;
+  status: string;
+  due_date?: string;
+  created_at: string;
+  borrower?: {
+    farmer_profile?: {
+      nom: string;
+      crop_type: string | null;
+    };
+  };
 }
 
 // Charger WalletConnection côté client uniquement (évite l'état faux non connecté au premier rendu)
@@ -72,9 +80,11 @@ function LenderDashboardContent() {
     availableFunds: 0,
     portfolioValue: 0
   });
+  const [avgReturnRate, setAvgReturnRate] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'overview' | 'opportunities' | 'portfolio' | 'analytics' | 'risk'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [loanOpportunities, setLoanOpportunities] = useState<LoanOpportunity[]>([]);
+  const [fundedLoans, setFundedLoans] = useState<Loan[]>([]);
   const [selectedOpportunityForRisk, setSelectedOpportunityForRisk] = useState<LoanOpportunity | null>(null);
 
   useEffect(() => {
@@ -85,34 +95,43 @@ function LenderDashboardContent() {
         setIsLoading(true);
 
         // Charger les données depuis les APIs
-        const [opportunitiesRes, activeLoansRes] = await Promise.all([
+        const [opportunitiesRes, activeLoansRes, allFundedLoansRes] = await Promise.all([
           fetch(`/api/lender/opportunities`),
-          fetch(`/api/loans?lender_id=${user.id}&status=active`)
+          fetch(`/api/loans?lender_id=${user.id}&status=active`),
+          fetch(`/api/loans?lender_id=${user.id}`),
         ]);
 
         const opportunitiesResult = await opportunitiesRes.json();
         const activeLoansResult = await activeLoansRes.json();
+        const allFundedResult = await allFundedLoansRes.json();
 
-        // Extraire les données des réponses API
-        const opportunities = Array.isArray(opportunitiesResult) 
-          ? opportunitiesResult 
+        const opportunities = Array.isArray(opportunitiesResult)
+          ? opportunitiesResult
           : (opportunitiesResult?.data || []);
-        
-        const activeLoans = Array.isArray(activeLoansResult) 
-          ? activeLoansResult 
+
+        const activeLoans: Loan[] = Array.isArray(activeLoansResult)
+          ? activeLoansResult
           : (activeLoansResult?.data || []);
 
+        const allFunded: Loan[] = Array.isArray(allFundedResult)
+          ? allFundedResult
+          : (allFundedResult?.data || []);
+
         setLoanOpportunities(opportunities);
+        setFundedLoans(allFunded);
 
         // Calculer les statistiques
-        const totalInvested = activeLoans.reduce((sum: number, loan: Loan) => sum + loan.principal, 0);
+        const totalInvested = activeLoans.reduce((sum: number, loan: Loan) => sum + Number(loan.principal), 0);
         const totalReturns = activeLoans.reduce((sum: number, loan: Loan) => {
-          const interest = loan.principal * loan.interest_rate;
-          return sum + interest;
+          return sum + Number(loan.principal) * Number(loan.interest_rate);
         }, 0);
+        const avg = activeLoans.length > 0
+          ? activeLoans.reduce((s, l) => s + Number(l.interest_rate), 0) / activeLoans.length
+          : 0;
         const availableFunds = profile.lender_profiles?.available_funds || 0;
         const portfolioValue = totalInvested + totalReturns;
 
+        setAvgReturnRate(avg);
         setStats({
           totalInvested,
           activeLoans: activeLoans.length,
@@ -438,17 +457,142 @@ function LenderDashboardContent() {
         )}
 
         {activeTab === 'opportunities' && (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Opportunités d&apos;investissement disponibles</h3>
-            <LenderInvestmentDashboard />
-          </Card>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Opportunités d&apos;investissement disponibles ({loanOpportunities.length})</h3>
+            </div>
+            {loanOpportunities.length === 0 ? (
+              <Card className="p-10 text-center">
+                <p className="text-gray-500">Aucune opportunité d&apos;investissement disponible pour le moment.</p>
+                <p className="text-gray-400 text-sm mt-1">Les demandes de prêt approuvées par les coopératives apparaîtront ici.</p>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {loanOpportunities.map(opp => (
+                  <Card key={opp.id} className="p-5 hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">{opp.farmer?.nom || 'Agriculteur'}</h4>
+                        <p className="text-sm text-gray-500">{opp.farmer?.crop_type || 'Culture mixte'} · {opp.farmer?.localisation || '—'}</p>
+                      </div>
+                      <span className="text-xl font-bold text-primary-600">${Number(opp.principal).toLocaleString()}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+                      <div className="bg-gray-50 rounded p-2">
+                        <p className="text-xs text-gray-500">Taux</p>
+                        <p className="font-bold text-success-600">{(Number(opp.interest_rate) * 100).toFixed(1)}%</p>
+                      </div>
+                      <div className="bg-gray-50 rounded p-2">
+                        <p className="text-xs text-gray-500">Garantie</p>
+                        <p className="font-bold text-gray-700">${Number(opp.collateral_amount).toLocaleString()}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded p-2">
+                        <p className="text-xs text-gray-500">Superficie</p>
+                        <p className="font-bold text-gray-700">{opp.farmer?.superficie ? `${opp.farmer.superficie} ha` : '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {opp.risk_assessment && (
+                        <Button size="sm" variant="outline" onClick={() => { setSelectedOpportunityForRisk(opp); setActiveTab('risk'); }}>
+                          Analyse risque
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleInvestInLoan(opp.id, Number(opp.principal), opp.id)}
+                      >
+                        Financer ce prêt
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'portfolio' && (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Mon portfolio d&apos;investissements</h3>
-            <LenderPortfolio />
-          </Card>
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="p-5">
+                <p className="text-sm text-gray-600">Montant total prêté</p>
+                <p className="text-2xl font-bold text-primary-600">${stats.totalInvested.toLocaleString()}</p>
+              </Card>
+              <Card className="p-5">
+                <p className="text-sm text-gray-600">Rendement moyen</p>
+                <p className="text-2xl font-bold text-success-600">
+                  {avgReturnRate > 0 ? `${(avgReturnRate * 100).toFixed(1)}%` : '—'}
+                </p>
+              </Card>
+              <Card className="p-5">
+                <p className="text-sm text-gray-600">Prêts financés</p>
+                <p className="text-2xl font-bold text-secondary-600">{fundedLoans.length}</p>
+              </Card>
+            </div>
+
+            <Card className="p-6">
+              <h4 className="text-base font-semibold mb-4">Liste des prêts financés</h4>
+              {fundedLoans.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 text-sm">Vous n&apos;avez pas encore financé de prêts.</p>
+                  <Button className="mt-4" onClick={() => setActiveTab('opportunities')}>
+                    Voir les opportunités
+                  </Button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Emprunteur</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Montant</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Taux</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Échéance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {fundedLoans.map(loan => {
+                        const statusColor: Record<string, string> = {
+                          active: 'bg-emerald-100 text-emerald-700',
+                          pending: 'bg-yellow-100 text-yellow-700',
+                          completed: 'bg-blue-100 text-blue-700',
+                          defaulted: 'bg-red-100 text-red-700',
+                        };
+                        const statusLabel: Record<string, string> = {
+                          active: 'Actif',
+                          pending: 'En attente',
+                          completed: 'Remboursé',
+                          defaulted: 'En défaut',
+                        };
+                        return (
+                          <tr key={loan.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                              {loan.borrower?.farmer_profile?.nom || '—'}
+                              {loan.borrower?.farmer_profile?.crop_type && (
+                                <span className="ml-1 text-gray-500 font-normal">({loan.borrower.farmer_profile.crop_type})</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600">${Number(loan.principal).toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-right text-success-600">{(Number(loan.interest_rate) * 100).toFixed(1)}%</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColor[loan.status] || 'bg-gray-100 text-gray-600'}`}>
+                                {statusLabel[loan.status] || loan.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {loan.due_date ? new Date(loan.due_date).toLocaleDateString('fr-FR') : '—'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
         )}
 
         {activeTab === 'risk' && (
@@ -486,25 +630,32 @@ function LenderDashboardContent() {
           const utilizationRate = totalCapital > 0 ? (stats.totalInvested / totalCapital) * 100 : 0;
           return (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card className="p-6">
-                  <p className="text-sm font-medium text-gray-600 mb-1">Taux d&apos;intérêt moyen (opportunités)</p>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="p-5">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Rendement moyen (actifs)</p>
+                  <p className="text-3xl font-bold text-success-600">
+                    {avgReturnRate > 0 ? `${(avgReturnRate * 100).toFixed(1)}%` : '—'}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Sur {stats.activeLoans} prêts actifs</p>
+                </Card>
+                <Card className="p-5">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Taux moyen (opportunités)</p>
                   <p className="text-3xl font-bold text-primary-600">
                     {avgRate > 0 ? `${(avgRate * 100).toFixed(1)}%` : '—'}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">Sur {loanOpportunities.length} opportunités disponibles</p>
+                  <p className="text-xs text-gray-400 mt-1">{loanOpportunities.length} opportunités disponibles</p>
                 </Card>
-                <Card className="p-6">
-                  <p className="text-sm font-medium text-gray-600 mb-1">Taux d&apos;utilisation du capital</p>
+                <Card className="p-5">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Taux d&apos;utilisation</p>
                   <p className="text-3xl font-bold text-secondary-600">
                     {totalCapital > 0 ? `${utilizationRate.toFixed(1)}%` : '—'}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">${stats.totalInvested.toLocaleString()} sur ${totalCapital.toLocaleString()} disponibles</p>
+                  <p className="text-xs text-gray-400 mt-1">${stats.totalInvested.toLocaleString()} / ${totalCapital.toLocaleString()}</p>
                 </Card>
-                <Card className="p-6">
-                  <p className="text-sm font-medium text-gray-600 mb-1">Prêts actifs</p>
-                  <p className="text-3xl font-bold text-success-600">{stats.activeLoans}</p>
-                  <p className="text-xs text-gray-400 mt-1">Rendements projetés : ${stats.totalReturns.toLocaleString()}</p>
+                <Card className="p-5">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Rendements projetés</p>
+                  <p className="text-3xl font-bold text-accent-600">${stats.totalReturns.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 mt-1">Sur {stats.activeLoans} prêts actifs</p>
                 </Card>
               </div>
 

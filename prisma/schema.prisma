@@ -44,6 +44,7 @@ model FarmerProfile {
   crop_type            String?
   rendement_historique Decimal?
   experience_annees    Int?
+  telephone            String?
   cooperative_id       String?
   created_at           DateTime @default(now())
 

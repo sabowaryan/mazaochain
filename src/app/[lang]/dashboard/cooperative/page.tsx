@@ -1,7 +1,6 @@
 'use client';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslations } from '@/components/TranslationProvider';
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -60,14 +59,16 @@ interface Member {
   superficie: number;
   localisation: string;
   crop_type: string | null;
+  telephone: string | null;
   experience_annees: number | null;
   created_at: string;
   evaluation_count: number;
+  latest_evaluation_status: string | null;
+  latest_evaluation_crop: string | null;
 }
 
 function CooperativeDashboardContent() {
   const { user, profile } = useAuth();
-  const t = useTranslations('cooperative');
   const { isConnected, disconnectWallet } = useWallet();
 
   const [stats, setStats] = useState<CooperativeStats>({
@@ -84,7 +85,7 @@ function CooperativeDashboardContent() {
   const [membersLoading, setMembersLoading] = useState(false);
 
   const [showAddMember, setShowAddMember] = useState(false);
-  const [newMemberId, setNewMemberId] = useState('');
+  const [newMemberInput, setNewMemberInput] = useState('');
   const [addMemberLoading, setAddMemberLoading] = useState(false);
   const [addMemberError, setAddMemberError] = useState('');
   const [addMemberSuccess, setAddMemberSuccess] = useState('');
@@ -160,23 +161,26 @@ function CooperativeDashboardContent() {
     e.preventDefault();
     setAddMemberError('');
     setAddMemberSuccess('');
-    if (!newMemberId.trim()) {
-      setAddMemberError("L'identifiant de l'agriculteur est requis");
+    const input = newMemberInput.trim();
+    if (!input) {
+      setAddMemberError("L'identifiant ou l'email de l'agriculteur est requis");
       return;
     }
     setAddMemberLoading(true);
+    const isEmail = input.includes('@');
+    const body = isEmail ? { email: input } : { farmer_id: input };
     try {
       const res = await fetch('/api/cooperative/members', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ farmer_id: newMemberId.trim() }),
+        body: JSON.stringify(body),
       });
       const result = await res.json();
       if (!res.ok) {
         setAddMemberError(result.error || "Erreur lors de l'ajout du membre");
       } else {
         setAddMemberSuccess('Agriculteur ajouté avec succès !');
-        setNewMemberId('');
+        setNewMemberInput('');
         setShowAddMember(false);
         await loadMembers();
       }
@@ -413,20 +417,20 @@ function CooperativeDashboardContent() {
                 <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
                   <h4 className="text-sm font-semibold text-emerald-800 mb-3">Ajouter un agriculteur par son identifiant utilisateur</h4>
                   <form onSubmit={handleAddMember} className="flex gap-3 items-end flex-wrap">
-                    <div className="flex-1 min-w-48">
+                    <div className="flex-1 min-w-64">
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Identifiant utilisateur (user_id)
+                        Email ou identifiant utilisateur (user_id)
                       </label>
                       <Input
                         type="text"
-                        placeholder="ex: user_2abc123..."
-                        value={newMemberId}
-                        onChange={e => { setNewMemberId(e.target.value); setAddMemberError(''); }}
+                        placeholder="ex: agriculteur@email.com ou user_2abc123..."
+                        value={newMemberInput}
+                        onChange={e => { setNewMemberInput(e.target.value); setAddMemberError(''); }}
                         disabled={addMemberLoading}
                         className="text-sm"
                       />
                     </div>
-                    <Button type="submit" disabled={addMemberLoading || !newMemberId.trim()}>
+                    <Button type="submit" disabled={addMemberLoading || !newMemberInput.trim()}>
                       {addMemberLoading ? 'Ajout...' : 'Confirmer'}
                     </Button>
                   </form>
@@ -461,53 +465,84 @@ function CooperativeDashboardContent() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Culture</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Téléphone</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Localisation</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Superficie</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Évaluations</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut éval.</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {members.map(member => (
+                      {members.map(member => {
+                        const evalStatusColor: Record<string, string> = {
+                          approved: 'bg-emerald-100 text-emerald-700',
+                          pending: 'bg-yellow-100 text-yellow-700',
+                          rejected: 'bg-red-100 text-red-700',
+                        };
+                        const evalStatusLabel: Record<string, string> = {
+                          approved: 'Approuvée',
+                          pending: 'En attente',
+                          rejected: 'Rejetée',
+                        };
+                        return (
                         <tr key={member.user_id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
                             <div className="font-medium text-gray-900">{member.nom}</div>
+                            {member.crop_type && (
+                              <div className="text-xs text-gray-500">{member.crop_type} · {member.superficie} ha</div>
+                            )}
                             {member.experience_annees !== null && (
-                              <div className="text-xs text-gray-500">{member.experience_annees} ans d&apos;expérience</div>
+                              <div className="text-xs text-gray-400">{member.experience_annees} ans d&apos;exp.</div>
                             )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
-                            {member.crop_type || <span className="text-gray-400 italic">Non spécifié</span>}
+                            {member.telephone
+                              ? <a href={`tel:${member.telephone}`} className="text-primary-600 hover:underline">{member.telephone}</a>
+                              : <span className="text-gray-400 italic text-xs">Non renseigné</span>}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             <div className="flex items-center gap-1">
-                              <MapPinIcon className="w-3 h-3 text-gray-400" />
+                              <MapPinIcon className="w-3 h-3 text-gray-400 shrink-0" />
                               {member.localisation}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {member.superficie} ha
-                          </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 text-sm text-center">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                               member.evaluation_count > 0
                                 ? 'bg-emerald-100 text-emerald-700'
                                 : 'bg-gray-100 text-gray-600'
                             }`}>
-                              {member.evaluation_count} éval.
+                              {member.evaluation_count}
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => handleRemoveMember(member.user_id)}
-                              className="text-xs text-red-500 hover:text-red-700 hover:underline"
-                            >
-                              Retirer
-                            </button>
+                            {member.latest_evaluation_status ? (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${evalStatusColor[member.latest_evaluation_status] || 'bg-gray-100 text-gray-600'}`}>
+                                {evalStatusLabel[member.latest_evaluation_status] || member.latest_evaluation_status}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">Aucune</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <a
+                                href={`/fr/dashboard/farmer?member_id=${member.user_id}`}
+                                className="text-xs text-primary-600 hover:text-primary-800 hover:underline"
+                              >
+                                Profil
+                              </a>
+                              <button
+                                onClick={() => handleRemoveMember(member.user_id)}
+                                className="text-xs text-red-500 hover:text-red-700 hover:underline"
+                              >
+                                Retirer
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

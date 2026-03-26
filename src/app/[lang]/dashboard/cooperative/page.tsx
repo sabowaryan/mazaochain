@@ -218,10 +218,10 @@ function CooperativeDashboardContent() {
 
   return (
     <>
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Tableau de bord - Coopérative</h1>
-        <p className="text-gray-600">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Tableau de bord Coopérative</h1>
+        <p className="text-gray-500 text-sm">
           Bienvenue, {profile?.cooperative_profiles?.nom || user?.email}
         </p>
       </div>
@@ -250,85 +250,88 @@ function CooperativeDashboardContent() {
         </div>
       </ClientOnly>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Membres actifs</p>
-              <p className="text-2xl font-bold text-primary-600">{stats.totalMembers}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Card className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <UserGroupIcon className="w-5 h-5 text-white" />
+              </div>
             </div>
-            <div className="p-3 bg-primary-100 rounded-full">
-              <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
+            <p className="text-2xl font-bold text-blue-900">{stats.totalMembers}</p>
+            <p className="text-xs font-medium text-blue-600 mt-1">Membres actifs</p>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Évaluations en attente</p>
-              <p className="text-2xl font-bold text-warning-600">{stats.pendingEvaluations}</p>
+        <Card className="relative overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-amber-500 rounded-lg">
+                <CheckCircleIcon className="w-5 h-5 text-white" />
+              </div>
+              {stats.pendingEvaluations > 0 && (
+                <span className="text-xs font-bold text-white bg-amber-500 rounded-full px-2 py-0.5">{stats.pendingEvaluations}</span>
+              )}
             </div>
-            <div className="p-3 bg-warning-100 rounded-full">
-              <svg className="w-6 h-6 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
+            <p className="text-2xl font-bold text-amber-900">{stats.pendingEvaluations}</p>
+            <p className="text-xs font-medium text-amber-600 mt-1">Évaluations à valider</p>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Prêts en attente</p>
-              <p className="text-2xl font-bold text-secondary-600">{stats.pendingLoans}</p>
+        <Card className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-purple-500 rounded-lg">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              {stats.pendingLoans > 0 && (
+                <span className="text-xs font-bold text-white bg-purple-500 rounded-full px-2 py-0.5">{stats.pendingLoans}</span>
+              )}
             </div>
-            <div className="p-3 bg-secondary-100 rounded-full">
-              <svg className="w-6 h-6 text-secondary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
+            <p className="text-2xl font-bold text-purple-900">{stats.pendingLoans}</p>
+            <p className="text-xs font-medium text-purple-600 mt-1">Prêts en attente</p>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Valeur gérée</p>
-              <p className="text-2xl font-bold text-success-600">${stats.totalValueManaged.toLocaleString()}</p>
+        <Card className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 bg-emerald-500 rounded-lg">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </div>
             </div>
-            <div className="p-3 bg-success-100 rounded-full">
-              <svg className="w-6 h-6 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
+            <p className="text-2xl font-bold text-emerald-900">${stats.totalValueManaged.toLocaleString()}</p>
+            <p className="text-xs font-medium text-emerald-600 mt-1">Valeur gérée (USD)</p>
           </div>
         </Card>
       </div>
 
-      <div className="border-b border-gray-200 mb-8">
-        <nav className="-mb-px flex space-x-8">
-          {[
-            { key: 'overview', label: "Vue d'ensemble", icon: '📊' },
-            { key: 'evaluations', label: 'Évaluations', icon: '🌾' },
-            { key: 'loans', label: 'Prêts', icon: '💰' },
-            { key: 'members', label: 'Membres', icon: '👥' },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as typeof activeTab)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === tab.key
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab.icon} {tab.label}
-            </button>
-          ))}
-        </nav>
+      <div className="flex flex-wrap gap-2 mb-8 p-1 bg-gray-100 rounded-xl w-fit">
+        {[
+          { key: 'overview', label: "Vue d'ensemble", badge: null },
+          { key: 'evaluations', label: 'Évaluations', badge: stats.pendingEvaluations > 0 ? stats.pendingEvaluations : null },
+          { key: 'loans', label: 'Prêts', badge: stats.pendingLoans > 0 ? stats.pendingLoans : null },
+          { key: 'members', label: 'Membres', badge: null },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as typeof activeTab)}
+            className={`flex items-center gap-2 py-2 px-4 rounded-lg font-medium text-sm transition-all duration-200 ${
+              activeTab === tab.key
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab.label}
+            {tab.badge !== null && (
+              <span className="bg-amber-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">{tab.badge}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       <div className="space-y-6">

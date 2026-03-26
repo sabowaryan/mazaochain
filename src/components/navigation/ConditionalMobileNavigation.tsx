@@ -6,10 +6,10 @@ import { MobileNavigation } from './MobileNavigation';
 export function ConditionalMobileNavigation() {
   const pathname = usePathname();
 
-  // Hide mobile navigation on auth pages
   const isAuthPage = pathname?.includes('/auth/');
-  
-  if (isAuthPage) {
+  const isDashboardPage = pathname?.includes('/dashboard');
+
+  if (isAuthPage || isDashboardPage) {
     return null;
   }
 

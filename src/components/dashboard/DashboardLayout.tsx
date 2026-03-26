@@ -1,19 +1,21 @@
-"use client";
+'use client';
 
 import { ReactNode } from 'react';
-import { DashboardNavigation } from './DashboardNavigation';
+import { DashboardSidebar } from './DashboardSidebar';
 
 interface DashboardLayoutProps {
   children: ReactNode;
-  showNavigation?: boolean;
 }
 
-export function DashboardLayout({ children, showNavigation = true }: DashboardLayoutProps) {
+export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
-      {showNavigation && <DashboardNavigation />}
-      <div className="py-8">
-        {children}
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <DashboardSidebar />
+      <div className="flex-1 flex flex-col min-w-0 overflow-auto">
+        <div className="lg:hidden h-14 flex-shrink-0" />
+        <main className="flex-1">
+          {children}
+        </main>
       </div>
     </div>
   );

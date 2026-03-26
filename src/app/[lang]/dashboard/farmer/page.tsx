@@ -204,8 +204,7 @@ export default function FarmerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
-      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
         {/* En-tête moderne */}
         <div className="mb-8 lg:mb-12">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -455,7 +454,6 @@ export default function FarmerDashboard() {
             </Card>
           </div>
         </div>
-      </div>
     </div>
   );
 }

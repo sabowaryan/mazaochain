@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { useWallet } from '@/hooks/useWallet';
 import { useHapticFeedback } from '@/components/ui/HapticFeedback';
 import {
   WalletIcon,
-  ArrowRightOnRectangleIcon,
   Cog6ToothIcon,
   UserIcon
 } from '@heroicons/react/24/outline';
@@ -27,67 +25,22 @@ export function AppKitWalletButton({
   className = '',
   showLabel = true
 }: AppKitWalletButtonProps) {
-  const { isConnected, connection, isConnecting } = useWallet();
+  const { isConnected, isConnecting, isRestoring, connection, openModal, connectWallet } = useWallet();
   const { triggerHaptic } = useHapticFeedback();
-  const [appKit, setAppKit] = useState<any>(null);
-
-  // Load AppKit instance
-  useEffect(() => {
-    const loadAppKit = async () => {
-      try {
-        // Import the wallet service to get AppKit instance
-        const { getWalletService } = await import('@/lib/wallet/wallet-service-factory');
-        const walletService = await getWalletService();
-        const appKitInstance = (walletService as any).getAppKitInstance?.();
-        
-        if (appKitInstance) {
-          setAppKit(appKitInstance);
-        }
-      } catch (error) {
-        console.error('Failed to load AppKit instance:', error);
-      }
-    };
-
-    loadAppKit();
-  }, []);
 
   const handleConnectClick = async () => {
-    if (!appKit) return;
-    
     triggerHaptic('medium');
-    
-    try {
-      // Open AppKit connect modal
-      await appKit.open();
-    } catch (error) {
-      console.error('Failed to open AppKit modal:', error);
-    }
+    await connectWallet('hedera');
   };
 
   const handleAccountClick = async () => {
-    if (!appKit) return;
-    
     triggerHaptic('light');
-    
-    try {
-      // Open AppKit modal - when connected, it shows account details by default
-      await appKit.open();
-    } catch (error) {
-      console.error('Failed to open AppKit account modal:', error);
-    }
+    await openModal();
   };
 
   const handleNetworkClick = async () => {
-    if (!appKit) return;
-    
     triggerHaptic('light');
-    
-    try {
-      // Open AppKit modal - user can navigate to network settings from there
-      await appKit.open();
-    } catch (error) {
-      console.error('Failed to open AppKit network modal:', error);
-    }
+    await openModal();
   };
 
   const formatAccountId = (accountId: string) => {
@@ -116,23 +69,25 @@ export function AppKitWalletButton({
     }
   };
 
+  const isLoading = isConnecting || isRestoring;
+
   // Connect button for non-connected state
   if (!isConnected && variant === 'connect') {
     return (
       <Button
         onClick={handleConnectClick}
-        disabled={isConnecting || !appKit}
+        disabled={isLoading}
         className={`${getSizeClasses()} bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${className}`}
       >
         <div className="flex items-center gap-2">
-          {isConnecting ? (
+          {isLoading ? (
             <div className={`${getIconSize()} animate-spin rounded-full border-2 border-white border-t-transparent`} />
           ) : (
             <WalletIconSolid className={getIconSize()} />
           )}
           {showLabel && (
             <span>
-              {isConnecting ? 'Connexion...' : 'Connecter Wallet'}
+              {isConnecting ? 'Connexion...' : isRestoring ? 'Initialisation...' : 'Connecter Wallet'}
             </span>
           )}
         </div>
@@ -145,7 +100,6 @@ export function AppKitWalletButton({
     return (
       <Button
         onClick={handleAccountClick}
-        disabled={!appKit}
         variant="outline"
         className={`${getSizeClasses()} border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-all duration-200 ${className}`}
       >
@@ -169,7 +123,6 @@ export function AppKitWalletButton({
     return (
       <Button
         onClick={handleNetworkClick}
-        disabled={!appKit}
         variant="outline"
         size="sm"
         className={`border-gray-200 text-gray-600 hover:bg-gray-50 ${className}`}
@@ -192,7 +145,7 @@ export function AppKitWalletButton({
   return (
     <Button
       onClick={isConnected ? handleAccountClick : handleConnectClick}
-      disabled={isConnecting || !appKit}
+      disabled={isLoading}
       className={`${getSizeClasses()} ${className}`}
     >
       <div className="flex items-center gap-2">

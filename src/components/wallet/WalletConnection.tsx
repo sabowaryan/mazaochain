@@ -5,7 +5,6 @@ import { useWallet } from "@/hooks/useWallet";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { useWalletModal } from "@/hooks/useWalletModal";
-import { NamespaceSelector } from "./NamespaceSelector";
 import { useHapticFeedback } from "@/components/ui/HapticFeedback";
 import React from "react";
 import {
@@ -165,24 +164,10 @@ export function WalletConnection({
         }
     };
 
-    // Handle namespace selection
-    const handleConnectClick = () => {
-        showModal(
-            "Choisir le type de connexion",
-            <NamespaceSelector
-                onSelect={async (selectedNamespace) => {
-                    closeModal();
-                    await connectWallet(selectedNamespace);
-                }}
-                onCancel={() => {
-                    closeModal();
-                }}
-            />,
-            "info",
-            undefined,
-            undefined,
-            true // hideButtons since NamespaceSelector has its own
-        );
+    // Connect directly using the Hedera native namespace (recommended default).
+    // AppKit's modal handles wallet/network selection internally.
+    const handleConnectClick = async () => {
+        await connectWallet("hedera");
     };
 
     if (!isConnected) {

@@ -1,7 +1,7 @@
 // React hook for Hedera wallet management - v2
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   WalletConnection,
   WalletBalances,
@@ -26,6 +26,7 @@ export interface UseWalletReturn {
   connectWallet: (namespace?: "hedera" | "eip155") => Promise<void>;
   disconnectWallet: () => Promise<void>;
   refreshBalances: () => Promise<void>;
+  openModal: () => Promise<void>;
 
   // Error state
   error: string | null;
@@ -46,6 +47,13 @@ export function useWallet(): UseWalletReturn {
   const [walletService, setWalletService] = useState<any>(null);
 
   const { user } = useAuth();
+
+  // Ref to track the latest isConnected value inside subscription callbacks
+  // Updated after every render so it is always current when the callback fires
+  const isConnectedRef = useRef(isConnected);
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  });
 
   // Load wallet service dynamically (only once)
   useEffect(() => {
@@ -109,14 +117,8 @@ export function useWallet(): UseWalletReturn {
 
         if (!mounted) return;
 
-        // Note: Session event listeners are set up in the service itself
-        // The service handles accountsChanged, chainChanged, session_update, and session_delete events
-        // This hook will poll the service state when needed
-
         // Attempt to restore existing session
-        // CRITICAL FIX: Ensure the connection state is updated after initialization
-        const existingConnection = await walletService.restoreExistingSession(); // Force restoration check
-        // Fallback to simple state check if restoration didn't return a connection
+        const existingConnection = await walletService.restoreExistingSession();
         const finalConnection = existingConnection || walletService.getConnectionState();
         if (finalConnection && finalConnection.isConnected) {
           setConnection(finalConnection);
@@ -152,16 +154,20 @@ export function useWallet(): UseWalletReturn {
     };
   }, [walletService, loadBalances]);
 
-  // Poll wallet service state to detect connection changes (reduced frequency)
+  // Subscribe to AppKit state changes to detect connect/disconnect events reactively.
+  // This replaces the previous setInterval polling approach and provides instant updates.
   useEffect(() => {
     if (!walletService || isRestoring) return;
-    
-    const pollInterval = setInterval(() => {
+
+    const appKitInstance = (walletService as any).getAppKitInstance?.();
+    if (!appKitInstance || typeof appKitInstance.subscribeState !== "function") return;
+
+    const unsubscribe = appKitInstance.subscribeState(() => {
       const currentState = walletService.getConnectionState();
-      
-      // Update state if connection status changed
-      if (currentState?.isConnected !== isConnected) {
-        if (currentState?.isConnected) {
+      const serviceConnected = currentState?.isConnected ?? false;
+
+      if (serviceConnected !== isConnectedRef.current) {
+        if (serviceConnected && currentState) {
           setConnection(currentState);
           setIsConnected(true);
           setNamespace(currentState.namespace);
@@ -173,10 +179,12 @@ export function useWallet(): UseWalletReturn {
           setBalances(null);
         }
       }
-    }, 2000); // Poll every 2 seconds (reduced from 1s)
+    });
 
-    return () => clearInterval(pollInterval);
-  }, [walletService, isConnected, isRestoring, loadBalances]);
+    return () => {
+      if (typeof unsubscribe === "function") unsubscribe();
+    };
+  }, [walletService, isRestoring, loadBalances]);
 
   const updateUserWalletAddress = useCallback(
     async (walletAddress: string | null) => {
@@ -312,6 +320,15 @@ export function useWallet(): UseWalletReturn {
     await loadBalances(connection.accountId);
   }, [connection?.accountId, loadBalances]);
 
+  // Open the AppKit modal (works for both connect and account management views)
+  const openModal = useCallback(async () => {
+    if (!walletService) return;
+    const appKitInstance = (walletService as any).getAppKitInstance?.();
+    if (appKitInstance) {
+      await appKitInstance.open();
+    }
+  }, [walletService]);
+
   const clearError = useCallback(() => {
     setError(null);
     setErrorCode(null);
@@ -328,6 +345,7 @@ export function useWallet(): UseWalletReturn {
     connectWallet,
     disconnectWallet,
     refreshBalances,
+    openModal,
     error,
     errorCode,
     clearError,

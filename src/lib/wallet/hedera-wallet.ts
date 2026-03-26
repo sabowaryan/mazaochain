@@ -2045,10 +2045,6 @@ class HederaWalletService {
         }
       }
 
-      // Clear all adapter instances (Requirement 13.2)
-      this.nativeAdapter = null;
-      this.evmAdapter = null;
-
       // Clear signers array
       this.signers = [];
 
@@ -2057,6 +2053,12 @@ class HederaWalletService {
 
       // Clear any cached wallet data (Requirement 13.4)
       this.clearSavedSession();
+
+      // Notify account-change subscribers of disconnect so React state updates
+      // immediately, without waiting for AppKit's subscribeAccount event.
+      this.accountChangeCallbacks.forEach((cb) =>
+        cb({ isConnected: false, address: '' })
+      );
 
       // Close AppKit modal if open (Requirement 13.5)
       if (this.appKitInstance) {

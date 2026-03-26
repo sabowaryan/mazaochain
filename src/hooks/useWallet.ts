@@ -281,8 +281,8 @@ export function useWallet(): UseWalletReturn {
             }
             loadBalances(currentState.accountId).catch(console.error);
           }
-        } else if (account.isConnected === false) {
-          // Wallet explicitly disconnected (not just an intermediate empty-address event)
+        } else if (!account.isConnected) {
+          // Wallet disconnected — isConnected may be false, undefined, or null
           setIsConnecting(false);
           setConnection(null);
           setIsConnected(false);
@@ -371,14 +371,12 @@ export function useWallet(): UseWalletReturn {
     if (!walletService) return;
     try {
       await walletService.disconnectWallet();
-      setConnection(null);
-      setIsConnected(false);
-      setNamespace(null);
-      setBalances(null);
       setError(null);
       setErrorCode(null);
       if (user) await updateUserWalletAddress(null);
     } catch (err: unknown) {
+      // Log the error but do NOT block the UI reset — the session is considered
+      // locally cleared even if the remote disconnect fails.
       if (err instanceof WalletError) {
         setError(err.message);
         setErrorCode(err.code);
@@ -390,6 +388,12 @@ export function useWallet(): UseWalletReturn {
         setError(errorMessage);
         setErrorCode(WalletErrorCode.UNKNOWN_ERROR);
       }
+    } finally {
+      // Always clear UI state on disconnect, regardless of remote errors
+      setConnection(null);
+      setIsConnected(false);
+      setNamespace(null);
+      setBalances(null);
     }
   }, [updateUserWalletAddress, user, walletService]);
 

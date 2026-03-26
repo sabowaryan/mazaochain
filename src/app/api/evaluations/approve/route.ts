@@ -44,6 +44,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Idempotency guard: return existing completed tokenization record rather than minting again
+    const existingCompleted = await prisma.tokenizationRecord.findFirst({
+      where: { evaluation_id: evaluationId, status: 'completed' },
+    });
+    if (existingCompleted) {
+      return NextResponse.json({
+        success: true,
+        message: 'Tokenisation déjà effectuée (idempotent)',
+        evaluationId,
+        tokenId: existingCompleted.token_id,
+        tokenSymbol: existingCompleted.token_symbol,
+      });
+    }
+
     if (evaluation.status !== 'pending') {
       return NextResponse.json({ error: 'Cette évaluation a déjà été traitée' }, { status: 400 });
     }
@@ -57,17 +71,24 @@ export async function POST(request: NextRequest) {
     const harvestDate = new Date();
     harvestDate.setDate(harvestDate.getDate() + daysUntilHarvest);
 
-    // Mark evaluation as approved and create a pending tokenization record
-    const [, tokenRecord] = await prisma.$transaction([
-      prisma.cropEvaluation.update({ where: { id: evaluationId }, data: { status: 'approved' } }),
-      prisma.tokenizationRecord.create({
-        data: {
-          evaluation_id: evaluationId,
-          status: 'pending',
-          error_message: `Tokenisation en cours...`,
-        },
-      }),
-    ]);
+    // Atomically transition evaluation from 'pending' → 'approved'.
+    // updateMany returns a count — if 0 rows matched (concurrent request won the race), abort.
+    const { count: updatedCount } = await prisma.cropEvaluation.updateMany({
+      where: { id: evaluationId, status: 'pending' },
+      data: { status: 'approved' },
+    });
+    if (updatedCount === 0) {
+      return NextResponse.json({ error: 'Cette évaluation a déjà été traitée (concurrence)' }, { status: 409 });
+    }
+
+    // Only create the pending tokenization record after winning the atomic status transition
+    const tokenRecord = await prisma.tokenizationRecord.create({
+      data: {
+        evaluation_id: evaluationId,
+        status: 'pending',
+        error_message: 'Tokenisation en cours...',
+      },
+    });
 
     // Attempt real on-chain token creation
     const tokenResult = await createCropToken({

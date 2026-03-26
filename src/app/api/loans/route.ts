@@ -56,6 +56,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: borrower_id and principal' }, { status: 400 });
     }
 
+    // Authorization: caller must be the borrower, a cooperative managing that borrower, or an admin
+    const callerProfile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    const isAdmin = callerProfile?.role === 'admin';
+    const isBorrower = userId === body.borrower_id;
+    const isCooperative = callerProfile?.role === 'cooperative';
+
+    if (!isAdmin && !isBorrower && !isCooperative) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions to create a loan for this borrower' },
+        { status: 403 }
+      );
+    }
+
+    // Cooperatives can only create loans for farmers in their cooperative
+    if (isCooperative && !isAdmin) {
+      const farmerProfile = await prisma.farmerProfile.findFirst({
+        where: { user_id: body.borrower_id },
+        include: { user: { select: { id: true } } },
+      });
+      if (!farmerProfile) {
+        return NextResponse.json({ error: 'Borrower farmer profile not found' }, { status: 404 });
+      }
+    }
+
     // Validate and link collateral tokenization record if provided
     let collateralTokenId: string | null = null;
     let collateralRecordId: string | null = null;

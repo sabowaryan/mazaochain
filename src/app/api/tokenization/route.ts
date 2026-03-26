@@ -36,20 +36,9 @@ export async function POST(request: NextRequest) {
     if (!evaluation) {
       return NextResponse.json({ error: 'Évaluation non trouvée' }, { status: 404 });
     }
-    if (evaluation.status !== 'approved') {
-      return NextResponse.json(
-        { error: "Seules les évaluations approuvées peuvent être tokenisées. Statut actuel : " + evaluation.status },
-        { status: 400 }
-      );
-    }
-    if (!evaluation.farmer.wallet_address) {
-      return NextResponse.json(
-        { error: "Le fermier n'a pas d'adresse wallet configurée" },
-        { status: 400 }
-      );
-    }
 
-    // Idempotency guard: return existing completed token record if one already exists
+    // Idempotency guard: check BEFORE status gate so that already-tokenized evaluations
+    // return the existing record rather than a 400. Covers retries and duplicate calls.
     const existingCompleted = await prisma.tokenizationRecord.findFirst({
       where: { evaluation_id: evaluationId, status: 'completed', token_id: { not: null } },
       orderBy: { created_at: 'desc' },
@@ -64,6 +53,19 @@ export async function POST(request: NextRequest) {
         },
         message: 'Token déjà créé (réponse idempotente)',
       });
+    }
+
+    if (evaluation.status !== 'approved') {
+      return NextResponse.json(
+        { error: "Seules les évaluations approuvées peuvent être tokenisées. Statut actuel : " + evaluation.status },
+        { status: 400 }
+      );
+    }
+    if (!evaluation.farmer.wallet_address) {
+      return NextResponse.json(
+        { error: "Le fermier n'a pas d'adresse wallet configurée" },
+        { status: 400 }
+      );
     }
 
     const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;

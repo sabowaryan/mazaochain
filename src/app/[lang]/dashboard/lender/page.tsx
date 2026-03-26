@@ -120,8 +120,8 @@ function LenderDashboardContent() {
         setLoanOpportunities(opportunities);
         setFundedLoans(allFunded);
 
-        // Calculer les statistiques
-        const totalInvested = activeLoans.reduce((sum: number, loan: Loan) => sum + Number(loan.principal), 0);
+        // Calculer les statistiques (totalInvested = tous les prêts financés, actifs + complétés)
+        const totalInvested = allFunded.reduce((sum: number, loan: Loan) => sum + Number(loan.principal), 0);
         const totalReturns = activeLoans.reduce((sum: number, loan: Loan) => {
           return sum + Number(loan.principal) * Number(loan.interest_rate);
         }, 0);
@@ -516,7 +516,7 @@ function LenderDashboardContent() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card className="p-5">
-                <p className="text-sm text-gray-600">Montant total prêté</p>
+                <p className="text-sm text-gray-600">Capital total prêté (tous statuts)</p>
                 <p className="text-2xl font-bold text-primary-600">${stats.totalInvested.toLocaleString()}</p>
               </Card>
               <Card className="p-5">

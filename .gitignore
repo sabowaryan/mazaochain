@@ -134,3 +134,4 @@ scripts/test-wallets.json
 test-wallets.json
 # clerk configuration (can include secrets)
 /.clerk/
+*.tsbuildinfo

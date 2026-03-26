@@ -27,29 +27,48 @@ export async function GET(request: NextRequest) {
       orderBy: { created_at: 'desc' },
     });
 
-    const enriched = await Promise.all(
-      members.map(async m => {
-        const latestEval = await prisma.cropEvaluation.findFirst({
-          where: { farmer_id: m.user_id },
-          orderBy: { created_at: 'desc' },
-          select: { status: true, crop_type: true },
-        });
-        const evalCount = await prisma.cropEvaluation.count({ where: { farmer_id: m.user_id } });
-        return {
-          user_id: m.user_id,
-          nom: m.nom,
-          superficie: Number(m.superficie),
-          localisation: m.localisation,
-          crop_type: m.crop_type,
-          telephone: m.telephone,
-          experience_annees: m.experience_annees,
-          created_at: m.created_at,
-          evaluation_count: evalCount,
-          latest_evaluation_status: latestEval?.status ?? null,
-          latest_evaluation_crop: latestEval?.crop_type ?? null,
-        };
-      })
-    );
+    const farmerIds = members.map(m => m.user_id);
+
+    const [allEvals, evalCounts] = await Promise.all([
+      prisma.cropEvaluation.findMany({
+        where: { farmer_id: { in: farmerIds } },
+        orderBy: { created_at: 'desc' },
+        select: { farmer_id: true, status: true, crop_type: true, created_at: true },
+      }),
+      prisma.cropEvaluation.groupBy({
+        by: ['farmer_id'],
+        where: { farmer_id: { in: farmerIds } },
+        _count: { id: true },
+      }),
+    ]);
+
+    const latestByFarmer = new Map<string, { status: string; crop_type: string }>();
+    for (const e of allEvals) {
+      if (!latestByFarmer.has(e.farmer_id)) {
+        latestByFarmer.set(e.farmer_id, { status: e.status, crop_type: e.crop_type });
+      }
+    }
+    const countByFarmer = new Map<string, number>();
+    for (const c of evalCounts) {
+      countByFarmer.set(c.farmer_id, c._count.id);
+    }
+
+    const enriched = members.map(m => {
+      const latest = latestByFarmer.get(m.user_id) ?? null;
+      return {
+        user_id: m.user_id,
+        nom: m.nom,
+        superficie: Number(m.superficie),
+        localisation: m.localisation,
+        crop_type: m.crop_type,
+        telephone: m.telephone,
+        experience_annees: m.experience_annees,
+        created_at: m.created_at,
+        evaluation_count: countByFarmer.get(m.user_id) ?? 0,
+        latest_evaluation_status: latest?.status ?? null,
+        latest_evaluation_crop: latest?.crop_type ?? null,
+      };
+    });
 
     return NextResponse.json({ data: enriched, message: 'Cooperative members retrieved successfully' });
   } catch (error) {

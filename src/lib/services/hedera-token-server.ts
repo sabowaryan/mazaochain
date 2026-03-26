@@ -5,6 +5,7 @@ export interface CropTokenCreationResult {
   success: boolean;
   tokenId?: string;
   transactionId?: string;
+  transferredToFarmer?: boolean;
   error?: string;
 }
 
@@ -14,13 +15,14 @@ export async function createCropToken(params: {
   estimatedValue: number;
   tokenSymbol: string;
 }): Promise<CropTokenCreationResult> {
-  const accountId = process.env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID;
+  const operatorAccountId = process.env.NEXT_PUBLIC_HEDERA_ACCOUNT_ID;
   const privateKey = process.env.HEDERA_PRIVATE_KEY;
 
-  if (!accountId || !privateKey) {
+  if (!operatorAccountId || !privateKey) {
     return {
       success: false,
-      error: 'Hedera operator credentials not configured (HEDERA_PRIVATE_KEY / NEXT_PUBLIC_HEDERA_ACCOUNT_ID)',
+      error:
+        'Hedera operator credentials not configured (HEDERA_PRIVATE_KEY / NEXT_PUBLIC_HEDERA_ACCOUNT_ID)',
     };
   }
 
@@ -30,6 +32,7 @@ export async function createCropToken(params: {
       TokenType,
       TokenSupplyType,
       AccountId,
+      TransferTransaction,
     } = await import('@hashgraph/sdk');
 
     const { getHederaClient } = await import('@/lib/hedera/client');
@@ -38,9 +41,10 @@ export async function createCropToken(params: {
     const tokenName = `MAZAO-${params.cropType.toUpperCase()}`;
     const symbol = params.tokenSymbol.substring(0, 10);
     const initialSupply = Math.max(1, Math.round(params.estimatedValue * 100));
-    const treasuryId = AccountId.fromString(accountId);
+    const treasuryId = AccountId.fromString(operatorAccountId);
 
-    const tx = await new TokenCreateTransaction()
+    // Step 1: Create the HTS fungible token (treasury = operator)
+    const createTx = await new TokenCreateTransaction()
       .setTokenName(tokenName)
       .setTokenSymbol(symbol)
       .setTokenType(TokenType.FungibleCommon)
@@ -54,16 +58,45 @@ export async function createCropToken(params: {
       )
       .execute(client);
 
-    const receipt = await tx.getReceipt(client);
+    const createReceipt = await createTx.getReceipt(client);
 
-    if (!receipt.tokenId) {
+    if (!createReceipt.tokenId) {
       return { success: false, error: 'Token creation succeeded but receipt has no tokenId' };
+    }
+
+    const tokenId = createReceipt.tokenId;
+    const tokenIdStr = tokenId.toString();
+    const createTxId = createTx.transactionId.toString();
+
+    // Step 2: Attempt to transfer tokens to farmer's wallet.
+    // This succeeds when the farmer's account has auto-association enabled (common on testnet)
+    // or has already associated with this token. If not, the token stays with the operator
+    // as custodian until the farmer signs a TokenAssociateTransaction via their wallet.
+    let transferredToFarmer = false;
+    try {
+      const farmerAccountId = AccountId.fromString(params.farmerWalletAddress);
+      const transferTx = await new TransferTransaction()
+        .addTokenTransfer(tokenId, treasuryId, -initialSupply)
+        .addTokenTransfer(tokenId, farmerAccountId, initialSupply)
+        .execute(client);
+
+      const transferReceipt = await transferTx.getReceipt(client);
+      transferredToFarmer = transferReceipt.status.toString() === 'SUCCESS';
+    } catch (transferError) {
+      // TOKEN_NOT_ASSOCIATED_TO_ACCOUNT or similar — farmer must associate via wallet first.
+      // The token remains with the operator; farmer sees it via tokenization records in DB.
+      const msg =
+        transferError instanceof Error ? transferError.message : String(transferError);
+      console.warn(
+        `[hedera-token-server] Transfer to farmer failed (${msg}). Token ${tokenIdStr} held by operator.`
+      );
     }
 
     return {
       success: true,
-      tokenId: receipt.tokenId.toString(),
-      transactionId: tx.transactionId.toString(),
+      tokenId: tokenIdStr,
+      transactionId: createTxId,
+      transferredToFarmer,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

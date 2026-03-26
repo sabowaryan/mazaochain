@@ -22,6 +22,10 @@ export interface TokenHolding {
   estimatedValue: number;
   harvestDate: string;
   status: 'active' | 'harvested' | 'expired';
+  tokenName?: string;
+  tokenSymbol?: string;
+  transferredToFarmer?: boolean;
+  mirrorNodeBalance?: number;
 }
 
 export interface LoanInfo {
@@ -167,15 +171,14 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     });
   }, [handleAsyncOperation]);
 
-  const getFarmerTotalBalance = useCallback(async (farmerAddress: string): Promise<number> => {
+  const getFarmerTotalBalance = useCallback(async (_farmerAddress: string): Promise<number> => {
     return handleAsyncOperation(async () => {
-      const res = await fetch(
-        `/api/mirror-node/tokens?accountId=${encodeURIComponent(farmerAddress)}`
-      );
+      // Use DB-backed portfolio for accurate count of tokenized crops.
+      // Mirror Node balance may be 0 if farmer hasn't associated their wallet yet.
+      const res = await fetch('/api/farmer/portfolio');
       if (!res.ok) return 0;
       const data = await res.json();
-      const tokens: { balance: number }[] = data?.tokens ?? [];
-      return tokens.reduce((sum, t) => sum + (t.balance ?? 0), 0);
+      return data?.tokenCount ?? 0;
     });
   }, [handleAsyncOperation]);
 
@@ -184,37 +187,31 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
       const res = await fetch('/api/farmer/portfolio');
       if (!res.ok) return [];
       const data = await res.json();
-      const items: {
-        tokenId: string;
-        cropType: string;
-        amount: number;
-        estimatedValue: number;
-        harvestDate: string;
-        status: 'active' | 'harvested' | 'expired';
-      }[] = data?.data ?? [];
-      return items.map((item) => ({
-        tokenId: item.tokenId,
-        cropType: item.cropType,
-        amount: item.amount,
-        estimatedValue: item.estimatedValue,
-        harvestDate: item.harvestDate,
-        status: item.status,
-      }));
+      const items: TokenHolding[] = data?.data ?? [];
+      return items;
     });
   }, [handleAsyncOperation]);
 
   const getTokenDetails = useCallback(async (tokenId: string): Promise<MazaoTokenInfo | null> => {
     return handleAsyncOperation(async () => {
-      const network =
-        typeof window !== 'undefined'
-          ? (process.env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet' ? 'mainnet' : 'testnet')
-          : 'testnet';
       const res = await fetch(
-        `/api/mirror-node/tokens?accountId=${encodeURIComponent(tokenId)}`
+        `/api/mirror-node/token-details?tokenId=${encodeURIComponent(tokenId)}`
       );
       if (!res.ok) return null;
-      void network;
-      return null;
+      const data = await res.json();
+      if (!data || !data.token_id) return null;
+      const cropType = data.name?.replace(/^MAZAO-/, '').split('-')[0]?.toLowerCase() ?? 'unknown';
+      return {
+        tokenId: data.token_id,
+        farmer: data.treasury_account_id ?? '',
+        estimatedValue: Number(data.total_supply ?? 0) / Math.pow(10, Number(data.decimals ?? 2)),
+        cropType,
+        harvestDate: 0,
+        isActive: true,
+        totalSupply: Number(data.total_supply ?? 0),
+        createdAt: data.created_timestamp ? Math.floor(Number(data.created_timestamp)) : 0,
+        tokenSymbol: data.symbol ?? '',
+      } satisfies MazaoTokenInfo;
     });
   }, [handleAsyncOperation]);
 

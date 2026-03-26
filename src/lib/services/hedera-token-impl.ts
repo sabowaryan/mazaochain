@@ -1,3 +1,13 @@
+// DEPRECATED: Client-side Hedera token service (wallet-signed transactions).
+//
+// Token CREATION is now handled server-side:
+//   POST /api/evaluations/approve  → creates HTS token via operator key
+//   POST /api/tokenization         → same, callable manually
+//   src/lib/services/hedera-token-server.ts  → the actual TokenCreateTransaction logic
+//
+// This file is only active for future wallet-based operations (token transfer/associate)
+// where the farmer must sign. It is NOT used for the primary tokenization flow.
+
 // Implementation file that will only be loaded dynamically
 import { env } from "@/lib/config/env";
 import { hederaWalletService } from "@/lib/wallet/hedera-wallet";

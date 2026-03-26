@@ -8,26 +8,53 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { evaluationId, cropType, farmerId, farmerAddress, estimatedValue } = body;
+    const { evaluationId } = body;
 
-    if (!evaluationId || !cropType || !farmerId || !farmerAddress || !estimatedValue) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!evaluationId) {
+      return NextResponse.json({ error: 'evaluationId is required' }, { status: 400 });
     }
 
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const profile = await prisma.profile.findUnique({ where: { id: userId }, select: { role: true } });
-    if (!profile || !['cooperative', 'admin'].includes(profile.role)) {
+    const callerProfile = await prisma.profile.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (!callerProfile || !['cooperative', 'admin'].includes(callerProfile.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const tokenSymbol = `MAZAO-${cropType.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;
+    // Load canonical evaluation data from DB — never trust request body for security-critical fields
+    const evaluation = await prisma.cropEvaluation.findUnique({
+      where: { id: evaluationId },
+      include: {
+        farmer: { select: { wallet_address: true } },
+      },
+    });
+
+    if (!evaluation) {
+      return NextResponse.json({ error: 'Évaluation non trouvée' }, { status: 404 });
+    }
+    if (!['approved', 'pending'].includes(evaluation.status)) {
+      return NextResponse.json(
+        { error: 'Cette évaluation ne peut pas être tokenisée dans son état actuel' },
+        { status: 400 }
+      );
+    }
+    if (!evaluation.farmer.wallet_address) {
+      return NextResponse.json(
+        { error: "Le fermier n'a pas d'adresse wallet configurée" },
+        { status: 400 }
+      );
+    }
+
+    const tokenSymbol = `MAZAO-${evaluation.crop_type.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;
 
     const tokenResult = await createCropToken({
-      cropType,
-      farmerWalletAddress: farmerAddress,
-      estimatedValue,
+      cropType: evaluation.crop_type,
+      farmerWalletAddress: evaluation.farmer.wallet_address,
+      estimatedValue: evaluation.valeur_estimee ?? 0,
       tokenSymbol,
     });
 
@@ -38,36 +65,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Persist the tokenization record (update existing pending record or create new one)
+    // Persist the tokenization record and update evaluation status atomically
     const existing = await prisma.tokenizationRecord.findFirst({
       where: { evaluation_id: evaluationId },
       orderBy: { created_at: 'desc' },
     });
 
-    const record = existing
-      ? await prisma.tokenizationRecord.update({
-          where: { id: existing.id },
-          data: {
-            token_id: tokenResult.tokenId,
-            status: 'completed',
-            error_message: null,
-          },
-        })
-      : await prisma.tokenizationRecord.create({
-          data: {
-            evaluation_id: evaluationId,
-            token_id: tokenResult.tokenId,
-            status: 'completed',
-          },
-        });
+    const [, record] = await prisma.$transaction([
+      prisma.cropEvaluation.update({
+        where: { id: evaluationId },
+        data: { status: 'tokenized' },
+      }),
+      existing
+        ? prisma.tokenizationRecord.update({
+            where: { id: existing.id },
+            data: {
+              token_id: tokenResult.tokenId,
+              status: 'completed',
+              error_message: null,
+            },
+          })
+        : prisma.tokenizationRecord.create({
+            data: {
+              evaluation_id: evaluationId,
+              token_id: tokenResult.tokenId,
+              status: 'completed',
+            },
+          }),
+    ]);
 
     return NextResponse.json({
       data: {
         tokenId: tokenResult.tokenId,
         transactionId: tokenResult.transactionId,
+        transferredToFarmer: tokenResult.transferredToFarmer,
         recordId: record.id,
       },
-      message: 'Tokenisation initiée avec succès',
+      message: 'Tokenisation réussie',
     });
   } catch (error) {
     console.error('Error initiating tokenization:', error);

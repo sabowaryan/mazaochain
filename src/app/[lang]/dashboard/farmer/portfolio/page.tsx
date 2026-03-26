@@ -250,22 +250,47 @@ export default function FarmerPortfolioPage() {
               const CropIcon = getCropIcon(holding.cropType);
               return (
                 <div key={holding.tokenId} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
                         <CropIcon className="w-6 h-6 text-primary-600" />
                       </div>
                       <div>
-                        <h4 className="font-medium capitalize">{holding.cropType}</h4>
-                        <p className="text-sm text-gray-600">Token ID: {holding.tokenId}</p>
+                        <h4 className="font-semibold capitalize">
+                          {holding.tokenName ?? `MAZAO-${holding.cropType.toUpperCase()}`}
+                          {holding.tokenSymbol && (
+                            <span className="ml-2 text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                              {holding.tokenSymbol}
+                            </span>
+                          )}
+                        </h4>
+                        <p className="text-sm text-gray-600 font-mono">{holding.tokenId}</p>
+                        {holding.transferredToFarmer ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded mt-0.5">
+                            <CheckCircleIcon className="w-3 h-3" />
+                            Transféré sur votre wallet
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5">
+                            <ClockIcon className="w-3 h-3" />
+                            En garde par l&apos;opérateur
+                          </span>
+                        )}
                       </div>
                     </div>
 
                     <div className="text-right">
                       <div className="flex items-center space-x-4">
                         <div>
-                          <p className="font-medium">{holding.amount.toLocaleString()} MAZAO</p>
+                          <p className="font-medium">
+                            {holding.amount.toLocaleString()} {holding.tokenSymbol ?? 'MAZAO'}
+                          </p>
                           <p className="text-sm text-gray-600">${holding.estimatedValue.toLocaleString()}</p>
+                          {holding.mirrorNodeBalance !== undefined && holding.mirrorNodeBalance > 0 && (
+                            <p className="text-xs text-emerald-600 mt-0.5">
+                              Solde Mirror Node: {holding.mirrorNodeBalance.toLocaleString()}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusIcon(holding.status)}

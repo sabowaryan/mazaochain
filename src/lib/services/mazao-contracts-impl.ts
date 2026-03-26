@@ -186,20 +186,38 @@ export class MazaoContractsServiceImpl {
     tokenId: string
   ): Promise<number> {
     try {
-      await this.initializeClient();
-      return 0;
+      const res = await fetch(
+        `${this.mirrorNodeBase}/accounts/${encodeURIComponent(farmerAddress)}/tokens?token.id=${encodeURIComponent(tokenId)}`
+      );
+      if (!res.ok) return 0;
+      const data = await res.json();
+      const tokens: { balance: number }[] = data?.tokens ?? [];
+      return tokens[0]?.balance ?? 0;
     } catch (error) {
-      console.error("Error getting farmer balance for token:", error);
+      console.error("Error getting farmer balance for token from Mirror Node:", error);
       return 0;
     }
   }
 
   async getTokenDetails(tokenId: string): Promise<MazaoTokenInfo | null> {
     try {
-      await this.initializeClient();
-      return null;
+      const res = await fetch(`${this.mirrorNodeBase}/tokens/${encodeURIComponent(tokenId)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data?.token_id) return null;
+      return {
+        tokenId: data.token_id,
+        farmer: data.treasury_account_id ?? '',
+        estimatedValue: Number(data.total_supply ?? 0) / Math.pow(10, Number(data.decimals ?? 2)),
+        cropType: (data.name as string)?.replace(/^MAZAO-/, '').split('-')[0]?.toLowerCase() ?? 'unknown',
+        harvestDate: 0,
+        isActive: true,
+        totalSupply: Number(data.total_supply ?? 0),
+        createdAt: data.created_timestamp ? Math.floor(Number(data.created_timestamp)) : 0,
+        tokenSymbol: data.symbol ?? '',
+      };
     } catch (error) {
-      console.error("Error getting token details:", error);
+      console.error("Error getting token details from Mirror Node:", error);
       return null;
     }
   }
@@ -256,27 +274,38 @@ export class MazaoContractsServiceImpl {
 
   async tokenizeApprovedEvaluation(
     evaluationId: string,
-    cropType: string,
-    farmerId: string,
-    farmerAddress: string,
-    estimatedValue: number,
-    harvestDate: number
+    _cropType: string,
+    _farmerId: string,
+    _farmerAddress: string,
+    _estimatedValue: number,
+    _harvestDate: number
   ): Promise<{
     success: boolean;
     tokenId?: string;
     transactionIds?: string[];
     error?: string;
   }> {
+    // Token creation is handled server-side via POST /api/tokenization
+    // which uses the operator private key securely. Call that route.
     try {
-      await this.initializeClient();
+      const response = await fetch('/api/tokenization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evaluationId }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        return { success: false, error: result.error ?? 'Tokenization failed' };
+      }
       return {
-        success: false,
-        error: 'Not implemented in build environment'
+        success: true,
+        tokenId: result.data?.tokenId,
+        transactionIds: result.data?.transactionId ? [result.data.transactionId] : [],
       };
     } catch (error) {
       return {
         success: false,
-        error: `Error tokenizing evaluation: ${error}`
+        error: `Error calling tokenization API: ${error}`,
       };
     }
   }

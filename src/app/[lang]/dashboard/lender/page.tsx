@@ -86,6 +86,7 @@ function LenderDashboardContent() {
   const [loanOpportunities, setLoanOpportunities] = useState<LoanOpportunity[]>([]);
   const [fundedLoans, setFundedLoans] = useState<Loan[]>([]);
   const [selectedOpportunityForRisk, setSelectedOpportunityForRisk] = useState<LoanOpportunity | null>(null);
+  const [portfolioSort, setPortfolioSort] = useState<{ key: string; dir: 'asc' | 'desc' }>({ key: 'principal', dir: 'desc' });
 
   useEffect(() => {
     const loadLenderData = async () => {
@@ -433,45 +434,72 @@ function LenderDashboardContent() {
               </Card>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {loanOpportunities.map(opp => (
-                  <Card key={opp.id} className="p-5 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{opp.farmer?.nom || 'Agriculteur'}</h4>
-                        <p className="text-sm text-gray-500">{opp.farmer?.crop_type || 'Culture mixte'} · {opp.farmer?.localisation || '—'}</p>
+                {loanOpportunities.map(opp => {
+                  const score: number | undefined = (opp.risk_assessment as { score?: number } | undefined)?.score;
+                  const riskPct = score != null ? Math.min(Math.max(score * 100, 0), 100) : null;
+                  const riskColor = riskPct == null ? 'bg-gray-300'
+                    : riskPct < 40 ? 'bg-emerald-500'
+                    : riskPct < 70 ? 'bg-amber-500'
+                    : 'bg-red-500';
+                  const riskLabel = riskPct == null ? 'Non évalué'
+                    : riskPct < 40 ? 'Faible risque'
+                    : riskPct < 70 ? 'Risque modéré'
+                    : 'Risque élevé';
+                  return (
+                  <Card key={opp.id} className="p-5 hover:shadow-md transition-shadow flex flex-col gap-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-white">{(opp.farmer?.nom?.[0] ?? 'A').toUpperCase()}</span>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 text-sm">{opp.farmer?.nom || 'Agriculteur'}</h4>
+                          <p className="text-xs text-gray-500">{opp.farmer?.crop_type || 'Culture mixte'} · {opp.farmer?.localisation || '—'}</p>
+                        </div>
                       </div>
-                      <span className="text-xl font-bold text-primary-600">${Number(opp.principal).toLocaleString()}</span>
+                      <span className="text-lg font-bold text-primary-600">${Number(opp.principal).toLocaleString()}</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 mb-3 text-center">
-                      <div className="bg-gray-50 rounded p-2">
+
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-gray-50 rounded-lg p-2">
                         <p className="text-xs text-gray-500">Taux</p>
-                        <p className="font-bold text-success-600">{(Number(opp.interest_rate) * 100).toFixed(1)}%</p>
+                        <p className="font-bold text-emerald-600 text-sm">{(Number(opp.interest_rate) * 100).toFixed(1)}%</p>
                       </div>
-                      <div className="bg-gray-50 rounded p-2">
+                      <div className="bg-gray-50 rounded-lg p-2">
                         <p className="text-xs text-gray-500">Garantie</p>
-                        <p className="font-bold text-gray-700">${Number(opp.collateral_amount).toLocaleString()}</p>
+                        <p className="font-bold text-gray-700 text-sm">${Number(opp.collateral_amount).toLocaleString()}</p>
                       </div>
-                      <div className="bg-gray-50 rounded p-2">
-                        <p className="text-xs text-gray-500">Superficie</p>
-                        <p className="font-bold text-gray-700">{opp.farmer?.superficie ? `${opp.farmer.superficie} ha` : '—'}</p>
+                      <div className="bg-gray-50 rounded-lg p-2">
+                        <p className="text-xs text-gray-500">Surface</p>
+                        <p className="font-bold text-gray-700 text-sm">{opp.farmer?.superficie ? `${opp.farmer.superficie} ha` : '—'}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-500">Score de risque</span>
+                        <span className={`text-xs font-medium ${riskPct == null ? 'text-gray-400' : riskPct < 40 ? 'text-emerald-600' : riskPct < 70 ? 'text-amber-600' : 'text-red-600'}`}>{riskLabel}</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        {riskPct != null && (
+                          <div className={`h-full rounded-full ${riskColor} transition-all`} style={{ width: `${riskPct}%` }} />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-auto">
                       {opp.risk_assessment && (
                         <Button size="sm" variant="outline" onClick={() => { setSelectedOpportunityForRisk(opp); setActiveTab('risk'); }}>
-                          Analyse risque
+                          Détail risque
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleInvestInLoan(opp.id, Number(opp.principal), opp.id)}
-                      >
+                      <Button size="sm" className="flex-1" onClick={() => handleInvestInLoan(opp.id, Number(opp.principal), opp.id)}>
                         Financer ce prêt
                       </Button>
                     </div>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -497,7 +525,7 @@ function LenderDashboardContent() {
             </div>
 
             <Card className="p-6">
-              <h4 className="text-base font-semibold mb-4">Liste des prêts financés</h4>
+              <h4 className="text-base font-semibold mb-4">Prêts financés</h4>
               {fundedLoans.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-gray-400 text-sm">Vous n&apos;avez pas encore financé de prêts.</p>
@@ -505,57 +533,82 @@ function LenderDashboardContent() {
                     Voir les opportunités
                   </Button>
                 </div>
-              ) : (
+              ) : (() => {
+                const statusColor: Record<string, string> = {
+                  active: 'bg-emerald-100 text-emerald-700',
+                  pending: 'bg-yellow-100 text-yellow-700',
+                  completed: 'bg-blue-100 text-blue-700',
+                  defaulted: 'bg-red-100 text-red-700',
+                };
+                const statusLabel: Record<string, string> = {
+                  active: 'Actif',
+                  pending: 'En attente',
+                  completed: 'Remboursé',
+                  defaulted: 'En défaut',
+                };
+                const sorted = [...fundedLoans].sort((a, b) => {
+                  const dir = portfolioSort.dir === 'asc' ? 1 : -1;
+                  if (portfolioSort.key === 'principal') return (Number(a.principal) - Number(b.principal)) * dir;
+                  if (portfolioSort.key === 'interest_rate') return (Number(a.interest_rate) - Number(b.interest_rate)) * dir;
+                  if (portfolioSort.key === 'status') return a.status.localeCompare(b.status) * dir;
+                  if (portfolioSort.key === 'due_date') return ((a.due_date ?? '').localeCompare(b.due_date ?? '')) * dir;
+                  return 0;
+                });
+                const SortIcon = ({ col }: { col: string }) => {
+                  if (portfolioSort.key !== col) return <span className="ml-1 text-gray-300">↕</span>;
+                  return <span className="ml-1 text-primary-500">{portfolioSort.dir === 'asc' ? '↑' : '↓'}</span>;
+                };
+                const toggleSort = (key: string) => {
+                  setPortfolioSort(prev => prev.key === key
+                    ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+                    : { key, dir: 'desc' });
+                };
+                return (
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Emprunteur</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Montant</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Taux</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Échéance</th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" onClick={() => toggleSort('principal')}>
+                          Montant <SortIcon col="principal" />
+                        </th>
+                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" onClick={() => toggleSort('interest_rate')}>
+                          Taux <SortIcon col="interest_rate" />
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" onClick={() => toggleSort('status')}>
+                          Statut <SortIcon col="status" />
+                        </th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700 select-none" onClick={() => toggleSort('due_date')}>
+                          Échéance <SortIcon col="due_date" />
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {fundedLoans.map(loan => {
-                        const statusColor: Record<string, string> = {
-                          active: 'bg-emerald-100 text-emerald-700',
-                          pending: 'bg-yellow-100 text-yellow-700',
-                          completed: 'bg-blue-100 text-blue-700',
-                          defaulted: 'bg-red-100 text-red-700',
-                        };
-                        const statusLabel: Record<string, string> = {
-                          active: 'Actif',
-                          pending: 'En attente',
-                          completed: 'Remboursé',
-                          defaulted: 'En défaut',
-                        };
-                        return (
-                          <tr key={loan.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                              {loan.borrower?.farmer_profile?.nom || '—'}
-                              {loan.borrower?.farmer_profile?.crop_type && (
-                                <span className="ml-1 text-gray-500 font-normal">({loan.borrower.farmer_profile.crop_type})</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600">${Number(loan.principal).toLocaleString()}</td>
-                            <td className="px-4 py-3 text-sm text-right text-success-600">{(Number(loan.interest_rate) * 100).toFixed(1)}%</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColor[loan.status] || 'bg-gray-100 text-gray-600'}`}>
-                                {statusLabel[loan.status] || loan.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600">
-                              {loan.due_date ? new Date(loan.due_date).toLocaleDateString('fr-FR') : '—'}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {sorted.map(loan => (
+                        <tr key={loan.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                            {loan.borrower?.farmer_profile?.nom || '—'}
+                            {loan.borrower?.farmer_profile?.crop_type && (
+                              <span className="ml-1 text-gray-500 font-normal">({loan.borrower.farmer_profile.crop_type})</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600">${Number(loan.principal).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-right text-success-600">{(Number(loan.interest_rate) * 100).toFixed(1)}%</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColor[loan.status] || 'bg-gray-100 text-gray-600'}`}>
+                              {statusLabel[loan.status] || loan.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {loan.due_date ? new Date(loan.due_date).toLocaleDateString('fr-FR') : '—'}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
-              )}
+                );
+              })()}
             </Card>
           </div>
         )}

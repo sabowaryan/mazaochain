@@ -12,10 +12,10 @@ export function ClientNavigation() {
     setMounted(true);
   }, []);
 
-  // Hide navigation on auth pages
   const isAuthPage = pathname?.includes('/auth/');
-  
-  if (isAuthPage) {
+  const isDashboardPage = pathname?.includes('/dashboard');
+
+  if (isAuthPage || isDashboardPage) {
     return null;
   }
 

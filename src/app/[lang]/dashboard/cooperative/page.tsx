@@ -496,6 +496,11 @@ function CooperativeDashboardContent() {
                         return (
                         <tr key={member.user_id} className="hover:bg-gray-50">
                           <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-bold text-white">{(member.nom?.[0] ?? '?').toUpperCase()}</span>
+                              </div>
+                              <div>
                             <div className="font-medium text-gray-900">{member.nom}</div>
                             {member.crop_type && (
                               <div className="text-xs text-gray-500">{member.crop_type} · {member.superficie} ha</div>
@@ -503,6 +508,8 @@ function CooperativeDashboardContent() {
                             {member.experience_annees !== null && (
                               <div className="text-xs text-gray-400">{member.experience_annees} ans d&apos;exp.</div>
                             )}
+                              </div>
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {member.telephone

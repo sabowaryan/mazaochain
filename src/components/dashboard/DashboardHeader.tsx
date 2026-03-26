@@ -1,85 +1,73 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/Button';
-import { useRouter } from 'next/navigation';
+import { BellIcon } from '@heroicons/react/24/outline';
 
-interface DashboardHeaderProps {
-  title: string;
-  subtitle?: string;
-  actions?: React.ReactNode;
-}
+const ROUTE_META: Record<string, { title: string; breadcrumbs: string[] }> = {
+  farmer: { title: 'Tableau de bord', breadcrumbs: ['Agriculteur', 'Accueil'] },
+  'farmer/evaluations': { title: 'Évaluations', breadcrumbs: ['Agriculteur', 'Évaluations'] },
+  'farmer/loans': { title: 'Prêts', breadcrumbs: ['Agriculteur', 'Prêts'] },
+  'farmer/portfolio': { title: 'Portfolio', breadcrumbs: ['Agriculteur', 'Portfolio'] },
+  'farmer/profile': { title: 'Profil', breadcrumbs: ['Agriculteur', 'Profil'] },
+  cooperative: { title: 'Tableau de bord', breadcrumbs: ['Coopérative', 'Accueil'] },
+  'cooperative/evaluations': { title: 'Évaluations', breadcrumbs: ['Coopérative', 'Évaluations'] },
+  'cooperative/loans': { title: 'Prêts', breadcrumbs: ['Coopérative', 'Prêts'] },
+  'cooperative/farmers': { title: 'Membres', breadcrumbs: ['Coopérative', 'Membres'] },
+  'cooperative/profile': { title: 'Profil', breadcrumbs: ['Coopérative', 'Profil'] },
+  lender: { title: 'Tableau de bord', breadcrumbs: ['Prêteur', 'Accueil'] },
+  'lender/opportunities': { title: 'Opportunités', breadcrumbs: ['Prêteur', 'Opportunités'] },
+  'lender/portfolio': { title: 'Portfolio', breadcrumbs: ['Prêteur', 'Portfolio'] },
+  'lender/profile': { title: 'Profil', breadcrumbs: ['Prêteur', 'Profil'] },
+  notifications: { title: 'Notifications', breadcrumbs: ['Notifications'] },
+};
 
-export function DashboardHeader({ title, subtitle, actions }: DashboardHeaderProps) {
-  const { user, profile, signOut } = useAuth();
-  const router = useRouter();
+export function DashboardHeader() {
+  const pathname = usePathname();
+  const { user } = useAuth();
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      router.push('/auth/login');
-    } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error);
-    }
-  };
+  const dashboardIdx = pathname?.indexOf('/dashboard/') ?? -1;
+  const routeKey = dashboardIdx >= 0
+    ? pathname!.slice(dashboardIdx + '/dashboard/'.length)
+    : '';
 
-  const getRoleDisplayName = (role: string) => {
-    switch (role) {
-      case 'agriculteur': return 'Agriculteur';
-      case 'cooperative': return 'Coopérative';
-      case 'preteur': return 'Prêteur';
-      case 'admin': return 'Administrateur';
-      default: return 'Utilisateur';
-    }
-  };
-
-  const getUserDisplayName = () => {
-    if (profile?.farmer_profiles?.nom) return profile.farmer_profiles.nom;
-    if (profile?.cooperative_profiles?.nom) return profile.cooperative_profiles.nom;
-    if (profile?.lender_profiles?.institution_name) return profile.lender_profiles.institution_name;
-    return user?.email || 'Utilisateur';
-  };
+  const meta = ROUTE_META[routeKey] ?? { title: 'Dashboard', breadcrumbs: [] };
+  const initials = (user?.email?.[0] ?? 'U').toUpperCase();
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-          {subtitle && (
-            <p className="text-gray-600 mt-1">{subtitle}</p>
-          )}
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          {actions}
-          
-          <div className="flex items-center space-x-3">
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">
-                {getUserDisplayName()}
-              </p>
-              <p className="text-xs text-gray-500">
-                {getRoleDisplayName(profile?.role || '')}
-              </p>
-            </div>
-            
-            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-              <span className="text-primary-600 font-medium text-sm">
-                {getUserDisplayName().charAt(0).toUpperCase()}
+    <header className="sticky top-0 z-30 flex h-14 flex-shrink-0 items-center gap-3 border-b border-gray-100 bg-white px-4 sm:px-6">
+      <div className="w-10 lg:hidden flex-shrink-0" />
+
+      <div className="flex-1 min-w-0">
+        {meta.breadcrumbs.length > 0 && (
+          <nav className="flex items-center gap-1 text-xs text-gray-400 mb-0.5" aria-label="Breadcrumb">
+            {meta.breadcrumbs.map((crumb, i) => (
+              <span key={i} className="flex items-center gap-1">
+                {i > 0 && <span className="text-gray-300">/</span>}
+                <span className={i === meta.breadcrumbs.length - 1 ? 'text-gray-600 font-medium' : ''}>
+                  {crumb}
+                </span>
               </span>
-            </div>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSignOut}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              Déconnexion
-            </Button>
-          </div>
+            ))}
+          </nav>
+        )}
+        <h2 className="text-sm font-semibold text-gray-900 leading-none truncate">{meta.title}</h2>
+      </div>
+
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          aria-label="Notifications"
+        >
+          <BellIcon className="w-5 h-5" />
+        </button>
+        <div
+          className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center"
+          title={user?.email ?? undefined}
+        >
+          <span className="text-xs font-bold text-white">{initials}</span>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

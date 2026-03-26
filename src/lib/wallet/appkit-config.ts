@@ -52,12 +52,17 @@ export async function initializeAppKit(config: AppKitConfig) {
   // Dynamic import to avoid SSR issues
   const { createAppKit } = await import('@reown/appkit');
 
-  // Prepare application metadata
+  // Prepare application metadata.
+  // Use window.location.origin so the metadata URL matches the actual deployed domain
+  // in both dev (Replit preview) and production. WalletConnect uses this URL for
+  // domain verification — a mismatch (e.g. hardcoded localhost) causes relay to reject
+  // session proposals, preventing QR code generation.
+  const siteOrigin = window.location.origin;
   const metadata = {
     name: env.NEXT_PUBLIC_HASHPACK_APP_NAME || "MazaoChain MVP",
     description: env.NEXT_PUBLIC_HASHPACK_APP_DESCRIPTION || "Decentralized lending platform for farmers",
-    url: env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-    icons: [`${env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/favicon.ico`],
+    url: siteOrigin,
+    icons: [`${siteOrigin}/favicon.ico`],
   };
 
   // Create and configure AppKit instance

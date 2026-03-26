@@ -120,16 +120,21 @@ class HederaWalletService {
         );
       }
 
-      // Configure application metadata
+      // Configure application metadata.
+      // window.location.origin is always correct in the browser (both Replit preview
+      // and production). This is critical: WalletConnect validates the metadata URL
+      // for domain verification; using localhost in production prevents session creation.
+      const siteOrigin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : env.NEXT_PUBLIC_APP_URL || "https://mazaochain.replit.app";
       const metadata = {
         name: env.NEXT_PUBLIC_HASHPACK_APP_NAME || "MazaoChain MVP",
         description:
           env.NEXT_PUBLIC_HASHPACK_APP_DESCRIPTION ||
           "Decentralized lending platform for farmers",
-        url: env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        icons: [
-          `${env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/favicon.ico`,
-        ],
+        url: siteOrigin,
+        icons: [`${siteOrigin}/favicon.ico`],
       };
 
       // Requirement 14.1: Add error handling for HederaProvider.init failures

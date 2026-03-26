@@ -37,6 +37,14 @@ class HederaWalletService {
   private connectionState: WalletConnection | null = null;
   private client: any = null;
 
+  // Singleton subscribeAccount registration — ensures AppKit's subscribeAccount is
+  // called at most once per service lifetime, regardless of how many UI components
+  // call subscribeToAccountChanges(). Each caller receives a proper unsubscribe fn.
+  private accountChangeCallbacks = new Set<
+    (account: { address?: string; isConnected?: boolean }) => void
+  >();
+  private accountSubRegistered = false;
+
   constructor() {
     // Lazy initialization - client will be created when needed
     // Suppress WalletConnect console errors in development
@@ -2186,6 +2194,35 @@ class HederaWalletService {
    */
   getAppKitInstance(): AppKit | null {
     return this.appKitInstance;
+  }
+
+  /**
+   * Subscribe to AppKit account changes (connect / disconnect events).
+   *
+   * Internally, AppKit's `subscribeAccount` is registered at most ONCE on the
+   * AppKit instance (singleton guard via `accountSubRegistered`).  Every caller
+   * receives a real unsubscribe function that removes only their callback from the
+   * shared Set — no listener leak regardless of how many components call this.
+   */
+  subscribeToAccountChanges(
+    callback: (account: { address?: string; isConnected?: boolean }) => void
+  ): () => void {
+    this.accountChangeCallbacks.add(callback);
+
+    // Register with AppKit exactly once across all callers
+    if (!this.accountSubRegistered && this.appKitInstance) {
+      this.accountSubRegistered = true;
+      this.appKitInstance.subscribeAccount((account) => {
+        this.accountChangeCallbacks.forEach((cb) =>
+          cb(account as { address?: string; isConnected?: boolean })
+        );
+      });
+    }
+
+    // Return a proper unsubscribe that removes only this callback
+    return () => {
+      this.accountChangeCallbacks.delete(callback);
+    };
   }
 
   async getAccountBalance(accountId?: string): Promise<WalletBalances> {

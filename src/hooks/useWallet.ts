@@ -16,21 +16,21 @@ import { useAuth } from "@/hooks/useAuth";
 interface AppKitLike {
   /** Fires on every AppKit state change (modal open/close, loading, etc.) */
   subscribeState(cb: (state: { open: boolean }) => void): () => void;
-  /**
-   * Fires when the connected account changes.
-   * NOTE: AppKit's subscribeAccount does not return an unsubscribe handle.
-   * Use a ref guard to prevent duplicate registration across re-renders.
-   */
-  subscribeAccount(
-    cb: (account: { address?: string; isConnected?: boolean }) => void,
-    namespace?: string
-  ): void;
-  open(): Promise<void>;
+  /** Open the AppKit modal, optionally scoped to a chain namespace. */
+  open(options?: { namespace?: string; view?: string }): Promise<void>;
 }
 
 // Additional methods present on HederaWalletService but not declared in IWalletService.
 // A type guard (isAppKitAware) is used to narrow to this type safely.
 interface AppKitAwareService {
+  /**
+   * Subscribe to wallet account changes. Registers AppKit's subscribeAccount exactly
+   * once at the service level and fans out to all registered callbacks.
+   * Returns a real unsubscribe function scoped to the caller's callback.
+   */
+  subscribeToAccountChanges(
+    cb: (account: { address?: string; isConnected?: boolean }) => void
+  ): () => void;
   getAppKitInstance(): AppKitLike | null;
   restoreExistingSession(): Promise<WalletConnection | null>;
 }
@@ -41,9 +41,11 @@ function isAppKitAware(
   service: IWalletService
 ): service is IWalletService & AppKitAwareService {
   return (
+    "subscribeToAccountChanges" in service &&
     "getAppKitInstance" in service &&
-    typeof (service as IWalletService & AppKitAwareService).getAppKitInstance === "function" &&
     "restoreExistingSession" in service &&
+    typeof (service as IWalletService & AppKitAwareService).subscribeToAccountChanges === "function" &&
+    typeof (service as IWalletService & AppKitAwareService).getAppKitInstance === "function" &&
     typeof (service as IWalletService & AppKitAwareService).restoreExistingSession === "function"
   );
 }
@@ -94,11 +96,6 @@ export function useWallet(): UseWalletReturn {
     isConnectedRef.current = isConnected;
     isConnectingRef.current = isConnecting;
   });
-
-  // Guard to ensure subscribeAccount is registered at most once per AppKit instance.
-  // subscribeAccount does not return an unsubscribe handle; the guard prevents the
-  // duplicate-listener issue that would occur on component re-mounts.
-  const accountSubRegisteredRef = useRef(false);
 
   // Load wallet service dynamically (browser-only, only once)
   useEffect(() => {
@@ -257,24 +254,15 @@ export function useWallet(): UseWalletReturn {
     };
   }, [walletService, isRestoring, loadBalances]);
 
-  // Subscribe to AppKit account changes (subscribeAccount).
-  // Fires when a wallet connects or disconnects, providing the updated account state.
-  // Drives profile updates and balance refreshes on connection events.
-  //
-  // Important: AppKit's subscribeAccount does not expose an unsubscribe handle.
-  // The accountSubRegisteredRef guard ensures it is registered only once per
-  // AppKit instance, preventing duplicate callbacks across React re-renders.
+  // Subscribe to AppKit account changes via the service's subscribeToAccountChanges.
+  // The service registers AppKit's subscribeAccount exactly once at the singleton level
+  // and fans out to all hook instances. Each hook instance receives a real unsubscribe
+  // function — no duplicate listeners regardless of how many components mount this hook.
   useEffect(() => {
     if (!walletService || isRestoring) return;
-    if (accountSubRegisteredRef.current) return;
     if (!isAppKitAware(walletService)) return;
 
-    const appKitInstance = walletService.getAppKitInstance();
-    if (!appKitInstance) return;
-
-    accountSubRegisteredRef.current = true;
-
-    appKitInstance.subscribeAccount(
+    const unsubAccount = walletService.subscribeToAccountChanges(
       (account: { address?: string; isConnected?: boolean }) => {
         if (account.isConnected && account.address) {
           // Wallet connected — sync state from the service
@@ -302,20 +290,28 @@ export function useWallet(): UseWalletReturn {
         }
       }
     );
+
+    return () => {
+      if (typeof unsubAccount === "function") unsubAccount();
+    };
   }, [walletService, isRestoring, user, updateUserWalletAddress, loadBalances]);
 
-  // Open the AppKit modal directly
-  const openModal = useCallback(async () => {
-    if (!walletService || !isAppKitAware(walletService)) return;
-    const appKitInstance = walletService.getAppKitInstance();
-    if (appKitInstance) await appKitInstance.open();
-  }, [walletService]);
+  // Open the AppKit modal, defaulting to the "hedera" namespace so the wallet picker
+  // scopes itself to Hedera-compatible wallets (e.g. HashPack) without any selector UI.
+  const openModal = useCallback(
+    async (namespace: "hedera" | "eip155" = "hedera") => {
+      if (!walletService || !isAppKitAware(walletService)) return;
+      const appKitInstance = walletService.getAppKitInstance();
+      if (appKitInstance) await appKitInstance.open({ namespace });
+    },
+    [walletService]
+  );
 
-  // Connect wallet: opens the AppKit modal directly.
-  // subscribeAccount (above) detects the connection result and updates state.
+  // Connect wallet: opens the AppKit modal scoped to the given namespace (default "hedera").
+  // subscribeToAccountChanges detects the connection result and updates state.
   // subscribeState clears isConnecting if the modal is dismissed without connecting.
   const connectWallet = useCallback(
-    async (_namespace: "hedera" | "eip155" = "hedera") => {
+    async (namespace: "hedera" | "eip155" = "hedera") => {
       if (isConnecting || isConnected || !walletService) return;
 
       setIsConnecting(true);
@@ -323,7 +319,7 @@ export function useWallet(): UseWalletReturn {
       setErrorCode(null);
 
       try {
-        await openModal();
+        await openModal(namespace);
       } catch (err: unknown) {
         if (err instanceof WalletError) {
           switch (err.code) {

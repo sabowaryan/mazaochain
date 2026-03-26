@@ -2202,13 +2202,39 @@ class HederaWalletService {
   }
 
   /**
-   * Subscribe to AppKit account changes (connect / disconnect events).
-   *
-   * Internally, AppKit's `subscribeAccount` is registered at most ONCE on the
-   * AppKit instance (singleton guard via `accountSubRegistered`).  Every caller
-   * receives a real unsubscribe function that removes only their callback from the
-   * shared Set — no listener leak regardless of how many components call this.
+   * Read the first account from the active WalletConnect session.
+   * Called when AppKit fires subscribeAccount with isConnected=true but address=''
+   * (HederaAdapter.connect() always returns address:'' by design).
    */
+  private getAccountFromSession(): { address: string; chainId: string } | null {
+    try {
+      const session = this.hederaProvider?.session;
+      if (!session?.namespaces) return null;
+
+      // Prefer hedera namespace
+      const hederaAccounts = session.namespaces.hedera?.accounts;
+      if (hederaAccounts?.length) {
+        const [, network, accountId] = hederaAccounts[0].split(':');
+        if (accountId?.match(/^\d+\.\d+\.\d+$/)) {
+          return { address: accountId, chainId: `hedera:${network}` };
+        }
+      }
+
+      // Fall back to eip155 namespace
+      const eip155Accounts = session.namespaces.eip155?.accounts;
+      if (eip155Accounts?.length) {
+        const [, chainId, address] = eip155Accounts[0].split(':');
+        if (address?.match(/^0x[a-fA-F0-9]{40}$/)) {
+          return { address, chainId: `eip155:${chainId}` };
+        }
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   subscribeToAccountChanges(
     callback: (account: { address?: string; isConnected?: boolean }) => void
   ): () => void {
@@ -2217,10 +2243,35 @@ class HederaWalletService {
     // Register with AppKit exactly once across all callers
     if (!this.accountSubRegistered && this.appKitInstance) {
       this.accountSubRegistered = true;
-      this.appKitInstance.subscribeAccount((account) => {
-        this.accountChangeCallbacks.forEach((cb) =>
-          cb(account as { address?: string; isConnected?: boolean })
-        );
+      this.appKitInstance.subscribeAccount((rawAccount) => {
+        let account = rawAccount as { address?: string; isConnected?: boolean };
+
+        // HederaAdapter.connect() always returns address:'' even though the session
+        // is already established at this point. When we see isConnected=true with an
+        // empty address, read the real account ID directly from the provider session.
+        if (account.isConnected && !account.address) {
+          const sessionAccount = this.getAccountFromSession();
+          if (sessionAccount) {
+            console.log("🔄 Enriching empty AppKit address from session:", sessionAccount.address);
+            account = { ...account, address: sessionAccount.address };
+
+            // Also update connectionState if not already set
+            if (!this.connectionState?.isConnected) {
+              const detectedNamespace = sessionAccount.chainId.startsWith('eip155') ? 'eip155' : 'hedera';
+              this.connectionState = {
+                accountId: sessionAccount.address,
+                network: sessionAccount.chainId.includes('mainnet') ? 'mainnet' : 'testnet',
+                isConnected: true,
+                namespace: detectedNamespace,
+                chainId: sessionAccount.chainId,
+              };
+              this.saveSession();
+              console.log("✅ Connection state set from session:", this.connectionState);
+            }
+          }
+        }
+
+        this.accountChangeCallbacks.forEach((cb) => cb(account));
       });
     }
 

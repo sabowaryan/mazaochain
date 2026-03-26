@@ -264,8 +264,12 @@ export function useWallet(): UseWalletReturn {
 
     const unsubAccount = walletService.subscribeToAccountChanges(
       (account: { address?: string; isConnected?: boolean }) => {
-        if (account.isConnected && account.address) {
-          // Wallet connected — sync state from the service
+        if (account.isConnected) {
+          // Wallet connected — sync state from the service.
+          // Note: account.address may be '' for Hedera (HederaAdapter.connect()
+          // always returns address:'' — the service enriches it from the WalletConnect
+          // session, but we also fall back to walletService.getConnectionState() here
+          // for defence-in-depth.
           setIsConnecting(false);
           const currentState = walletService.getConnectionState();
           if (currentState?.isConnected) {
@@ -277,8 +281,8 @@ export function useWallet(): UseWalletReturn {
             }
             loadBalances(currentState.accountId).catch(console.error);
           }
-        } else if (!account.isConnected) {
-          // Wallet disconnected
+        } else if (account.isConnected === false) {
+          // Wallet explicitly disconnected (not just an intermediate empty-address event)
           setIsConnecting(false);
           setConnection(null);
           setIsConnected(false);

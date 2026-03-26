@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/db';
-import { mazaoContractsService } from '@/lib/services/mazao-contracts';
+import { createCropToken } from '@/lib/services/hedera-token-server';
+
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { evaluationId, cropType, farmerId, farmerAddress, estimatedValue, harvestDate } = body;
+    const { evaluationId, cropType, farmerId, farmerAddress, estimatedValue } = body;
 
-    if (!evaluationId || !cropType || !farmerId || !farmerAddress || !estimatedValue || !harvestDate) {
+    if (!evaluationId || !cropType || !farmerId || !farmerAddress || !estimatedValue) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -20,11 +22,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const result = await mazaoContractsService.tokenizeApprovedEvaluation(
-      evaluationId, cropType, farmerId, farmerAddress, estimatedValue, harvestDate
-    );
+    const tokenSymbol = `MAZAO-${cropType.toUpperCase().substring(0, 6)}-${Date.now().toString().slice(-4)}`;
 
-    return NextResponse.json({ data: result, message: 'Tokenization initiated successfully' });
+    const tokenResult = await createCropToken({
+      cropType,
+      farmerWalletAddress: farmerAddress,
+      estimatedValue,
+      tokenSymbol,
+    });
+
+    if (!tokenResult.success) {
+      return NextResponse.json(
+        { error: tokenResult.error ?? 'Token creation failed' },
+        { status: 500 }
+      );
+    }
+
+    // Persist the tokenization record (update existing pending record or create new one)
+    const existing = await prisma.tokenizationRecord.findFirst({
+      where: { evaluation_id: evaluationId },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const record = existing
+      ? await prisma.tokenizationRecord.update({
+          where: { id: existing.id },
+          data: {
+            token_id: tokenResult.tokenId,
+            status: 'completed',
+            error_message: null,
+          },
+        })
+      : await prisma.tokenizationRecord.create({
+          data: {
+            evaluation_id: evaluationId,
+            token_id: tokenResult.tokenId,
+            status: 'completed',
+          },
+        });
+
+    return NextResponse.json({
+      data: {
+        tokenId: tokenResult.tokenId,
+        transactionId: tokenResult.transactionId,
+        recordId: record.id,
+      },
+      message: 'Tokenisation initiée avec succès',
+    });
   } catch (error) {
     console.error('Error initiating tokenization:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

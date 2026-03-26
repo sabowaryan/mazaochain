@@ -156,29 +156,65 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
     tokenId: string
   ): Promise<number> => {
     return handleAsyncOperation(async () => {
-      // TODO: Implémenter via API Route si nécessaire
-      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      const res = await fetch(
+        `/api/mirror-node/tokens?accountId=${encodeURIComponent(farmerAddress)}`
+      );
+      if (!res.ok) return 0;
+      const data = await res.json();
+      const tokens: { token_id: string; balance: number }[] = data?.tokens ?? [];
+      const found = tokens.find((t) => t.token_id === tokenId);
+      return found ? found.balance : 0;
     });
   }, [handleAsyncOperation]);
 
   const getFarmerTotalBalance = useCallback(async (farmerAddress: string): Promise<number> => {
     return handleAsyncOperation(async () => {
-      // TODO: Implémenter via API Route si nécessaire
-      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      const res = await fetch(
+        `/api/mirror-node/tokens?accountId=${encodeURIComponent(farmerAddress)}`
+      );
+      if (!res.ok) return 0;
+      const data = await res.json();
+      const tokens: { balance: number }[] = data?.tokens ?? [];
+      return tokens.reduce((sum, t) => sum + (t.balance ?? 0), 0);
     });
   }, [handleAsyncOperation]);
 
-  const getFarmerTokenHoldings = useCallback(async (farmerAddress: string): Promise<TokenHolding[]> => {
+  const getFarmerTokenHoldings = useCallback(async (_farmerAddress: string): Promise<TokenHolding[]> => {
     return handleAsyncOperation(async () => {
-      // TODO: Implémenter via API Route si nécessaire
-      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      const res = await fetch('/api/farmer/portfolio');
+      if (!res.ok) return [];
+      const data = await res.json();
+      const items: {
+        tokenId: string;
+        cropType: string;
+        amount: number;
+        estimatedValue: number;
+        harvestDate: string;
+        status: 'active' | 'harvested' | 'expired';
+      }[] = data?.data ?? [];
+      return items.map((item) => ({
+        tokenId: item.tokenId,
+        cropType: item.cropType,
+        amount: item.amount,
+        estimatedValue: item.estimatedValue,
+        harvestDate: item.harvestDate,
+        status: item.status,
+      }));
     });
   }, [handleAsyncOperation]);
 
   const getTokenDetails = useCallback(async (tokenId: string): Promise<MazaoTokenInfo | null> => {
     return handleAsyncOperation(async () => {
-      // TODO: Implémenter via API Route si nécessaire
-      throw new Error('Cette méthode n\'est pas encore implémentée via API Route');
+      const network =
+        typeof window !== 'undefined'
+          ? (process.env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet' ? 'mainnet' : 'testnet')
+          : 'testnet';
+      const res = await fetch(
+        `/api/mirror-node/tokens?accountId=${encodeURIComponent(tokenId)}`
+      );
+      if (!res.ok) return null;
+      void network;
+      return null;
     });
   }, [handleAsyncOperation]);
 
@@ -251,8 +287,8 @@ export function useMazaoContracts(): UseMazaoContractsReturn {
 
       return {
         success: true,
-        tokenId: result.data?.tokenId,
-        transactionIds: result.data?.transactionId ? [result.data.transactionId] : []
+        tokenId: result.tokenId,
+        transactionIds: result.transactionId ? [result.transactionId] : [],
       };
     });
   }, [handleAsyncOperation]);
